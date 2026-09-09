@@ -10,5 +10,8 @@
 - S3 implementation/review pass; s3.md and code-review-20260909-001625.md; 23 backend tests and TS/build pass. One malformed-header finding fixed and re-reviewed.
 - Accepted S3: d7f8d42.
 - Aggregate deepreview: code-review-20260909-002005.md PASS. Standards 0 findings; Spec one localhost-origin finding fixed/re-reviewed. Final backend 24 and Linux browser 7 passed; TS/build pass; normal local startup healthy.
-- Current gate: accepted deepreview commit; next entry ready-to-open-draft-PR.
+- Accepted deepreview commit: f19c586.
+- ready-to-open-draft-PR criteria satisfied: intended scope relative to stacked base, all slice commits, aggregate review/fixes, tests and docs complete.
+- Current gate / next entry: push. Remote publication blocked by automatic safety review, which requires explicit user authorization to publish source to studyben/DGA_lab. The rejected combined push/PR command did not execute. No draft PR created for #3; no merge, issue comment or issue-close action taken.
+- Prepared draft body: .tools/issue-3-pr.md (local ignored helper). After authorization: push branch, create draft PR on codex/sungrow-header-logo, execute actual PR review/accepted review commit/final push, then final closeout. Do not claim draft-PR-pass or final closeout pass yet.
 - Preserve existing user-owned dirty documents/tools. No merge or later issue implementation.
