@@ -6,6 +6,7 @@ import { analysisPages } from "./features/condition-analysis/pages";
 import "./styles.css";
 import { ConnectionStatus } from "./ConnectionStatus";
 import sungrowLogo from "./assets/sungrow-logo.svg";
+import { AuthProvider, AuthBoundary, SessionControls, useAuth } from './Auth';
 
 const path =
   window.location.pathname === "/"
@@ -17,6 +18,7 @@ const inLab = path === "/lab" || path.startsWith("/lab/");
 const workspace = inLab ? "DGA 实验室" : "资产管理与仪表板";
 
 function App() {
+  const { can } = useAuth();
   return (
     <>
       <a className="skip" href="#main">
@@ -28,14 +30,14 @@ function App() {
           <small>资产与油样管理</small>
         </a>
         <nav aria-label="工作区" className="workspaces">
-          <a href="/assets" aria-current={!inLab ? "page" : undefined}>
+          {can('assets.read') && <a href="/assets" aria-current={!inLab ? "page" : undefined}>
             资产管理与仪表板
-          </a>
-          <a href="/lab" aria-current={inLab ? "page" : undefined}>
+          </a>}
+          {can('laboratory.read') && <a href="/lab" aria-current={inLab ? "page" : undefined}>
             DGA 实验室
-          </a>
+          </a>}
         </nav>
-        <span className="environment">开发预览</span>
+        <SessionControls />
       </header>
       <div className="shell">
         <aside>
@@ -44,7 +46,9 @@ function App() {
             {(inLab ? laboratoryPages : assetPages).map((page, index) => (
               <a
                 key={page.path}
-                href={page.path}
+                href={can(page.permission) ? page.path : undefined}
+                aria-disabled={!can(page.permission) || undefined}
+                title={can(page.permission) ? undefined : '当前账号无操作权限'}
                 aria-current={path === page.path ? "page" : undefined}
               >
                 <span aria-hidden="true" className="nav-number">
@@ -53,7 +57,7 @@ function App() {
                 {page.title}
               </a>
             ))}
-            {!inLab && (
+            {!inLab && can('analysis.read') && (
               <>
                 <p className="nav-caption analysis-caption">状态分析</p>
                 {analysisPages.map((page) => (
@@ -144,6 +148,6 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <AuthProvider><AuthBoundary permission={current?.permission ?? 'assets.read'}><App /></AuthBoundary></AuthProvider>
   </React.StrictMode>,
 );

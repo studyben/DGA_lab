@@ -3,7 +3,7 @@ export default defineConfig({
   testDir: "./tests",
   use: {
     channel: process.env.BROWSER_CHANNEL,
-    baseURL: process.env.BASE_URL ?? "http://127.0.0.1:8080",
+    baseURL: process.env.BASE_URL ?? "http://127.0.0.1:18080",
     viewport: { width: 1920, height: 1080 },
     trace: "retain-on-failure",
   },
