@@ -81,6 +81,8 @@ def test_csrf_origin_validation_and_password_error_redaction(database_url):
         data = {'current_password': INITIAL, 'new_password': CHANGED}
         assert client.post('/api/auth/password', json=data, headers=ORIGIN).status_code == 403
         assert client.post('/api/auth/password', json=data, headers={**ORIGIN, 'X-CSRF-Token': 'wrong'}).status_code == 403
+        assert client.post('/api/auth/password', json=data,
+                           headers=[(b'Origin', b'http://127.0.0.1:8080'), (b'X-CSRF-Token', b'\xff')]).status_code == 403
         invalid = client.post('/api/auth/password', json={**data, 'new_password': 'secret-short'}, headers={**ORIGIN, 'X-CSRF-Token': csrf})
         assert invalid.status_code == 422 and 'secret-short' not in invalid.text and INITIAL not in invalid.text
         changed = client.post('/api/auth/password', json=data, headers={**ORIGIN, 'X-CSRF-Token': csrf})

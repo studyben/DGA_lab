@@ -16,10 +16,16 @@ jobs:
       - name: Public interfaces and module ownership with real PostgreSQL
         run: docker compose --profile test run --build --rm api-test
       - name: Browser acceptance on production build
-        run: docker compose --profile test run --build --rm browser-test
+        run: |
+          docker compose -f compose.browser.yaml up --build -d --wait frontend
+          docker compose -f compose.browser.yaml --profile test run --build --no-deps --rm browser-test
       - name: Service logs
         if: always()
-        run: docker compose --profile test logs --tail=100
+        run: |
+          docker compose --profile test logs --tail=100
+          docker compose -f compose.browser.yaml --profile test logs --tail=100
       - name: Stop runner containers
         if: always()
-        run: docker compose --profile test down
+        run: |
+          docker compose --profile test down
+          docker compose -f compose.browser.yaml --profile test down

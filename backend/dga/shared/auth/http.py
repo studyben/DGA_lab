@@ -37,7 +37,7 @@ def auth_router(service: IdentityService, settings):
 
     def csrf(request):
         session = service.session(request.cookies.get(COOKIE, ''))
-        if not compare_digest(request.headers.get('x-csrf-token', ''), session.csrf_token):
+        if not compare_digest(request.headers.get('x-csrf-token', '').encode('utf-8'), session.csrf_token.encode('utf-8')):
             raise IdentityError('csrf_rejected', 403)
 
     def issue(response, session):
