@@ -31,32 +31,21 @@ header {
 }
 .brand {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 23px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   min-width: 220px;
 }
-.brand strong {
-  font-weight: 400;
-  color: #667085;
+.brand img {
+  display: block;
+  width: 180px;
+  height: auto;
 }
 .brand small {
   display: block;
   font-size: 11px;
   letter-spacing: 2px;
-  margin-top: 3px;
   color: #8b94a3;
-}
-.brand-mark {
-  background: #f58025;
-  color: white;
-  font-size: 26px;
-  font-weight: 700;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
 }
 .workspaces {
   display: flex;

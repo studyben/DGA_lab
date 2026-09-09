@@ -5,6 +5,7 @@ import { laboratoryPages } from "./features/laboratory/pages";
 import { analysisPages } from "./features/condition-analysis/pages";
 import "./styles.css";
 import { ConnectionStatus } from "./ConnectionStatus";
+import sungrowLogo from "./assets/sungrow-logo.svg";
 
 const path =
   window.location.pathname === "/"
@@ -23,11 +24,8 @@ function App() {
       </a>
       <header>
         <a href="/" className="brand">
-          <span className="brand-mark">D</span>
-          <span>
-            DGA <strong>Lab</strong>
-            <small>资产与油样管理</small>
-          </span>
+          <img src={sungrowLogo} alt="SUNGROW" width={150} height={20} />
+          <small>资产与油样管理</small>
         </a>
         <nav aria-label="工作区" className="workspaces">
           <a href="/assets" aria-current={!inLab ? "page" : undefined}>

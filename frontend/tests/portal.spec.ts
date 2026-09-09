@@ -1,5 +1,24 @@
 import { test, expect } from "@playwright/test";
 
+test("SUNGROW 品牌在两个工作区加载且可返回首页", async ({ page }) => {
+  for (const path of ["/assets", "/lab/reports"]) {
+    await page.goto(path);
+    const header = page.getByRole("banner");
+    const logo = header.getByRole("img", { name: "SUNGROW", exact: true });
+    await expect(logo).toBeVisible();
+    await expect.poll(() => logo.evaluate((image: HTMLImageElement) =>
+      image.complete && image.naturalWidth > 0,
+    )).toBe(true);
+    const bounds = await logo.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.width / bounds!.height).toBeCloseTo(7.5, 1);
+    await expect(header.getByText("资产与油样管理", { exact: true })).toBeVisible();
+    await logo.click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: "资产仪表板", exact: true })).toBeVisible();
+  }
+});
+
 test('正式门户连接真实后端并显示就绪状态', async ({ page }) => {
   await page.goto('/lab');
   await expect(page.getByRole('status')).toContainText('服务连接正常');
