@@ -67,30 +67,33 @@ def test_first_login_password_change_and_logout(database_url):
         engine.dispose()
 
 
-def test_csrf_origin_validation_and_password_error_redaction(database_url):
+@pytest.mark.parametrize('allowed_origin', ['http://127.0.0.1:8080', 'http://localhost:5173'])
+def test_csrf_origin_validation_and_password_error_redaction(database_url, allowed_origin):
     engine = create_engine(database_url)
     service = IdentityService(engine)
     service.bootstrap_admin('admin', 'Admin', INITIAL)
-    with TestClient(create_app(Settings(database_url=database_url, cookie_secure=False))) as client:
+    with TestClient(create_app(Settings(database_url=database_url, cookie_secure=False,
+                                      auth_allowed_origins=allowed_origin))) as client:
         payload = {'username': 'admin', 'password': INITIAL}
+        origin = {'Origin': allowed_origin}
         assert client.post('/api/auth/login', json=payload).status_code == 403
         assert client.post('/api/auth/login', json=payload, headers={'Origin': 'https://evil.example'}).status_code == 403
-        login = client.post('/api/auth/login', json=payload, headers=ORIGIN)
+        login = client.post('/api/auth/login', json=payload, headers=origin)
         csrf = login.json()['csrf_token']
         old_cookie = client.cookies.get('dga_session')
         data = {'current_password': INITIAL, 'new_password': CHANGED}
-        assert client.post('/api/auth/password', json=data, headers=ORIGIN).status_code == 403
-        assert client.post('/api/auth/password', json=data, headers={**ORIGIN, 'X-CSRF-Token': 'wrong'}).status_code == 403
+        assert client.post('/api/auth/password', json=data, headers=origin).status_code == 403
+        assert client.post('/api/auth/password', json=data, headers={**origin, 'X-CSRF-Token': 'wrong'}).status_code == 403
         assert client.post('/api/auth/password', json=data,
-                           headers=[(b'Origin', b'http://127.0.0.1:8080'), (b'X-CSRF-Token', b'\xff')]).status_code == 403
-        invalid = client.post('/api/auth/password', json={**data, 'new_password': 'secret-short'}, headers={**ORIGIN, 'X-CSRF-Token': csrf})
+                           headers=[(b'Origin', allowed_origin.encode()), (b'X-CSRF-Token', b'\xff')]).status_code == 403
+        invalid = client.post('/api/auth/password', json={**data, 'new_password': 'secret-short'}, headers={**origin, 'X-CSRF-Token': csrf})
         assert invalid.status_code == 422 and 'secret-short' not in invalid.text and INITIAL not in invalid.text
-        changed = client.post('/api/auth/password', json=data, headers={**ORIGIN, 'X-CSRF-Token': csrf})
+        changed = client.post('/api/auth/password', json=data, headers={**origin, 'X-CSRF-Token': csrf})
         assert changed.status_code == 200
         assert client.cookies.get('dga_session') != old_cookie
         with pytest.raises(Exception, match='session_expired'):
             service.session(old_cookie)
-        assert client.post('/api/auth/logout', headers={**ORIGIN, 'X-CSRF-Token': csrf}).status_code == 403
+        assert client.post('/api/auth/logout', headers={**origin, 'X-CSRF-Token': csrf}).status_code == 403
     engine.dispose()
 
 
