@@ -9,7 +9,12 @@
 - S2 accepted commit: 85974f1
 - S3 accepted commit: 88d177c
 - Aggregate deepreview: pass; docs/reviews/code-review-20260908-215903.md; no new findings.
-- Current gate / next entry point: accepted deepreview commit
+- Accepted deepreview commit: ec67372
+- Ready-to-open-draft-PR checks: passed; only intended issue commits, all slice/review evidence present, local validation passed, user-owned dirty inputs preserved.
+- Initial push: succeeded; origin/codex/issue-2-foundation tracks reviewed branch.
+- Draft PR created: https://github.com/studyben/DGA_lab/pull/21; body contains Closes #2.
+- PR review: pass; docs/reviews/pr-21-review-20260908-220154.md; no new findings. Hosted CI is running and will be verified after final push.
+- Current gate / next entry point: accepted PR review commit
 - Implementation: all three slices implemented/reviewed; S2-1 fixed and re-reviewed.
 - Validation: 11 backend checks; 4 Linux container browser tests; TypeScript/production build; clean-stack startup; real database outage/recovery all pass.
 - Residual risks: runtime and dependency acquisition owned by #2; auth #3; business modules #4 onward; cloud #20.
