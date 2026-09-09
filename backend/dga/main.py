@@ -11,6 +11,10 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from dga.shared.config import Settings
+from dga.assets.public import MODULE as ASSETS
+from dga.laboratory.public import MODULE as LABORATORY
+from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS
+from dga.shared.contracts import ModuleDescriptor
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -32,6 +36,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine.dispose()
 
     app = FastAPI(title='DGA Lab', lifespan=lifespan)
+
+    @app.get('/api/modules')
+    def modules() -> list[ModuleDescriptor]:
+        return [ASSETS, LABORATORY, CONDITION_ANALYSIS]
 
     @app.get('/api/health')
     def health():
