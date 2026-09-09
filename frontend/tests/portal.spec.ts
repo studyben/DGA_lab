@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
 
+test('正式门户连接真实后端并显示就绪状态', async ({ page }) => {
+  await page.goto('/lab');
+  await expect(page.getByRole('status')).toContainText('服务连接正常');
+});
+
 test("顶部切换工作区，侧栏跟随工作区且支持刷新与返回", async ({ page }) => {
   await page.goto("/");
   const top = page.getByRole("navigation", { name: "工作区", exact: true });
