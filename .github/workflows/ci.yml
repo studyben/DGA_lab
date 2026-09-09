@@ -1,0 +1,25 @@
+name: Foundation checks
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start deployable portal and migrate PostgreSQL
+        run: docker compose up --build -d --wait
+      - name: Public interfaces and module ownership with real PostgreSQL
+        run: docker compose --profile test run --build --rm api-test
+      - name: Browser acceptance on production build
+        run: docker compose --profile test run --build --rm browser-test
+      - name: Service logs
+        if: always()
+        run: docker compose --profile test logs --tail=100
+      - name: Stop runner containers
+        if: always()
+        run: docker compose --profile test down

@@ -1,0 +1,1 @@
+"""DGA Lab modular monolith."""
