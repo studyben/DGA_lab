@@ -1,6 +1,6 @@
 from zoneinfo import ZoneInfo
 
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(hide_input_in_errors=True)
     database_url: SecretStr
     business_timezone: str = 'America/Chicago'
+    cookie_secure: bool = True
+    session_hours: int = Field(default=8, ge=1, le=24)
+    auth_allowed_origins: str = 'http://127.0.0.1:8080'
 
     @field_validator('database_url')
     @classmethod

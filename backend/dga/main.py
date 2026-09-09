@@ -7,6 +7,7 @@ from alembic.script import ScriptDirectory
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -15,6 +16,8 @@ from dga.assets.public import MODULE as ASSETS
 from dga.laboratory.public import MODULE as LABORATORY
 from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS
 from dga.shared.contracts import ModuleDescriptor
+from dga.shared.auth.public import IdentityService, IdentityError
+from dga.shared.auth.http import auth_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -36,6 +39,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine.dispose()
 
     app = FastAPI(title='DGA Lab', lifespan=lifespan)
+    identity = IdentityService(engine, session_hours=settings.session_hours)
+    app.include_router(auth_router(identity, settings))
+
+    @app.exception_handler(IdentityError)
+    async def identity_error(request, error):
+        return JSONResponse(status_code=error.status, content={'code': error.code}, headers={'Cache-Control': 'no-store'})
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request, error):
+        # Pydantic error input/context can contain plaintext credentials.
+        return JSONResponse(status_code=422, content={'code': 'invalid_input'})
 
     @app.get('/api/modules')
     def modules() -> list[ModuleDescriptor]:
