@@ -26,6 +26,6 @@
 
 - Draft PR: https://github.com/studyben/DGA_lab/pull/23
 - Issue linkage: PR body uses `Closes #3`, intended to close #3 only after default-branch integration; merging into its stacked base alone does not close the issue.
-- Issue closeout comment: not posted. Gateflow requires separate user authorization for this external comment.
-- Status: draft-PR-pass achieved. Final closeout is pending only the authorized Issue #3 comment. No merge, ready-for-review transition, reviewer request or subsequent Issue has been performed.
-- Next entry: after user authorizes the prepared closeout comment, post it to #3 and record final closeout pass; otherwise remain paused at this external-action boundary.
+- Issue closeout comment: posted with user authorization at https://github.com/studyben/DGA_lab/issues/3#issuecomment-5602781468. It links Draft PR #23, records finding status and owners, and states the default-branch closing expectation.
+- Status: final closeout PASS. No merge, ready-for-review transition, reviewer request, Issue close or subsequent Issue has been performed.
+- Next entry: user review and dependency-ordered handling of Draft PRs #21 -> #22 -> #23. After #3 reaches the default branch and closes, start #4 in a fresh task/branch.
