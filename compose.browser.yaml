@@ -1,0 +1,58 @@
+name: dga-browser
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: dga_browser
+      POSTGRES_PASSWORD: isolated-browser-only
+      POSTGRES_DB: dga_browser
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dga_browser -d dga_browser"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  migrate:
+    build: ./backend
+    environment: &browser-env
+      DATABASE_URL: postgresql+psycopg://dga_browser:isolated-browser-only@db:5432/dga_browser
+      COOKIE_SECURE: "false"
+      AUTH_ALLOWED_ORIGINS: http://frontend:8080,http://127.0.0.1:18080
+    command: ["sh", "-c", "alembic upgrade head && python -m tests.seed_browser"]
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    build: ./backend
+    environment: *browser-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=8)"]
+      interval: 3s
+      timeout: 10s
+      retries: 20
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:18080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  browser-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.test
+    profiles: [test]
+    environment:
+      BASE_URL: http://frontend:8080
+    depends_on:
+      frontend:
+        condition: service_healthy

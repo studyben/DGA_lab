@@ -1,5 +1,13 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page, baseURL }) => {
+  const response = await page.request.post('/api/auth/login', {
+    headers: { Origin: new URL(baseURL!).origin },
+    data: { username: 'browser-admin', password: 'Browser changed passphrase 84!' },
+  });
+  expect(response.ok()).toBeTruthy();
+});
+
 test("SUNGROW 品牌在两个工作区加载且可返回首页", async ({ page }) => {
   for (const path of ["/assets", "/lab/reports"]) {
     await page.goto(path);

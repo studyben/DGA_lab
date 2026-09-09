@@ -5,19 +5,19 @@ from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from dga.shared.config import Settings
-from dga.assets.public import MODULE as ASSETS
-from dga.laboratory.public import MODULE as LABORATORY
-from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS
+from dga.assets.public import MODULE as ASSETS, access_context as asset_access
+from dga.laboratory.public import MODULE as LABORATORY, access_context as laboratory_access
+from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS, access_context as analysis_access
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import IdentityService, IdentityError
-from dga.shared.auth.http import auth_router
+from dga.shared.auth.http import auth_router, COOKIE
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -52,8 +52,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(status_code=422, content={'code': 'invalid_input'})
 
     @app.get('/api/modules')
-    def modules() -> list[ModuleDescriptor]:
-        return [ASSETS, LABORATORY, CONDITION_ANALYSIS]
+    def modules(request: Request) -> list[ModuleDescriptor]:
+        actor = current_actor(request)
+        return [module for module, permission in [(ASSETS, 'assets.read'), (LABORATORY, 'laboratory.read'), (CONDITION_ANALYSIS, 'analysis.read')]
+                if permission in actor.permissions]
+
+    def current_actor(request: Request):
+        actor = identity.session(request.cookies.get(COOKIE, '')).actor
+        if actor.must_change_password:
+            raise IdentityError('password_change_required', 403)
+        return actor
+
+    @app.get('/api/assets/access')
+    def assets_context(actor=Depends(current_actor)):
+        return asset_access(actor)
+
+    @app.get('/api/laboratory/access')
+    def lab_context(actor=Depends(current_actor)):
+        return laboratory_access(actor)
+
+    @app.get('/api/condition-analysis/access')
+    def condition_context(actor=Depends(current_actor)):
+        return analysis_access(actor)
 
     @app.get('/api/health')
     def health():

@@ -167,10 +167,69 @@ class IdentityService:
                 self._audit(c, 'LOGOUT', 'SUCCESS', user)
 
     def audit_events(self, actor: ActorContext, *, limit: int = 100) -> list[dict]:
-        require_permission(actor, 'audit.read')
         if not 1 <= limit <= 500:
             raise IdentityError('invalid_limit', 422)
         with self._engine.begin() as c:
+            self._authorized(c, actor, 'audit.read')
             return [dict(row) for row in c.execute(text('''SELECT id,actor_user_id,claimed_username,
                 action_code,result,occurred_at,entity_id FROM audit_logs ORDER BY occurred_at,id LIMIT :limit'''),
                 {'limit': limit}).mappings()]
+
+    def _authorized(self, c, actor, permission):
+        user = c.execute(text('SELECT * FROM users WHERE id=:id AND user_status=\'ACTIVE\' FOR UPDATE'), {'id': actor.user_id}).mappings().first()
+        if not user:
+            raise IdentityError('permission_denied', 403)
+        require_permission(self._actor(c, user), permission)
+
+    def provision_user(self, actor: ActorContext, username: str, display_name: str, password: str, roles: list[str]) -> UUID:
+        """Operator/admin application command; not exposed as a public HTTP registration endpoint."""
+        _validate_password(password)
+        username = username.strip().lower()
+        if not 1 <= len(username) <= 80 or not 1 <= len(display_name) <= 150:
+            raise IdentityError('invalid_user', 422)
+        with self._engine.begin() as c:
+            # Serialize uniqueness checking without exposing a database exception to callers.
+            c.execute(text('SELECT pg_advisory_xact_lock(30003)'))
+            self._authorized(c, actor, 'identity.manage')
+            if c.execute(text('SELECT 1 FROM users WHERE lower(username)=:username'), {'username': username}).first():
+                raise IdentityError('username_taken', 409)
+            user_id = uuid4()
+            c.execute(text('INSERT INTO users(id,username,display_name,password_hash) VALUES (:id,:username,:name,:hash)'),
+                      dict(id=user_id, username=username, name=display_name, hash=HASHER.hash(password)))
+            self._assign_roles(c, user_id, roles, actor.user_id)
+            self._audit(c, 'USER_CREATE', 'SUCCESS', actor.user_id, entity=user_id)
+            return user_id
+
+    def _assign_roles(self, c, user_id, roles, actor_id):
+        available = {row['role_code']: row['id'] for row in c.execute(text('SELECT id,role_code FROM roles WHERE is_active')).mappings()}
+        if not roles or not set(roles).issubset(available):
+            raise IdentityError('invalid_roles', 422)
+        c.execute(text('DELETE FROM user_roles WHERE user_id=:id'), {'id': user_id})
+        for role in set(roles):
+            c.execute(text('INSERT INTO user_roles(user_id,role_id,assigned_by) VALUES (:id,:role,:actor)'),
+                      dict(id=user_id, role=available[role], actor=actor_id))
+
+    def set_roles(self, actor: ActorContext, user_id: UUID, roles: list[str]) -> None:
+        with self._engine.begin() as c:
+            c.execute(text('SELECT pg_advisory_xact_lock(30003)'))
+            self._authorized(c, actor, 'identity.manage')
+            self._target(c, user_id)
+            self._assign_roles(c, user_id, roles, actor.user_id)
+            self._audit(c, 'ROLES_CHANGE', 'SUCCESS', actor.user_id, entity=user_id)
+
+    def _target(self, c, user_id):
+        if not c.execute(text('SELECT id FROM users WHERE id=:id FOR UPDATE'), {'id': user_id}).first():
+            raise IdentityError('user_not_found', 404)
+
+    def set_status(self, actor: ActorContext, user_id: UUID, status: str) -> None:
+        if status not in {'ACTIVE', 'LOCKED', 'DISABLED'}:
+            raise IdentityError('invalid_status', 422)
+        with self._engine.begin() as c:
+            c.execute(text('SELECT pg_advisory_xact_lock(30003)'))
+            self._authorized(c, actor, 'identity.manage')
+            self._target(c, user_id)
+            c.execute(text('UPDATE users SET user_status=:status,failed_logins=0,blocked_until=NULL,updated_at=:now WHERE id=:id'),
+                      dict(id=user_id, status=status, now=self._clock()))
+            if status != 'ACTIVE':
+                c.execute(text('DELETE FROM auth_sessions WHERE user_id=:id'), {'id': user_id})
+            self._audit(c, 'STATUS_CHANGE', 'SUCCESS', actor.user_id, entity=user_id)
