@@ -22,6 +22,7 @@ from dga.assets.public import (
 from dga.laboratory.public import (
     MODULE as LABORATORY,
     LaboratoryError,
+    LaboratoryWorkbench,
     SampleRegistry,
     access_context as laboratory_access,
     http_router as laboratory_router,
@@ -30,6 +31,7 @@ from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS, access_c
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
 from dga.shared.auth.http import AuthenticatedRequests, auth_router
+from dga.shared.files import ObjectStorageError, S3CompatibleFileStore, UnavailableFileStore
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -91,9 +93,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     asset_directory = AssetDirectory(engine)
     app.include_router(assets_router(asset_directory, current_actor))
+    object_store = UnavailableFileStore()
+    if all((settings.object_store_endpoint, settings.object_store_bucket,
+            settings.object_store_access_key, settings.object_store_secret_key)):
+        object_store = S3CompatibleFileStore(
+            settings.object_store_endpoint,
+            settings.object_store_bucket,
+            settings.object_store_access_key.get_secret_value(),
+            settings.object_store_secret_key.get_secret_value(),
+            region=settings.object_store_region,
+        )
+
+    @app.exception_handler(ObjectStorageError)
+    async def object_storage_error(request, error):
+        return JSONResponse(
+            status_code=503,
+            content={'code': 'object_storage_unavailable'},
+            headers={'Cache-Control': 'no-store'},
+        )
+    sample_registry = SampleRegistry(engine, asset_directory, AuditTrail())
     app.include_router(
         laboratory_router(
-            SampleRegistry(engine, asset_directory, AuditTrail()),
+            sample_registry,
+            LaboratoryWorkbench(engine, sample_registry, AuditTrail(), object_store),
             current_actor,
             mutation_actor,
         )
