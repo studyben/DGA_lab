@@ -43,6 +43,7 @@ class _AuditAction(StrEnum):
     LAB_TEST_CREATED = 'LAB_TEST_CREATED'
     LAB_TEST_UPDATED = 'LAB_TEST_UPDATED'
     LAB_TEST_REMOVED = 'LAB_TEST_REMOVED'
+    REPORT_RESULT_SELECTED = 'REPORT_RESULT_SELECTED'
 
 
 @dataclass(frozen=True)
@@ -131,6 +132,7 @@ class TestRecord:
     notes: str | None
     result: TypedResult
     attachments: tuple[StoredAttachment, ...]
+    selected_for_report: bool
     created_at: datetime
     updated_at: datetime
 
@@ -246,7 +248,7 @@ class LaboratoryWorkbench:
             with self._engine.begin() as connection:
                 sample_id = self._editable_sample(connection, self._barcode(barcode_value))
                 existing = connection.execute(
-                    text("""SELECT test_type,method_version_id FROM laboratory_tests
+                    text("""SELECT test_type,method_version_id,selected_for_report FROM laboratory_tests
                     WHERE id=:id AND oil_sample_id=:sample AND record_status='ACTIVE' FOR UPDATE"""),
                     {'id': test_id, 'sample': sample_id},
                 ).mappings().first()
@@ -265,12 +267,16 @@ class LaboratoryWorkbench:
                 connection.execute(
                     text("""UPDATE laboratory_tests SET test_type=:type,method_version_id=:method,
                     measured_at=:measured,instrument_name=:instrument,analyst_user_id=:analyst,
-                    notes=:notes,updated_by=:actor,updated_at=:now WHERE id=:id"""),
+                    notes=:notes,
+                    selected_for_report=:selected,
+                    updated_by=:actor,updated_at=:now WHERE id=:id"""),
                     {'id': test_id, 'type': submission.test_type.value,
                      'method': submission.method_version_id, 'measured': submission.measured_at,
                      'instrument': self._optional_text(submission.instrument_name, 160, 'invalid_instrument'),
                      'analyst': actor.user_id,
                      'notes': self._optional_text(submission.notes, 2000, 'invalid_notes'),
+                     'selected': existing['selected_for_report']
+                        if existing['test_type'] == submission.test_type.value else False,
                      'actor': actor.user_id, 'now': now},
                 )
                 self._replace_result(connection, test_id, submission)
@@ -301,6 +307,7 @@ class LaboratoryWorkbench:
             sample_id = self._editable_sample(connection, self._barcode(barcode_value))
             changed = connection.execute(
                 text("""UPDATE laboratory_tests SET record_status='REMOVED',removal_reason=:reason,
+                selected_for_report=FALSE,
                 updated_by=:actor,updated_at=:now
                 WHERE id=:id AND oil_sample_id=:sample AND record_status='ACTIVE'"""),
                 {'id': test_id, 'sample': sample_id, 'reason': reason,
@@ -309,6 +316,45 @@ class LaboratoryWorkbench:
             if changed.rowcount != 1:
                 raise LaboratoryError('test_not_found', 404)
             self._audit.append(connection, actor, _AuditAction.LAB_TEST_REMOVED, entity_id=test_id)
+
+    def select_report_result(
+        self,
+        actor: ActorContext,
+        barcode_value: str,
+        test_id: UUID,
+    ) -> WorkbenchSample:
+        require_permission(actor, 'laboratory.write')
+        barcode = self._barcode(barcode_value)
+        with self._engine.begin() as connection:
+            sample_id = self._editable_sample(connection, barcode)
+            selected = connection.execute(
+                text("""SELECT test_type,selected_for_report FROM laboratory_tests
+                WHERE id=:id AND oil_sample_id=:sample AND record_status='ACTIVE'"""),
+                {'id': test_id, 'sample': sample_id},
+            ).mappings().first()
+            if not selected:
+                raise LaboratoryError('test_not_found', 404)
+            if not selected['selected_for_report']:
+                connection.execute(
+                    text("""UPDATE laboratory_tests SET selected_for_report=FALSE,
+                    updated_by=:actor,updated_at=:now
+                    WHERE oil_sample_id=:sample AND test_type=:type
+                        AND record_status='ACTIVE' AND selected_for_report"""),
+                    {'sample': sample_id, 'type': selected['test_type'],
+                     'actor': actor.user_id, 'now': self._clock()},
+                )
+                connection.execute(
+                    text("""UPDATE laboratory_tests SET selected_for_report=TRUE,
+                    updated_by=:actor,updated_at=:now WHERE id=:id"""),
+                    {'id': test_id, 'actor': actor.user_id, 'now': self._clock()},
+                )
+                self._audit.append(
+                    connection,
+                    actor,
+                    _AuditAction.REPORT_RESULT_SELECTED,
+                    entity_id=test_id,
+                )
+        return self.load(actor, barcode)
 
     def update_sample(
         self,
@@ -492,7 +538,7 @@ class LaboratoryWorkbench:
         )
         return TestRecord(row['id'], TestType(row['test_type']), method, row['measured_at'],
                           row['instrument_name'], row['analyst_user_id'], row['notes'], result,
-                          attachments, row['created_at'], row['updated_at'])
+                          attachments, row['selected_for_report'], row['created_at'], row['updated_at'])
 
     @staticmethod
     def _editable_sample(connection, barcode):

@@ -1,9 +1,12 @@
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 
 from dga.assets.public import AssetDirectory
 from dga.laboratory.public import (
@@ -22,7 +25,7 @@ from dga.laboratory.public import (
     TestType as LaboratoryTestType,
     UpdateSampleBasics,
 )
-from dga.shared.auth.public import AuditTrail, IdentityService
+from dga.shared.auth.public import AuditTrail, IdentityError, IdentityService
 
 
 ASSET_ID = UUID('44000000-0000-0000-0000-000000000001')
@@ -64,6 +67,7 @@ def workbench_context(database_url):
                 'auth_sessions,user_roles,audit_logs,users CASCADE'
             )
         )
+        connection.execute(text('UPDATE test_method_versions SET is_active=TRUE'))
         connection.execute(
             text("INSERT INTO customers(id,customer_name) VALUES ('11000000-0000-0000-0000-000000000001','Prairie Solar LLC')")
         )
@@ -138,6 +142,19 @@ def _dga(method_id, *, h2='10.125', qualifier=ResultQualifier.EQ):
     )
 
 
+def _moisture(method_id, *, value='8.500'):
+    return TestSubmission(
+        test_type=TestType.MOISTURE,
+        method_version_id=method_id,
+        measured_at=datetime(2026, 8, 3, 16, 0, tzinfo=timezone.utc),
+        instrument_name='MOISTURE-01',
+        notes=None,
+        result=MoistureResultInput(
+            QualifiedMeasurement(ResultQualifier.EQ, Decimal(value))
+        ),
+    )
+
+
 def test_same_barcode_accepts_multiple_typed_dga_results(workbench_context):
     engine, _, actor, sample = workbench_context
     with engine.begin() as connection:
@@ -165,6 +182,158 @@ def test_same_barcode_accepts_multiple_typed_dga_results(workbench_context):
     assert dga_method.fields[0].unit_code == 'TEST-UNIT'
     assert dga_method.fields[0].display_decimal_places == 3
     assert dga_method.fields[0].detection_limit == Decimal('0.500000')
+
+
+def test_one_report_result_can_be_selected_per_test_type(workbench_context):
+    engine, identity, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    first = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    second = workbench.add_test(
+        actor,
+        sample.barcode_value,
+        _dga(method.id, h2='12.500'),
+    )
+
+    workbench.select_report_result(actor, sample.barcode_value, first.id)
+    first_selection = workbench.load(actor, sample.barcode_value)
+    assert [record.selected_for_report for record in first_selection.tests] == [True, False]
+
+    workbench.select_report_result(actor, sample.barcode_value, second.id)
+    workbench.select_report_result(actor, sample.barcode_value, second.id)
+    second_selection = workbench.load(actor, sample.barcode_value)
+    assert [record.selected_for_report for record in second_selection.tests] == [False, True]
+    selection_events = [
+        event for event in identity.audit_events(actor)
+        if event['action_code'] == 'REPORT_RESULT_SELECTED'
+    ]
+    assert [event['entity_id'] for event in selection_events] == [first.id, second.id]
+
+
+def test_changing_a_selected_test_type_clears_its_report_selection(workbench_context):
+    engine, _, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    methods = {
+        item.test_type: item
+        for item in workbench.load(actor, sample.barcode_value).methods
+    }
+    record = workbench.add_test(actor, sample.barcode_value, _dga(methods[TestType.DGA].id))
+    workbench.select_report_result(actor, sample.barcode_value, record.id)
+
+    changed = workbench.update_test(
+        actor,
+        sample.barcode_value,
+        record.id,
+        _moisture(methods[TestType.MOISTURE].id),
+    )
+
+    assert changed.test_type == TestType.MOISTURE
+    assert changed.selected_for_report is False
+
+
+def test_report_selection_rejects_missing_removed_and_read_only_access(workbench_context):
+    engine, _, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    record = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    workbench.remove_test(actor, sample.barcode_value, record.id, 'invalid run')
+
+    with pytest.raises(LaboratoryError) as removed:
+        workbench.select_report_result(actor, sample.barcode_value, record.id)
+    assert removed.value.code == 'test_not_found'
+
+    read_only = replace(actor, permissions=frozenset({'laboratory.read'}))
+    with pytest.raises(IdentityError, match='permission_denied'):
+        workbench.select_report_result(read_only, sample.barcode_value, record.id)
+
+
+def test_report_selection_rejects_a_test_owned_by_another_barcode(workbench_context):
+    engine, _, actor, sample = workbench_context
+    registry = SampleRegistry(engine, AssetDirectory(engine), AuditTrail())
+    other_sample = registry.receive(
+        actor,
+        ReceiveSample(
+            sampled_at=datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc),
+            received_at=datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc),
+            site_name='ignored',
+            equipment_serial='ignored',
+            notes='another oil sample',
+            container_count=1,
+            identity_status=SampleIdentityStatus.ASSOCIATED,
+            formal_asset_id=ASSET_ID,
+        ),
+    )
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, other_sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    other_test = workbench.add_test(
+        actor, other_sample.barcode_value, _dga(method.id)
+    )
+
+    with pytest.raises(LaboratoryError) as captured:
+        workbench.select_report_result(actor, sample.barcode_value, other_test.id)
+    assert captured.value.code == 'test_not_found'
+
+
+def test_database_rejects_two_selected_active_results_of_one_type(workbench_context):
+    engine, _, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    first = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    second = workbench.add_test(actor, sample.barcode_value, _dga(method.id, h2='12.500'))
+    workbench.select_report_result(actor, sample.barcode_value, first.id)
+
+    with pytest.raises(IntegrityError):
+        with engine.begin() as connection:
+            connection.execute(
+                text('UPDATE laboratory_tests SET selected_for_report=TRUE WHERE id=:id'),
+                {'id': second.id},
+            )
+
+    selected = [
+        record.id for record in workbench.load(actor, sample.barcode_value).tests
+        if record.selected_for_report
+    ]
+    assert selected == [first.id]
+
+
+def test_concurrent_report_selections_leave_one_current_result(workbench_context):
+    engine, _, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    records = [
+        workbench.add_test(actor, sample.barcode_value, _dga(method.id, h2=value))
+        for value in ('10.125', '12.500')
+    ]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(
+            lambda record: workbench.select_report_result(
+                actor, sample.barcode_value, record.id
+            ),
+            records,
+        ))
+
+    selected = [
+        record for record in workbench.load(actor, sample.barcode_value).tests
+        if record.selected_for_report
+    ]
+    assert len(selected) == 1
+    assert selected[0].id in {record.id for record in records}
 
 
 def test_object_store_failure_does_not_create_a_test_record(workbench_context):
