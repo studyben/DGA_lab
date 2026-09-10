@@ -16,4 +16,9 @@
 - S2 deep review `docs/reviews/code-review-20260910-132007.md`: one high persisted-state invariant finding accepted; fix/re-review pending.
 - S2 re-review `docs/reviews/code-review-20260910-132228.md`: PASS; clean-database migration and 54 backend tests pass.
 - Current gate: accepted S2 commit pending.
+- Accepted S2 commit: `eec0e27`.
+- S3 TDD: report selection, readiness blockers, finalization read-only state, withdrawal and re-finalization UI implemented; frontend build and 12 Playwright tests pass.
+- S3 deep review `docs/reviews/code-review-20260910-132752.md`: one high silent-warning-acknowledgement finding accepted; fix/re-review pending.
+- S3 re-review `docs/reviews/code-review-20260910-133017.md`: PASS; TypeScript/build and all 12 Playwright tests pass.
+- Current gate: accepted S3 commit pending.
 - No business implementation, push, PR, merge, Issue comment, or Issue close has occurred.
