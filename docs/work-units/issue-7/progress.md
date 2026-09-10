@@ -26,6 +26,7 @@
 - Aggregate findings fixed: implicit selection clears and sole-result auto-selection are audited; `0006` finalized-data downgrade/re-upgrade is covered.
 - Aggregate re-review `docs/reviews/code-review-20260910-133633.md`: PASS; 56 backend/PostgreSQL tests and 12 Playwright tests pass.
 - Accepted aggregate-review commit: `69a1fb1`.
-- Final closeout: all local gates passed; ready to publish a stacked draft PR after explicit authorization.
+- Final closeout: all local gates passed.
 - Draft PR base must be `codex/issue-6-test-entry` while PR #26 remains unmerged.
-- No push, PR, merge, Issue comment, or Issue close has occurred.
+- After explicit authorization, branch pushed and stacked draft PR #27 created: https://github.com/studyben/DGA_lab/pull/27
+- No merge, Issue close, or Issue closeout comment has occurred.

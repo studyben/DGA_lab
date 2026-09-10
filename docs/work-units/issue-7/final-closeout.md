@@ -33,8 +33,10 @@ Issue #7 的本地实现与 Gateflow 验收已完成。油样可在实验室公�
 - Report availability and PDF generation must consume only finalized selections in Issue #8.
 - CI and remote review remain pending because the branch has not been pushed.
 
-## Publication boundary
+## Publication
 
 - Local branch: `codex/issue-7-finalization`
 - Draft PR base while PR #26 remains unmerged: `codex/issue-6-test-entry`
-- Push, draft PR creation, Issue comment, merge and Issue close have not been performed.
+- Branch pushed to `studyben/DGA_lab` after explicit authorization.
+- Stacked draft PR: https://github.com/studyben/DGA_lab/pull/27
+- The PR uses `Relates to #7`, not a closing keyword; merge and Issue close have not been performed.
