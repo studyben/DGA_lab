@@ -1,5 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 
+
+type LifecycleStatus = 'COMMISSIONING' | 'IN_SERVICE' | 'OUT_OF_SERVICE' | 'RETIRED' | 'MERGED';
 
 type FormalAsset = {
   id: string;
@@ -8,7 +10,7 @@ type FormalAsset = {
   serial_number: string;
   model: string | null;
   material_number: string | null;
-  lifecycle_status: string;
+  lifecycle_status: LifecycleStatus;
 };
 
 type AssetContext = {
@@ -28,7 +30,7 @@ type SearchMatch = AssetContext & {
 
 export type OfficialAssetSelection = AssetContext;
 
-const statusLabels: Record<string, string> = {
+const statusLabels: Record<LifecycleStatus, string> = {
   COMMISSIONING: '调试中',
   IN_SERVICE: '投运',
   OUT_OF_SERVICE: '停运',
@@ -60,15 +62,22 @@ export function OfficialAssetSelector({
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
+  const requestVersion = useRef(0);
+  const currentSampledAt = useRef(sampledAt);
+  currentSampledAt.current = sampledAt;
 
   useEffect(() => {
+    requestVersion.current += 1;
     setMatches([]);
     setSearched(false);
     setError('');
+    setBusy(false);
   }, [sampledAt]);
 
   async function search(event: FormEvent) {
     event.preventDefault();
+    const requestedAt = sampledAt;
+    const version = ++requestVersion.current;
     setError('');
     setBusy(true);
     try {
@@ -80,18 +89,22 @@ export function OfficialAssetSelector({
       if (!response.ok) throw new Error('无法搜索正式资产，请稍后重试。');
       const body: unknown = await response.json();
       if (!Array.isArray(body)) throw new Error('资产搜索响应无效。');
+      if (version !== requestVersion.current || requestedAt !== currentSampledAt.current) return;
       setMatches(body as SearchMatch[]);
       setSearched(true);
     } catch (failure) {
+      if (version !== requestVersion.current || requestedAt !== currentSampledAt.current) return;
       setMatches([]);
       setSearched(false);
       setError(failure instanceof Error ? failure.message : '无法搜索正式资产。');
     } finally {
-      setBusy(false);
+      if (version === requestVersion.current) setBusy(false);
     }
   }
 
   async function select(asset: FormalAsset) {
+    const requestedAt = sampledAt;
+    const version = ++requestVersion.current;
     setError('');
     setBusy(true);
     try {
@@ -101,11 +114,13 @@ export function OfficialAssetSelector({
         { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(10000) },
       );
       if (!response.ok) throw new Error('无法确认采样时的资产关系，请重新搜索。');
+      if (version !== requestVersion.current || requestedAt !== currentSampledAt.current) return;
       onSelect(await response.json() as AssetContext);
     } catch (failure) {
+      if (version !== requestVersion.current || requestedAt !== currentSampledAt.current) return;
       setError(failure instanceof Error ? failure.message : '无法关联正式资产。');
     } finally {
-      setBusy(false);
+      if (version === requestVersion.current) setBusy(false);
     }
   }
 
@@ -133,7 +148,7 @@ export function OfficialAssetSelector({
           <div><dt>位置</dt><dd>{match.site_location ?? '—'}</dd></div>
           <div><dt>系统资产号</dt><dd>{match.asset.system_asset_number}</dd></div>
           <div><dt>设备型号</dt><dd>{match.asset.model ?? '—'}</dd></div>
-          <div><dt>状态</dt><dd>{statusLabels[match.asset.lifecycle_status] ?? match.asset.lifecycle_status}</dd></div>
+          <div><dt>状态</dt><dd>{statusLabels[match.asset.lifecycle_status]}</dd></div>
         </dl>
         {match.asset.asset_type === 'TRANSFORMER' &&
           <button className="select-asset" type="button" disabled={busy}
