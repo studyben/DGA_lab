@@ -49,6 +49,7 @@ class _AuditAction(StrEnum):
     LAB_TEST_UPDATED = 'LAB_TEST_UPDATED'
     LAB_TEST_REMOVED = 'LAB_TEST_REMOVED'
     REPORT_RESULT_SELECTED = 'REPORT_RESULT_SELECTED'
+    REPORT_RESULT_CLEARED = 'REPORT_RESULT_CLEARED'
     LAB_TESTING_FINALIZATION_ATTEMPT = 'LAB_TESTING_FINALIZATION_ATTEMPT'
     LAB_TESTING_FINALIZATION_WITHDRAWN = 'LAB_TESTING_FINALIZATION_WITHDRAWN'
 
@@ -324,6 +325,16 @@ class LaboratoryWorkbench:
                 if attachment:
                     object_key = self._store_attachment(connection, actor, test_id, attachment, now)
                 self._audit.append(connection, actor, _AuditAction.LAB_TEST_UPDATED, entity_id=test_id)
+                if (
+                    existing['selected_for_report']
+                    and existing['test_type'] != submission.test_type.value
+                ):
+                    self._audit.append(
+                        connection,
+                        actor,
+                        _AuditAction.REPORT_RESULT_CLEARED,
+                        entity_id=test_id,
+                    )
         except Exception:
             if object_key:
                 try:
@@ -346,6 +357,13 @@ class LaboratoryWorkbench:
             raise LaboratoryError('removal_reason_required')
         with self._engine.begin() as connection:
             sample_id = self._editable_sample(connection, self._barcode(barcode_value))
+            existing = connection.execute(
+                text("""SELECT selected_for_report FROM laboratory_tests
+                WHERE id=:id AND oil_sample_id=:sample AND record_status='ACTIVE' FOR UPDATE"""),
+                {'id': test_id, 'sample': sample_id},
+            ).mappings().first()
+            if not existing:
+                raise LaboratoryError('test_not_found', 404)
             changed = connection.execute(
                 text("""UPDATE laboratory_tests SET record_status='REMOVED',removal_reason=:reason,
                 selected_for_report=FALSE,
@@ -357,6 +375,13 @@ class LaboratoryWorkbench:
             if changed.rowcount != 1:
                 raise LaboratoryError('test_not_found', 404)
             self._audit.append(connection, actor, _AuditAction.LAB_TEST_REMOVED, entity_id=test_id)
+            if existing['selected_for_report']:
+                self._audit.append(
+                    connection,
+                    actor,
+                    _AuditAction.REPORT_RESULT_CLEARED,
+                    entity_id=test_id,
+                )
 
     def select_report_result(
         self,
@@ -443,6 +468,12 @@ class LaboratoryWorkbench:
                             text("""UPDATE laboratory_tests SET selected_for_report=TRUE,
                             updated_by=:actor,updated_at=:now WHERE id=:id"""),
                             {'id': records[0].id, 'actor': actor.user_id, 'now': now},
+                        )
+                        self._audit.append(
+                            connection,
+                            actor,
+                            _AuditAction.REPORT_RESULT_SELECTED,
+                            entity_id=records[0].id,
                         )
                 connection.execute(
                     text("""UPDATE oil_samples SET testing_status='FINALIZED',

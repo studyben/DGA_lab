@@ -53,6 +53,9 @@ def upgrade():
 def downgrade():
     op.execute(
         """
+        UPDATE oil_samples SET testing_status='OPEN',
+            testing_finalized_by=NULL,testing_finalized_at=NULL
+            WHERE testing_status='FINALIZED';
         DROP TABLE laboratory_finalization_events;
         ALTER TABLE oil_samples
             DROP CONSTRAINT testing_status_and_finalizer_consistent,

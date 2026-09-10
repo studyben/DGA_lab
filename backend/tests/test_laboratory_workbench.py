@@ -5,6 +5,8 @@ from decimal import Decimal
 from uuid import UUID
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
@@ -220,7 +222,7 @@ def test_one_report_result_can_be_selected_per_test_type(workbench_context):
 
 
 def test_changing_a_selected_test_type_clears_its_report_selection(workbench_context):
-    engine, _, actor, sample = workbench_context
+    engine, identity, actor, sample = workbench_context
     workbench = make_workbench(engine, RecordingObjectStore())
     methods = {
         item.test_type: item
@@ -238,6 +240,10 @@ def test_changing_a_selected_test_type_clears_its_report_selection(workbench_con
 
     assert changed.test_type == TestType.MOISTURE
     assert changed.selected_for_report is False
+    assert [
+        event['action_code'] for event in identity.audit_events(actor)
+        if event['action_code'] == 'REPORT_RESULT_CLEARED'
+    ] == ['REPORT_RESULT_CLEARED']
 
 
 def test_report_selection_rejects_missing_removed_and_read_only_access(workbench_context):
@@ -442,7 +448,50 @@ def test_single_result_is_auto_selected_and_label_can_be_reprinted_after_finaliz
     ]
     assert [event.event_type.value for event in finalized.finalization_history] == ['FINALIZED']
     actions = [event['action_code'] for event in identity.audit_events(actor)]
+    assert 'REPORT_RESULT_SELECTED' in actions
     assert 'BARCODE_LABEL_PRINTED' in actions
+
+
+def test_removing_a_selected_result_audits_selection_clear(workbench_context):
+    engine, identity, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    record = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    workbench.select_report_result(actor, sample.barcode_value, record.id)
+
+    workbench.remove_test(actor, sample.barcode_value, record.id, 'invalid selected run')
+
+    actions = [event['action_code'] for event in identity.audit_events(actor)]
+    assert actions[-2:] == ['LAB_TEST_REMOVED', 'REPORT_RESULT_CLEARED']
+
+
+def test_finalized_data_survives_0006_downgrade_and_reupgrade_as_open(workbench_context):
+    engine, _, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    record = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    workbench.finalize(actor, sample.barcode_value)
+
+    config = Config('alembic.ini')
+    command.downgrade(config, '0005_laboratory_test_entry')
+    with engine.connect() as connection:
+        assert connection.execute(
+            text('SELECT testing_status FROM oil_samples WHERE id=:id'),
+            {'id': sample.id},
+        ).scalar_one() == 'OPEN'
+    command.upgrade(config, 'head')
+
+    reloaded = workbench.load(actor, sample.barcode_value)
+    assert reloaded.testing_status == TestingStatus.OPEN
+    assert [(item.id, item.selected_for_report) for item in reloaded.tests] == [
+        (record.id, False)
+    ]
 
 
 def test_finalization_locks_all_scientific_data_mutations(workbench_context):
