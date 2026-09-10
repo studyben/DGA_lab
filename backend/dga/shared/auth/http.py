@@ -27,18 +27,48 @@ def session_body(session: Session):
                 expires_at=session.expires_at.isoformat())
 
 
-def auth_router(service: IdentityService, settings):
-    router = APIRouter(prefix='/api/auth')
-    origins = set(settings.auth_allowed_origins.split(','))
+class AuthenticatedRequests:
+    """One HTTP security policy for session reads and same-origin mutations."""
 
-    def origin(request):
-        if request.headers.get('origin') not in origins:
+    def __init__(self, service: IdentityService, settings):
+        self._service = service
+        self._origins = set(settings.auth_allowed_origins.split(','))
+
+    def require_origin(self, request: Request) -> None:
+        if request.headers.get('origin') not in self._origins:
             raise IdentityError('origin_rejected', 403)
 
-    def csrf(request):
-        session = service.session(request.cookies.get(COOKIE, ''))
-        if not compare_digest(request.headers.get('x-csrf-token', '').encode('utf-8'), session.csrf_token.encode('utf-8')):
+    def session(self, request: Request) -> Session:
+        return self._service.session(request.cookies.get(COOKIE, ''))
+
+    def csrf_session(self, request: Request) -> Session:
+        self.require_origin(request)
+        session = self.session(request)
+        supplied = request.headers.get('x-csrf-token', '').encode('utf-8')
+        if not compare_digest(supplied, session.csrf_token.encode('utf-8')):
             raise IdentityError('csrf_rejected', 403)
+        return session
+
+    def actor(self, request: Request):
+        actor = self.session(request).actor
+        if actor.must_change_password:
+            raise IdentityError('password_change_required', 403)
+        return actor
+
+    def mutation_actor(self, request: Request):
+        actor = self.csrf_session(request).actor
+        if actor.must_change_password:
+            raise IdentityError('password_change_required', 403)
+        return actor
+
+
+def auth_router(
+    service: IdentityService,
+    settings,
+    requests: AuthenticatedRequests | None = None,
+):
+    router = APIRouter(prefix='/api/auth')
+    requests = requests or AuthenticatedRequests(service, settings)
 
     def issue(response, session):
         response.set_cookie(COOKIE, session.token, httponly=True, secure=settings.cookie_secure,
@@ -48,26 +78,24 @@ def auth_router(service: IdentityService, settings):
 
     @router.post('/login')
     def login(payload: LoginInput, request: Request, response: Response):
-        origin(request)
+        requests.require_origin(request)
         return issue(response, service.login(payload.username, payload.password))
 
     @router.get('/session')
     def current(request: Request, response: Response):
         response.headers['Cache-Control'] = 'no-store'
-        return session_body(service.session(request.cookies.get(COOKIE, '')))
+        return session_body(requests.session(request))
 
     @router.post('/password')
     def password(payload: PasswordInput, request: Request, response: Response):
-        origin(request)
-        csrf(request)
+        requests.csrf_session(request)
         return issue(response, service.change_password(request.cookies.get(COOKIE, ''), payload.current_password, payload.new_password))
 
     @router.post('/logout', status_code=204)
     def logout(request: Request):
-        origin(request)
         token = request.cookies.get(COOKIE, '')
         try:
-            csrf(request)
+            requests.csrf_session(request)
         except IdentityError as error:
             if error.status != 401:
                 raise

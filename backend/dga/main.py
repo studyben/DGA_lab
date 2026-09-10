@@ -19,11 +19,17 @@ from dga.assets.public import (
     access_context as asset_access,
     http_router as assets_router,
 )
-from dga.laboratory.public import MODULE as LABORATORY, access_context as laboratory_access
+from dga.laboratory.public import (
+    MODULE as LABORATORY,
+    LaboratoryError,
+    SampleRegistry,
+    access_context as laboratory_access,
+    http_router as laboratory_router,
+)
 from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS, access_context as analysis_access
 from dga.shared.contracts import ModuleDescriptor
-from dga.shared.auth.public import IdentityService, IdentityError
-from dga.shared.auth.http import auth_router, COOKIE
+from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
+from dga.shared.auth.http import AuthenticatedRequests, auth_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -46,7 +52,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title='DGA Lab', lifespan=lifespan)
     identity = IdentityService(engine, session_hours=settings.session_hours)
-    app.include_router(auth_router(identity, settings))
+    requests = AuthenticatedRequests(identity, settings)
+    app.include_router(auth_router(identity, settings, requests))
 
     @app.exception_handler(IdentityError)
     async def identity_error(request, error):
@@ -54,6 +61,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(AssetQueryError)
     async def asset_query_error(request, error):
+        return JSONResponse(
+            status_code=error.status,
+            content={'code': error.code},
+            headers={'Cache-Control': 'no-store'},
+        )
+
+    @app.exception_handler(LaboratoryError)
+    async def laboratory_error(request, error):
         return JSONResponse(
             status_code=error.status,
             content={'code': error.code},
@@ -71,13 +86,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return [module for module, permission in [(ASSETS, 'assets.read'), (LABORATORY, 'laboratory.read'), (CONDITION_ANALYSIS, 'analysis.read')]
                 if permission in actor.permissions]
 
-    def current_actor(request: Request):
-        actor = identity.session(request.cookies.get(COOKIE, '')).actor
-        if actor.must_change_password:
-            raise IdentityError('password_change_required', 403)
-        return actor
+    current_actor = requests.actor
+    mutation_actor = requests.mutation_actor
 
-    app.include_router(assets_router(AssetDirectory(engine), current_actor))
+    asset_directory = AssetDirectory(engine)
+    app.include_router(assets_router(asset_directory, current_actor))
+    app.include_router(
+        laboratory_router(
+            SampleRegistry(engine, asset_directory, AuditTrail()),
+            current_actor,
+            mutation_actor,
+        )
+    )
 
     @app.get('/api/assets/access')
     def assets_context(actor=Depends(current_actor)):
