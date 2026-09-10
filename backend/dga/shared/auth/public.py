@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, InvalidHashError
 from sqlalchemy import Engine, text
+from sqlalchemy.engine import Connection
 
 HASHER = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1)
 DUMMY_HASH = HASHER.hash(token_urlsafe(32))
@@ -35,6 +36,38 @@ def require_permission(actor: ActorContext, permission: str) -> None:
         raise IdentityError('password_change_required', 403)
     if permission not in actor.permissions:
         raise IdentityError('permission_denied', 403)
+
+
+class AuditTrail:
+    """Append business audit events inside the caller's database transaction."""
+
+    def __init__(self, *, clock: Callable[[], datetime] | None = None):
+        self._clock = clock or (lambda: datetime.now(timezone.utc))
+
+    def append(
+        self,
+        connection: Connection,
+        actor: ActorContext,
+        action_code: str,
+        *,
+        entity_id: UUID,
+    ) -> None:
+        if not 1 <= len(action_code) <= 50:
+            raise IdentityError('invalid_audit_event', 422)
+        connection.execute(
+            text(
+                """INSERT INTO audit_logs
+                (id,actor_user_id,action_code,result,occurred_at,entity_id)
+                VALUES (:id,:actor,:action,'SUCCESS',:time,:entity)"""
+            ),
+            {
+                'id': uuid4(),
+                'actor': actor.user_id,
+                'action': action_code,
+                'time': self._clock(),
+                'entity': entity_id,
+            },
+        )
 
 
 @dataclass(frozen=True)

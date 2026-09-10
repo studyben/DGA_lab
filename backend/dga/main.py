@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+from secrets import compare_digest
 
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
@@ -19,10 +20,16 @@ from dga.assets.public import (
     access_context as asset_access,
     http_router as assets_router,
 )
-from dga.laboratory.public import MODULE as LABORATORY, access_context as laboratory_access
+from dga.laboratory.public import (
+    MODULE as LABORATORY,
+    LaboratoryError,
+    SampleRegistry,
+    access_context as laboratory_access,
+    http_router as laboratory_router,
+)
 from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS, access_context as analysis_access
 from dga.shared.contracts import ModuleDescriptor
-from dga.shared.auth.public import IdentityService, IdentityError
+from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
 from dga.shared.auth.http import auth_router, COOKIE
 
 
@@ -60,6 +67,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             headers={'Cache-Control': 'no-store'},
         )
 
+    @app.exception_handler(LaboratoryError)
+    async def laboratory_error(request, error):
+        return JSONResponse(
+            status_code=error.status,
+            content={'code': error.code},
+            headers={'Cache-Control': 'no-store'},
+        )
+
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, error):
         # Pydantic error input/context can contain plaintext credentials.
@@ -77,7 +92,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise IdentityError('password_change_required', 403)
         return actor
 
-    app.include_router(assets_router(AssetDirectory(engine), current_actor))
+    def mutation_actor(request: Request):
+        if request.headers.get('origin') not in set(settings.auth_allowed_origins.split(',')):
+            raise IdentityError('origin_rejected', 403)
+        session = identity.session(request.cookies.get(COOKIE, ''))
+        supplied = request.headers.get('x-csrf-token', '').encode('utf-8')
+        if not compare_digest(supplied, session.csrf_token.encode('utf-8')):
+            raise IdentityError('csrf_rejected', 403)
+        if session.actor.must_change_password:
+            raise IdentityError('password_change_required', 403)
+        return session.actor
+
+    asset_directory = AssetDirectory(engine)
+    app.include_router(assets_router(asset_directory, current_actor))
+    app.include_router(
+        laboratory_router(
+            SampleRegistry(engine, asset_directory, AuditTrail()),
+            current_actor,
+            mutation_actor,
+        )
+    )
 
     @app.get('/api/assets/access')
     def assets_context(actor=Depends(current_actor)):

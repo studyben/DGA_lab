@@ -2,7 +2,7 @@
 
 中文现场资产与油样管理门户。当前交付 [Issue #2](https://github.com/studyben/DGA_lab/issues/2) 的工程基础，完整 MVP 规格见 [Issue #1](https://github.com/studyben/DGA_lab/issues/1)。
 
-这是绿地项目的初始生产工程：#2 门户导航、模块入口、迁移和测试基础，#3 本地账号、权限、会话和身份审计，以及 #4 正式资产搜索与历史采样上下文已经实现。实验室收样页可按整机或变压器序列号搜索并明确选择正式资产，但创建油样、条码、检测和报告仍由后续工单交付；其他未实施业务页明确显示待开放，不展示原型假数据。
+这是绿地项目的初始生产工程：#2 门户导航、模块入口、迁移和测试基础，#3 本地账号、权限、会话和身份审计，#4 正式资产搜索与历史采样上下文，以及 #5 油样收样、身份快照、共享条码和浏览器标签打印已经实现。检测、整体检测定稿和报告仍由后续工单交付；其他未实施业务页明确显示待开放，不展示原型假数据。
 
 ## 启动
 
@@ -69,10 +69,12 @@ nginx 提供 React/TypeScript 静态构建，并将 `/api/` 转发给 FastAPI；
 - `/api/assets/access`、`/api/laboratory/access`、`/api/condition-analysis/access`：受保护的模块访问上下文，匿名 401、无权限/待改密 403，返回已验证 actor_id。不提供提前的业务 CRUD。
 - `GET /api/assets/search?q=...&effective_at=...`：按完整或部分整机/变压器序列号搜索指定时点可关联的正式资产；重复序列号返回客户、现场、型号、状态、系统资产号和匹配原因供消歧，整机结果包含当时安装的可关联变压器。
 - `GET /api/assets/{asset_id}/sampling-context?sampled_at=...`：按带时区的采样时间解析客户、现场和完整设备路径。两项查询均要求 `assets.read`，不提供资产编辑或导入。
+- `POST /api/laboratory/samples`：以正式资产关联或明确的“身份待确认”方式登记油样；正式关联会保存采样时客户、现场、设备路径和序列号快照，一个油样可登记 1–20 个共享条码的样品容器。
+- `GET /api/laboratory/samples/by-barcode/{barcode}`：扫描或输入油样条码取回同一组收样基本信息和容器；`POST /api/laboratory/samples/{barcode}/label-prints` 在调用浏览器打印前记录审计。两个 POST 均要求同源 Origin 和当前会话 CSRF。
 
 密码使用 Argon2id（19MiB、2 次、并行度 1）；只存哈希。会话为随机不透明凭据，数据库只存会话凭据 SHA-256。退出撤销当前会话，改密撤销全部旧会话并创建新会话；停用/锁定撤销旧会话，重新启用不会复活它们。每次请求读取当前状态/角色。连续 5 次错误密码后账号临时限制 15 分钟；接口不透露账号是否存在。前端每 30 秒及重新聚焦时检查会话，后端每次请求校验，因此撤销后的数据接口立即受限。
 
-身份审计只追加（登录成功/失败、退出、密码变更、账号/角色/状态操作），通过受权共享公开查询读取。未匹配账号的失败登录 actor 为空，另保存声称的用户名；不伪造用户 ID，不记录密码/会话/CSRF。结构化非法请求在认证前返回通用错误，不回显输入。审计查询为最小 operator/application 接口，无审计管理 UI。生产还需 #20 的 TLS、反向代理级限流、监控和最小数据库权限；应用内账号节流不替代外围防滥用。
+审计只追加（登录成功/失败、退出、密码变更、账号/角色/状态操作，以及收样、资产关联、条码打印），通过受权共享公开查询读取。未匹配账号的失败登录 actor 为空，另保存声称的用户名；不伪造用户 ID，不记录密码/会话/CSRF。结构化非法请求在认证前返回通用错误，不回显输入。审计查询为最小 operator/application 接口，无审计管理 UI。生产还需 #20 的 TLS、反向代理级限流、监控和最小数据库权限；应用内账号节流不替代外围防滥用。
 
 未来 Lightsail 的外部托管数据库、对象存储、worker 和备份配置由 #20 与对应业务工单提供，本地 Compose 不作为生产配置。
 
@@ -86,7 +88,7 @@ docker compose -f compose.browser.yaml --profile test run --build --no-deps --rm
 
 API 测试会启动独立 `test-db` PostgreSQL，先执行与应用一致的 Alembic migration，然后从 HTTP/公开应用接口观察行为。测试 URL 限制为 test-db/dga_test/dga_test，避免误迁移应用数据。测试存储为 tmpfs，停止后不保留。当前 migration downgrade 验证按串行执行；请勿对同一 test-db 并发运行多份套件。不同开发任务可使用不同 Compose project name 隔离。
 
-浏览器套件使用独立 dga-browser Compose 项目、临时 PostgreSQL 和匹配版本的 Playwright Linux 镜像，在 18080 提供测试门户。fixture 脚本严格拒绝非 dga_browser 数据库；测试账号仅存在于此隔离环境，不在正常应用中生成。验证登录/首次改密/退出、权限拒绝、Logo、导航/刷新/返回与服务重试。失败重试仅在 HTTP 外部边界注入 503，其余走真实 API；不依赖 React 组件树、CSS 类名或内部表。
+浏览器套件使用独立 dga-browser Compose 项目、临时 PostgreSQL 和匹配版本的 Playwright Linux 镜像，在 18080 提供测试门户。fixture 脚本严格拒绝非 dga_browser 数据库；测试账号仅存在于此隔离环境，不在正常应用中生成。验证登录/首次改密/退出、权限拒绝、Logo、导航/刷新/返回与服务重试，并覆盖正式资产搜索、收样、标签预览/打印及再次扫码取回。失败重试仅在 HTTP 外部边界注入 503，其余走真实 API；不依赖 React 组件树、CSS 类名或内部表。
 
 首次改密测试会改变测试账号密码。重复执行前，仅重置隔离 fixture（不能用于正常应用）：
 
@@ -114,7 +116,7 @@ docker compose -f compose.browser.yaml --profile test down
 
 ## 数据库演进
 
-首个 Alembic migration 是空业务 schema 基线；0002 增加用户、角色、权限、关联、会话与身份审计；0003 增加客户、现场、正式资产和带有效期的设备/现场安装关系。序列号刻意不唯一，系统资产号唯一。后续业务表归其拥有模块，不提前复制全部设计草案。downgrade 仅允许隔离测试库使用，已有真实数据的环境不得执行。
+首个 Alembic migration 是空业务 schema 基线；0002 增加用户、角色、权限、关联、会话与身份审计；0003 增加客户、现场、正式资产和带有效期的设备/现场安装关系；0004 增加油样、不可变资产快照、共享条码和样品容器。序列号刻意不唯一，系统资产号唯一。后续业务表归其拥有模块，不提前复制全部设计草案。downgrade 仅允许隔离测试库使用，已有真实数据的环境不得执行。
 
 ```sh
 docker compose run --rm migrate alembic current
