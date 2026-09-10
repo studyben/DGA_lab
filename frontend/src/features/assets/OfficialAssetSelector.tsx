@@ -74,10 +74,18 @@ export function OfficialAssetSelector({
     setBusy(false);
   }, [sampledAt]);
 
+  function beginRequest() {
+    return { sampledAt, version: ++requestVersion.current };
+  }
+
+  function isCurrent(request: { sampledAt: string; version: number }) {
+    return request.version === requestVersion.current
+      && request.sampledAt === currentSampledAt.current;
+  }
+
   async function search(event: FormEvent) {
     event.preventDefault();
-    const requestedAt = sampledAt;
-    const version = ++requestVersion.current;
+    const request = beginRequest();
     setError('');
     setBusy(true);
     try {
@@ -89,22 +97,21 @@ export function OfficialAssetSelector({
       if (!response.ok) throw new Error('无法搜索正式资产，请稍后重试。');
       const body: unknown = await response.json();
       if (!Array.isArray(body)) throw new Error('资产搜索响应无效。');
-      if (version !== requestVersion.current || requestedAt !== currentSampledAt.current) return;
+      if (!isCurrent(request)) return;
       setMatches(body as SearchMatch[]);
       setSearched(true);
     } catch (failure) {
-      if (version !== requestVersion.current || requestedAt !== currentSampledAt.current) return;
+      if (!isCurrent(request)) return;
       setMatches([]);
       setSearched(false);
       setError(failure instanceof Error ? failure.message : '无法搜索正式资产。');
     } finally {
-      if (version === requestVersion.current) setBusy(false);
+      if (isCurrent(request)) setBusy(false);
     }
   }
 
   async function select(asset: FormalAsset) {
-    const requestedAt = sampledAt;
-    const version = ++requestVersion.current;
+    const request = beginRequest();
     setError('');
     setBusy(true);
     try {
@@ -114,13 +121,14 @@ export function OfficialAssetSelector({
         { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(10000) },
       );
       if (!response.ok) throw new Error('无法确认采样时的资产关系，请重新搜索。');
-      if (version !== requestVersion.current || requestedAt !== currentSampledAt.current) return;
-      onSelect(await response.json() as AssetContext);
+      const context = await response.json() as AssetContext;
+      if (!isCurrent(request)) return;
+      onSelect(context);
     } catch (failure) {
-      if (version !== requestVersion.current || requestedAt !== currentSampledAt.current) return;
+      if (!isCurrent(request)) return;
       setError(failure instanceof Error ? failure.message : '无法关联正式资产。');
     } finally {
-      if (version === requestVersion.current) setBusy(false);
+      if (isCurrent(request)) setBusy(false);
     }
   }
 
