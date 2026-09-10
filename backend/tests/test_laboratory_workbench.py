@@ -5,6 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
@@ -23,9 +24,12 @@ from dga.laboratory.public import (
     SampleRegistry,
     TestSubmission as LaboratoryTestSubmission,
     TestType as LaboratoryTestType,
+    TestingStatus,
     UpdateSampleBasics,
 )
 from dga.shared.auth.public import AuditTrail, IdentityError, IdentityService
+from dga.main import create_app
+from dga.shared.config import Settings
 
 
 ASSET_ID = UUID('44000000-0000-0000-0000-000000000001')
@@ -47,13 +51,14 @@ class RecordingObjectStore:
         self.objects.pop(object_key, None)
 
 
-def make_workbench(engine, store):
+def make_workbench(engine, store, **kwargs):
     audit = AuditTrail()
     return LaboratoryWorkbench(
         engine,
         SampleRegistry(engine, AssetDirectory(engine), audit),
         audit,
         store,
+        **kwargs,
     )
 
 
@@ -116,6 +121,7 @@ TestType = LaboratoryTestType
 TestSubmission = LaboratoryTestSubmission
 TestType.__test__ = False
 TestSubmission.__test__ = False
+TestingStatus.__test__ = False
 
 
 def _dga(method_id, *, h2='10.125', qualifier=ResultQualifier.EQ):
@@ -308,6 +314,21 @@ def test_database_rejects_two_selected_active_results_of_one_type(workbench_cont
     assert selected == [first.id]
 
 
+def test_database_rejects_finalized_status_without_finalizer_metadata(workbench_context):
+    engine, _, actor, sample = workbench_context
+
+    with pytest.raises(IntegrityError):
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE oil_samples SET testing_status='FINALIZED' WHERE id=:id"),
+                {'id': sample.id},
+            )
+
+    assert make_workbench(
+        engine, RecordingObjectStore()
+    ).load(actor, sample.barcode_value).testing_status == TestingStatus.OPEN
+
+
 def test_concurrent_report_selections_leave_one_current_result(workbench_context):
     engine, _, actor, sample = workbench_context
     workbench = make_workbench(engine, RecordingObjectStore())
@@ -334,6 +355,274 @@ def test_concurrent_report_selections_leave_one_current_result(workbench_context
     ]
     assert len(selected) == 1
     assert selected[0].id in {record.id for record in records}
+
+
+def test_multiple_results_require_selection_before_overall_finalization(workbench_context):
+    engine, _, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    first = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    workbench.add_test(actor, sample.barcode_value, _dga(method.id, h2='12.500'))
+
+    with pytest.raises(LaboratoryError) as missing:
+        workbench.finalize(actor, sample.barcode_value)
+    assert missing.value.code == 'report_result_selection_required'
+    assert missing.value.details == {'test_types': ['DGA']}
+
+    workbench.select_report_result(actor, sample.barcode_value, first.id)
+    finalized = workbench.finalize(actor, sample.barcode_value)
+
+    assert finalized.testing_status == TestingStatus.FINALIZED
+    assert finalized.testing_finalized_by == actor.user_id
+    assert finalized.testing_finalized_at is not None
+    with pytest.raises(LaboratoryError, match='sample_finalized'):
+        workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    with pytest.raises(LaboratoryError, match='sample_finalized'):
+        workbench.select_report_result(actor, sample.barcode_value, first.id)
+
+
+def test_pending_identity_and_empty_testing_block_finalization_and_are_audited(workbench_context):
+    engine, identity, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+
+    with pytest.raises(LaboratoryError) as empty:
+        workbench.finalize(actor, sample.barcode_value)
+    assert empty.value.code == 'no_active_tests'
+    assert workbench.load(actor, sample.barcode_value).finalization_assessment.blocking_codes == (
+        'no_active_tests',
+    )
+
+    pending = SampleRegistry(engine, AssetDirectory(engine), AuditTrail()).receive(
+        actor,
+        ReceiveSample(
+            sampled_at=datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc),
+            received_at=datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc),
+            site_name='Unconfirmed site',
+            equipment_serial='UNKNOWN-TX',
+            notes=None,
+            container_count=1,
+            identity_status=SampleIdentityStatus.IDENTITY_PENDING,
+        ),
+    )
+    method = next(
+        item for item in workbench.load(actor, pending.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    workbench.add_test(actor, pending.barcode_value, _dga(method.id))
+    with pytest.raises(LaboratoryError) as unconfirmed:
+        workbench.finalize(actor, pending.barcode_value)
+    assert unconfirmed.value.code == 'sample_identity_not_confirmed'
+
+    attempts = [
+        event for event in identity.audit_events(actor)
+        if event['action_code'] == 'LAB_TESTING_FINALIZATION_ATTEMPT'
+    ]
+    assert [event['result'] for event in attempts] == ['FAILURE', 'FAILURE']
+
+
+def test_single_result_is_auto_selected_and_label_can_be_reprinted_after_finalization(workbench_context):
+    engine, identity, actor, sample = workbench_context
+    registry = SampleRegistry(engine, AssetDirectory(engine), AuditTrail())
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    record = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+
+    finalized = workbench.finalize(actor, sample.barcode_value)
+    registry.record_label_print(actor, sample.barcode_value)
+
+    assert finalized.finalization_assessment.ready is True
+    assert [(item.id, item.selected_for_report) for item in finalized.tests] == [
+        (record.id, True)
+    ]
+    assert [event.event_type.value for event in finalized.finalization_history] == ['FINALIZED']
+    actions = [event['action_code'] for event in identity.audit_events(actor)]
+    assert 'BARCODE_LABEL_PRINTED' in actions
+
+
+def test_finalization_locks_all_scientific_data_mutations(workbench_context):
+    engine, _, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    record = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    workbench.finalize(actor, sample.barcode_value)
+
+    operations = (
+        lambda: workbench.update_test(
+            actor, sample.barcode_value, record.id, _dga(method.id, h2='14.000')
+        ),
+        lambda: workbench.remove_test(actor, sample.barcode_value, record.id, 'incorrect'),
+        lambda: workbench.update_sample(
+            actor,
+            sample.barcode_value,
+            UpdateSampleBasics(
+                sample.sampled_at,
+                sample.received_at,
+                sample.site_name,
+                sample.equipment_serial,
+                'changed after finalization',
+            ),
+        ),
+    )
+    for operation in operations:
+        with pytest.raises(LaboratoryError) as captured:
+            operation()
+        assert captured.value.code == 'sample_finalized'
+
+
+def test_reasoned_withdrawal_restores_editing_and_supports_refinalization(workbench_context):
+    engine, identity, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    record = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    workbench.finalize(actor, sample.barcode_value)
+
+    with pytest.raises(LaboratoryError, match='withdrawal_reason_required'):
+        workbench.withdraw_finalization(actor, sample.barcode_value, '   ')
+    no_finalize = replace(actor, permissions=frozenset({'laboratory.read', 'laboratory.write'}))
+    with pytest.raises(IdentityError, match='permission_denied'):
+        workbench.withdraw_finalization(no_finalize, sample.barcode_value, 'correction')
+
+    reopened = workbench.withdraw_finalization(
+        actor, sample.barcode_value, '仪器数据导入有误，需要修正'
+    )
+    changed = workbench.update_test(
+        actor, sample.barcode_value, record.id, _dga(method.id, h2='14.000')
+    )
+    refinalized = workbench.finalize(actor, sample.barcode_value)
+
+    assert reopened.testing_status == TestingStatus.OPEN
+    assert reopened.testing_finalized_by is None
+    assert reopened.testing_finalized_at is None
+    assert reopened.finalization_history[-1].reason == '仪器数据导入有误，需要修正'
+    assert changed.result.h2.value == Decimal('14.000')
+    assert refinalized.testing_status == TestingStatus.FINALIZED
+    assert [event.event_type.value for event in refinalized.finalization_history] == [
+        'FINALIZED', 'WITHDRAWN', 'FINALIZED'
+    ]
+    actions = [event['action_code'] for event in identity.audit_events(actor)]
+    assert 'LAB_TESTING_FINALIZATION_WITHDRAWN' in actions
+
+
+def test_warning_codes_require_confirmation_without_implementing_qa_rules(workbench_context):
+    engine, _, actor, sample = workbench_context
+    workbench = make_workbench(
+        engine,
+        RecordingObjectStore(),
+        warning_source=lambda _tests: ('QA_REVIEW_REQUIRED',),
+    )
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+
+    with pytest.raises(LaboratoryError) as warning:
+        workbench.finalize(actor, sample.barcode_value)
+    assert warning.value.code == 'warnings_not_acknowledged'
+    assert warning.value.details == {'warning_codes': ['QA_REVIEW_REQUIRED']}
+
+    finalized = workbench.finalize(
+        actor,
+        sample.barcode_value,
+        acknowledged_warning_codes=('STALE_CLIENT_WARNING', 'QA_REVIEW_REQUIRED'),
+    )
+    assert finalized.testing_status == TestingStatus.FINALIZED
+
+
+def test_concurrent_finalization_has_one_success_and_one_stable_conflict(workbench_context):
+    engine, identity, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+
+    def finalize_once():
+        try:
+            workbench.finalize(actor, sample.barcode_value)
+            return 'FINALIZED'
+        except LaboratoryError as error:
+            return error.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(lambda _index: finalize_once(), range(2)))
+
+    assert sorted(outcomes) == ['FINALIZED', 'sample_already_finalized']
+    attempts = [
+        event for event in identity.audit_events(actor)
+        if event['action_code'] == 'LAB_TESTING_FINALIZATION_ATTEMPT'
+    ]
+    assert sorted(event['result'] for event in attempts) == ['FAILURE', 'SUCCESS']
+
+
+def test_http_adapter_exposes_selection_finalization_details_and_withdrawal(workbench_context):
+    engine, _, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    first = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    workbench.add_test(actor, sample.barcode_value, _dga(method.id, h2='12.500'))
+    settings = Settings(
+        database_url=engine.url.render_as_string(hide_password=False),
+        cookie_secure=False,
+        auth_allowed_origins='http://127.0.0.1:8080',
+    )
+
+    with TestClient(create_app(settings)) as client:
+        login = client.post(
+            '/api/auth/login',
+            headers={'Origin': 'http://127.0.0.1:8080'},
+            json={'username': 'workbench-admin', 'password': CHANGED_PASSWORD},
+        )
+        headers = {
+            'Origin': 'http://127.0.0.1:8080',
+            'X-CSRF-Token': login.json()['csrf_token'],
+        }
+        blocked = client.post(
+            f'/api/laboratory/samples/{sample.barcode_value}/finalization',
+            headers=headers,
+            json={'acknowledged_warning_codes': []},
+        )
+        assert blocked.status_code == 422
+        assert blocked.json() == {
+            'code': 'report_result_selection_required',
+            'details': {'test_types': ['DGA']},
+        }
+        selected = client.put(
+            f'/api/laboratory/samples/{sample.barcode_value}/report-result',
+            headers=headers,
+            json={'test_id': str(first.id)},
+        )
+        assert selected.status_code == 200
+        finalized = client.post(
+            f'/api/laboratory/samples/{sample.barcode_value}/finalization',
+            headers=headers,
+            json={'acknowledged_warning_codes': []},
+        )
+        assert finalized.status_code == 200
+        assert finalized.json()['testing_status'] == 'FINALIZED'
+        withdrawn = client.post(
+            f'/api/laboratory/samples/{sample.barcode_value}/finalization-withdrawals',
+            headers=headers,
+            json={'reason': 'correct the selected report result'},
+        )
+        assert withdrawn.status_code == 200
+        assert withdrawn.json()['testing_status'] == 'OPEN'
 
 
 def test_object_store_failure_does_not_create_a_test_record(workbench_context):
@@ -459,11 +748,8 @@ def test_finalized_status_blocks_result_mutation(workbench_context):
     engine, _, actor, sample = workbench_context
     workbench = make_workbench(engine, RecordingObjectStore())
     method = next(item for item in workbench.load(actor, sample.barcode_value).methods if item.test_type == TestType.DGA)
-    with engine.begin() as connection:
-        connection.execute(
-            text("UPDATE oil_samples SET testing_status='FINALIZED' WHERE id=:id"),
-            {'id': sample.id},
-        )
+    workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    workbench.finalize(actor, sample.barcode_value)
 
     with pytest.raises(LaboratoryError) as captured:
         workbench.add_test(actor, sample.barcode_value, _dga(method.id))

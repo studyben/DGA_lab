@@ -80,12 +80,15 @@ class AuditTrail:
         action: StrEnum,
         *,
         entity_id: UUID,
+        result: str = 'SUCCESS',
     ) -> None:
+        if result not in {'SUCCESS', 'FAILURE'}:
+            raise ValueError('invalid_audit_result')
         _append_audit(
             connection,
             occurred_at=self._clock(),
             action_code=action.value,
-            result='SUCCESS',
+            result=result,
             actor_user_id=actor.user_id,
             entity_id=entity_id,
         )

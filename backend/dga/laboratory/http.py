@@ -87,6 +87,18 @@ class RemovalInput(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
 
+class ReportResultInput(BaseModel):
+    test_id: UUID
+
+
+class FinalizationInput(BaseModel):
+    acknowledged_warning_codes: list[str] = Field(default_factory=list, max_length=100)
+
+
+class WithdrawalInput(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
 def _submission(payload: TestInput):
     def measurement(item):
         return QualifiedMeasurement(item.qualifier, item.value)
@@ -162,5 +174,33 @@ def laboratory_router(
     def remove_test(barcode_value: str, test_id: UUID, payload: RemovalInput, actor=Depends(mutation_actor_dependency)):
         workbench.remove_test(actor, barcode_value, test_id, payload.reason)
         return Response(status_code=204)
+
+    @router.put('/samples/{barcode_value}/report-result')
+    def select_report_result(
+        barcode_value: str,
+        payload: ReportResultInput,
+        actor=Depends(mutation_actor_dependency),
+    ):
+        return workbench.select_report_result(actor, barcode_value, payload.test_id)
+
+    @router.post('/samples/{barcode_value}/finalization')
+    def finalize(
+        barcode_value: str,
+        payload: FinalizationInput,
+        actor=Depends(mutation_actor_dependency),
+    ):
+        return workbench.finalize(
+            actor,
+            barcode_value,
+            tuple(payload.acknowledged_warning_codes),
+        )
+
+    @router.post('/samples/{barcode_value}/finalization-withdrawals')
+    def withdraw_finalization(
+        barcode_value: str,
+        payload: WithdrawalInput,
+        actor=Depends(mutation_actor_dependency),
+    ):
+        return workbench.withdraw_finalization(actor, barcode_value, payload.reason)
 
     return router

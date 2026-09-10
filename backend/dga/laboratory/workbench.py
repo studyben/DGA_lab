@@ -6,7 +6,7 @@ from decimal import Decimal
 from enum import StrEnum
 from hashlib import sha256
 from pathlib import PurePath
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Protocol
 from uuid import UUID, uuid4
 
 from sqlalchemy import Engine, text
@@ -38,12 +38,19 @@ class TestingStatus(StrEnum):
     FINALIZED = 'FINALIZED'
 
 
+class FinalizationEventType(StrEnum):
+    FINALIZED = 'FINALIZED'
+    WITHDRAWN = 'WITHDRAWN'
+
+
 class _AuditAction(StrEnum):
     SAMPLE_BASICS_UPDATED = 'SAMPLE_BASICS_UPDATED'
     LAB_TEST_CREATED = 'LAB_TEST_CREATED'
     LAB_TEST_UPDATED = 'LAB_TEST_UPDATED'
     LAB_TEST_REMOVED = 'LAB_TEST_REMOVED'
     REPORT_RESULT_SELECTED = 'REPORT_RESULT_SELECTED'
+    LAB_TESTING_FINALIZATION_ATTEMPT = 'LAB_TESTING_FINALIZATION_ATTEMPT'
+    LAB_TESTING_FINALIZATION_WITHDRAWN = 'LAB_TESTING_FINALIZATION_WITHDRAWN'
 
 
 @dataclass(frozen=True)
@@ -138,11 +145,36 @@ class TestRecord:
 
 
 @dataclass(frozen=True)
+class FinalizationAssessment:
+    ready: bool
+    blocking_codes: tuple[str, ...]
+    missing_test_types: tuple[TestType, ...]
+    warning_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class FinalizationEvent:
+    id: UUID
+    event_type: FinalizationEventType
+    actor_user_id: UUID
+    occurred_at: datetime
+    reason: str | None
+
+
+class FinalizationWarningSource(Protocol):
+    def __call__(self, tests: tuple[TestRecord, ...]) -> tuple[str, ...]: ...
+
+
+@dataclass(frozen=True)
 class WorkbenchSample:
     sample: 'OilSample'
     testing_status: TestingStatus
+    testing_finalized_by: UUID | None
+    testing_finalized_at: datetime | None
     methods: tuple[MethodConfiguration, ...]
     tests: tuple[TestRecord, ...]
+    finalization_assessment: FinalizationAssessment
+    finalization_history: tuple[FinalizationEvent, ...]
 
 
 @dataclass(frozen=True)
@@ -169,19 +201,22 @@ class LaboratoryWorkbench:
         object_store: FileStore,
         *,
         clock: Callable[[], datetime] | None = None,
+        warning_source: FinalizationWarningSource | None = None,
     ):
         self._engine = engine
         self._audit = audit_trail
         self._objects = object_store
         self._samples = sample_registry
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._warning_source = warning_source or (lambda _tests: ())
 
     def load(self, actor: ActorContext, barcode_value: str) -> WorkbenchSample:
         require_permission(actor, 'laboratory.read')
         barcode = self._barcode(barcode_value)
         with self._engine.connect() as connection:
             sample_row = connection.execute(
-                text('SELECT id,testing_status FROM oil_samples WHERE barcode_value=:barcode'),
+                text("""SELECT id,testing_status,identity_status,testing_finalized_by,
+                testing_finalized_at FROM oil_samples WHERE barcode_value=:barcode"""),
                 {'barcode': barcode},
             ).mappings().first()
             if not sample_row:
@@ -196,11 +231,17 @@ class LaboratoryWorkbench:
                     {'sample': sample_row['id']},
                 ).mappings()
             )
+            assessment = self._assessment(sample_row['identity_status'], tests)
+            history = self._events(connection, sample_row['id'])
         return WorkbenchSample(
             sample=self._samples.find_by_barcode(actor, barcode),
             testing_status=TestingStatus(sample_row['testing_status']),
+            testing_finalized_by=sample_row['testing_finalized_by'],
+            testing_finalized_at=sample_row['testing_finalized_at'],
             methods=methods,
             tests=tests,
+            finalization_assessment=assessment,
+            finalization_history=history,
         )
 
     def add_test(
@@ -354,6 +395,119 @@ class LaboratoryWorkbench:
                     _AuditAction.REPORT_RESULT_SELECTED,
                     entity_id=test_id,
                 )
+        return self.load(actor, barcode)
+
+    def finalize(
+        self,
+        actor: ActorContext,
+        barcode_value: str,
+        acknowledged_warning_codes: tuple[str, ...] = (),
+    ) -> WorkbenchSample:
+        require_permission(actor, 'laboratory.finalize')
+        barcode = self._barcode(barcode_value)
+        sample_id = None
+        try:
+            with self._engine.begin() as connection:
+                sample = self._locked_sample(connection, barcode)
+                sample_id = sample['id']
+                if sample['testing_status'] == TestingStatus.FINALIZED.value:
+                    raise LaboratoryError('sample_already_finalized', 409)
+                methods = self._methods(connection, sample_id)
+                tests = tuple(
+                    self._record(connection, row, methods)
+                    for row in connection.execute(
+                        text("""SELECT * FROM laboratory_tests
+                        WHERE oil_sample_id=:sample AND record_status='ACTIVE'
+                        ORDER BY created_at,id"""),
+                        {'sample': sample_id},
+                    ).mappings()
+                )
+                assessment = self._assessment(sample['identity_status'], tests)
+                self._raise_blocker(assessment)
+                acknowledged = set(acknowledged_warning_codes)
+                missing_warnings = [
+                    code for code in assessment.warning_codes if code not in acknowledged
+                ]
+                if missing_warnings:
+                    raise LaboratoryError(
+                        'warnings_not_acknowledged',
+                        details={'warning_codes': missing_warnings},
+                    )
+                now = self._clock()
+                by_type: dict[TestType, list[TestRecord]] = {}
+                for record in tests:
+                    by_type.setdefault(record.test_type, []).append(record)
+                for records in by_type.values():
+                    if len(records) == 1 and not records[0].selected_for_report:
+                        connection.execute(
+                            text("""UPDATE laboratory_tests SET selected_for_report=TRUE,
+                            updated_by=:actor,updated_at=:now WHERE id=:id"""),
+                            {'id': records[0].id, 'actor': actor.user_id, 'now': now},
+                        )
+                connection.execute(
+                    text("""UPDATE oil_samples SET testing_status='FINALIZED',
+                    testing_finalized_by=:actor,testing_finalized_at=:now,
+                    updated_by=:actor,updated_at=:now WHERE id=:id"""),
+                    {'id': sample_id, 'actor': actor.user_id, 'now': now},
+                )
+                self._insert_event(
+                    connection, sample_id, actor, FinalizationEventType.FINALIZED, now
+                )
+                self._audit.append(
+                    connection,
+                    actor,
+                    _AuditAction.LAB_TESTING_FINALIZATION_ATTEMPT,
+                    entity_id=sample_id,
+                )
+        except LaboratoryError:
+            if sample_id is not None:
+                with self._engine.begin() as connection:
+                    self._audit.append(
+                        connection,
+                        actor,
+                        _AuditAction.LAB_TESTING_FINALIZATION_ATTEMPT,
+                        entity_id=sample_id,
+                        result='FAILURE',
+                    )
+            raise
+        return self.load(actor, barcode)
+
+    def withdraw_finalization(
+        self,
+        actor: ActorContext,
+        barcode_value: str,
+        reason: str,
+    ) -> WorkbenchSample:
+        require_permission(actor, 'laboratory.finalize')
+        reason = reason.strip()
+        if not 1 <= len(reason) <= 500:
+            raise LaboratoryError('withdrawal_reason_required')
+        barcode = self._barcode(barcode_value)
+        with self._engine.begin() as connection:
+            sample = self._locked_sample(connection, barcode)
+            if sample['testing_status'] != TestingStatus.FINALIZED.value:
+                raise LaboratoryError('sample_not_finalized', 409)
+            now = self._clock()
+            connection.execute(
+                text("""UPDATE oil_samples SET testing_status='OPEN',
+                testing_finalized_by=NULL,testing_finalized_at=NULL,
+                updated_by=:actor,updated_at=:now WHERE id=:id"""),
+                {'id': sample['id'], 'actor': actor.user_id, 'now': now},
+            )
+            self._insert_event(
+                connection,
+                sample['id'],
+                actor,
+                FinalizationEventType.WITHDRAWN,
+                now,
+                reason,
+            )
+            self._audit.append(
+                connection,
+                actor,
+                _AuditAction.LAB_TESTING_FINALIZATION_WITHDRAWN,
+                entity_id=sample['id'],
+            )
         return self.load(actor, barcode)
 
     def update_sample(
@@ -539,6 +693,79 @@ class LaboratoryWorkbench:
         return TestRecord(row['id'], TestType(row['test_type']), method, row['measured_at'],
                           row['instrument_name'], row['analyst_user_id'], row['notes'], result,
                           attachments, row['selected_for_report'], row['created_at'], row['updated_at'])
+
+    def _assessment(self, identity_status, tests):
+        blocking = []
+        missing_types = []
+        if identity_status != 'ASSOCIATED':
+            blocking.append('sample_identity_not_confirmed')
+        if not tests:
+            blocking.append('no_active_tests')
+        by_type: dict[TestType, list[TestRecord]] = {}
+        for record in tests:
+            by_type.setdefault(record.test_type, []).append(record)
+        for test_type, records in by_type.items():
+            if len(records) > 1 and not any(record.selected_for_report for record in records):
+                missing_types.append(test_type)
+        if missing_types:
+            blocking.append('report_result_selection_required')
+        warnings = tuple(dict.fromkeys(self._warning_source(tests)))
+        return FinalizationAssessment(
+            ready=not blocking,
+            blocking_codes=tuple(blocking),
+            missing_test_types=tuple(missing_types),
+            warning_codes=warnings,
+        )
+
+    @staticmethod
+    def _raise_blocker(assessment):
+        if 'sample_identity_not_confirmed' in assessment.blocking_codes:
+            raise LaboratoryError('sample_identity_not_confirmed')
+        if 'no_active_tests' in assessment.blocking_codes:
+            raise LaboratoryError('no_active_tests')
+        if assessment.missing_test_types:
+            raise LaboratoryError(
+                'report_result_selection_required',
+                details={
+                    'test_types': [item.value for item in assessment.missing_test_types]
+                },
+            )
+
+    @staticmethod
+    def _locked_sample(connection, barcode):
+        row = connection.execute(
+            text("""SELECT id,identity_status,testing_status FROM oil_samples
+            WHERE barcode_value=:barcode FOR UPDATE"""),
+            {'barcode': barcode},
+        ).mappings().first()
+        if not row:
+            raise LaboratoryError('sample_not_found', 404)
+        return row
+
+    @staticmethod
+    def _insert_event(connection, sample_id, actor, event_type, occurred_at, reason=None):
+        connection.execute(
+            text("""INSERT INTO laboratory_finalization_events
+            (id,oil_sample_id,event_type,actor_user_id,occurred_at,reason)
+            VALUES (:id,:sample,:type,:actor,:time,:reason)"""),
+            {'id': uuid4(), 'sample': sample_id, 'type': event_type.value,
+             'actor': actor.user_id, 'time': occurred_at, 'reason': reason},
+        )
+
+    @staticmethod
+    def _events(connection, sample_id):
+        return tuple(
+            FinalizationEvent(
+                row['id'], FinalizationEventType(row['event_type']), row['actor_user_id'],
+                row['occurred_at'], row['reason'],
+            )
+            for row in connection.execute(
+                text("""SELECT id,event_type,actor_user_id,occurred_at,reason
+                FROM laboratory_finalization_events WHERE oil_sample_id=:sample
+                ORDER BY occurred_at,id"""),
+                {'sample': sample_id},
+            ).mappings()
+        )
 
     @staticmethod
     def _editable_sample(connection, barcode):

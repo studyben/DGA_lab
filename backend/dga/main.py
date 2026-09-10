@@ -71,9 +71,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(LaboratoryError)
     async def laboratory_error(request, error):
+        content = {'code': error.code}
+        if error.details is not None:
+            content['details'] = error.details
         return JSONResponse(
             status_code=error.status,
-            content={'code': error.code},
+            content=content,
             headers={'Cache-Control': 'no-store'},
         )
 

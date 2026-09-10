@@ -23,10 +23,12 @@ def upgrade():
         ALTER TABLE oil_samples
             ADD COLUMN testing_finalized_by UUID REFERENCES users(id),
             ADD COLUMN testing_finalized_at TIMESTAMPTZ,
-            ADD CONSTRAINT testing_finalizer_and_time_together CHECK (
-                (testing_finalized_by IS NULL AND testing_finalized_at IS NULL)
+            ADD CONSTRAINT testing_status_and_finalizer_consistent CHECK (
+                (testing_status='OPEN'
+                    AND testing_finalized_by IS NULL AND testing_finalized_at IS NULL)
                 OR
-                (testing_finalized_by IS NOT NULL AND testing_finalized_at IS NOT NULL)
+                (testing_status='FINALIZED'
+                    AND testing_finalized_by IS NOT NULL AND testing_finalized_at IS NOT NULL)
             );
 
         CREATE TABLE laboratory_finalization_events (
@@ -53,7 +55,7 @@ def downgrade():
         """
         DROP TABLE laboratory_finalization_events;
         ALTER TABLE oil_samples
-            DROP CONSTRAINT testing_finalizer_and_time_together,
+            DROP CONSTRAINT testing_status_and_finalizer_consistent,
             DROP COLUMN testing_finalized_at,
             DROP COLUMN testing_finalized_by;
         DROP INDEX laboratory_one_selected_result_per_type;
