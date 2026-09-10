@@ -1,8 +1,12 @@
 """Destructive fixture setup exclusively for the isolated browser-test database."""
+from datetime import datetime, timezone
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
+from dga.assets.public import AssetDirectory
+from dga.laboratory.public import ReceiveSample, SampleIdentityStatus, SampleRegistry
 from dga.shared.config import Settings
-from dga.shared.auth.public import IdentityService
+from dga.shared.auth.public import AuditTrail, IdentityService
 
 
 def main():
@@ -14,9 +18,10 @@ def main():
     try:
         with engine.begin() as connection:
             connection.execute(text(
-                'TRUNCATE asset_installations,formal_assets,sites,customers,'
+                'TRUNCATE oil_samples,asset_installations,formal_assets,sites,customers,'
                 'auth_sessions,user_roles,audit_logs,users CASCADE'
             ))
+            connection.execute(text("ALTER SEQUENCE oil_sample_number_seq RESTART WITH 1"))
         service = IdentityService(engine)
         initial = 'Browser initial passphrase 42!'
         changed = 'Browser changed passphrase 84!'
@@ -27,7 +32,6 @@ def main():
         service.provision_user(admin.actor, 'field-user', '现场工程师', initial, ['field_engineer'])
         field = service.login('field-user', initial)
         service.change_password(field.token, initial, changed)
-        service.logout(admin.token)
         with engine.begin() as connection:
             connection.execute(text("""
                 INSERT INTO customers(id,customer_name) VALUES
@@ -59,6 +63,22 @@ def main():
                  '30000000-0000-0000-0000-000000000001',NULL,
                  '2024-01-01T00:00:00Z',NULL);
             """))
+        sample = SampleRegistry(engine, AssetDirectory(engine), AuditTrail()).receive(
+            admin.actor,
+            ReceiveSample(
+                sampled_at=datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc),
+                received_at=datetime(2026, 8, 2, 9, 0, tzinfo=timezone.utc),
+                site_name='ignored',
+                equipment_serial='ignored',
+                notes='浏览器验收样品',
+                container_count=2,
+                identity_status=SampleIdentityStatus.ASSOCIATED,
+                formal_asset_id='40000000-0000-0000-0000-000000000002',
+            ),
+        )
+        if sample.barcode_value != 'DGA-20260802-000001':
+            raise RuntimeError('Unexpected browser sample barcode')
+        service.logout(admin.token)
     finally:
         engine.dispose()
 

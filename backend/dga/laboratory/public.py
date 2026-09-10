@@ -17,21 +17,14 @@ from dga.shared.auth.public import (
 )
 from dga.shared.contracts import ModuleDescriptor
 
+from .errors import LaboratoryError
+
 MODULE = ModuleDescriptor(code='laboratory', label='DGA 实验室')
 
 
 def access_context(actor: ActorContext) -> dict:
     require_permission(actor, 'laboratory.read')
     return {'module': MODULE.code, 'actor_id': str(actor.user_id)}
-
-
-class LaboratoryError(Exception):
-    """Stable application error for laboratory reception operations."""
-
-    def __init__(self, code: str, status: int = 422):
-        self.code = code
-        self.status = status
-        super().__init__(code)
 
 
 class SampleIdentityStatus(StrEnum):
@@ -321,8 +314,29 @@ class SampleRegistry:
             raise LaboratoryError('pending_identity_has_asset')
 
 
-def http_router(registry: SampleRegistry, actor_dependency: Callable, mutation_actor_dependency: Callable):
+def http_router(registry: SampleRegistry, workbench, actor_dependency: Callable, mutation_actor_dependency: Callable):
     """Compose the laboratory-owned HTTP adapter."""
     from .http import laboratory_router
 
-    return laboratory_router(registry, actor_dependency, mutation_actor_dependency)
+    return laboratory_router(registry, workbench, actor_dependency, mutation_actor_dependency)
+
+
+# Result-entry contracts are re-exported here so callers cross one laboratory seam.
+from .workbench import (  # noqa: E402
+    BreakdownVoltageResultInput,
+    DgaResultInput,
+    LaboratoryWorkbench,
+    MethodConfiguration,
+    MethodField,
+    MoistureResultInput,
+    QualifiedMeasurement,
+    RawAttachment,
+    ResultQualifier,
+    StoredAttachment,
+    TestRecord,
+    TestSubmission,
+    TestType,
+    TestingStatus,
+    UpdateSampleBasics,
+    WorkbenchSample,
+)

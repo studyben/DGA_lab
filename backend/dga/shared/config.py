@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
     session_hours: int = Field(default=8, ge=1, le=24)
     auth_allowed_origins: str = 'http://127.0.0.1:8080'
+    object_store_endpoint: str | None = None
+    object_store_bucket: str | None = None
+    object_store_access_key: SecretStr | None = None
+    object_store_secret_key: SecretStr | None = None
+    object_store_region: str = 'us-east-1'
 
     @field_validator('database_url')
     @classmethod

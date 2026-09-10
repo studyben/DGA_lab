@@ -2,7 +2,7 @@
 
 中文现场资产与油样管理门户。当前交付 [Issue #2](https://github.com/studyben/DGA_lab/issues/2) 的工程基础，完整 MVP 规格见 [Issue #1](https://github.com/studyben/DGA_lab/issues/1)。
 
-这是绿地项目的初始生产工程：#2 门户导航、模块入口、迁移和测试基础，#3 本地账号、权限、会话和身份审计，#4 正式资产搜索与历史采样上下文，以及 #5 油样收样、身份快照、共享条码和浏览器标签打印已经实现。检测、整体检测定稿和报告仍由后续工单交付；其他未实施业务页明确显示待开放，不展示原型假数据。
+这是绿地项目的初始生产工程：#2 门户导航与测试基础，#3 本地账号、权限、会话和审计，#4 正式资产搜索，#5 油样收样与共享条码，以及 #6 条码检测工作台、类型化检测结果和原始附件已经实现。整体检测定稿和报告仍由后续工单交付；其他未实施业务页明确显示待开放，不展示原型假数据。
 
 ## 启动
 
@@ -63,6 +63,7 @@ nginx 提供 React/TypeScript 静态构建，并将 `/api/` 转发给 FastAPI；
 - `COOKIE_SECURE`：应用默认 true；本机 Compose 显式 false。生产必须使用 HTTPS + Secure cookie。
 - `SESSION_HOURS`：绝对会话时长，默认 8，小于 1 或大于 24 拒绝启动。
 - `AUTH_ALLOWED_ORIGINS`：逗号分隔的完整来源（协议、主机、端口），认证 POST 必须带匹配 Origin；同源浏览器会自动发送。部署时仅列允许的 HTTPS 地址。
+- `OBJECT_STORE_ENDPOINT`、`OBJECT_STORE_BUCKET`、`OBJECT_STORE_ACCESS_KEY`、`OBJECT_STORE_SECRET_KEY`：共同配置一个 path-style S3 兼容对象存储；`OBJECT_STORE_REGION` 默认 `us-east-1`。四项缺失时普通检测数据仍可使用，但附件保存会明确失败且不会生成伪成功记录。本地 Compose 运行隔离 MinIO，生产凭据不得提交仓库。
 - `GET /api/health`：数据库可连接且迁移版本匹配时 200 `{ "status": "ok", "database": "ok" }`；连接失败或未迁移时 503，字段均为 `unavailable`。不自动执行迁移，不输出数据库异常或凭据。
 - `GET /api/modules`：登录且完成首次改密后返回获授权模块的稳定代码和标签；不是业务 CRUD。
 - `/api/auth/login`、`/api/auth/password`、`/api/auth/logout`：POST；`/api/auth/session`：GET。会话 cookie 为 HttpOnly/SameSite=Lax，不放 localStorage；改密和退出需当前会话返回的 X-CSRF-Token。
@@ -71,6 +72,7 @@ nginx 提供 React/TypeScript 静态构建，并将 `/api/` 转发给 FastAPI；
 - `GET /api/assets/{asset_id}/sampling-context?sampled_at=...`：按带时区的采样时间解析客户、现场和完整设备路径。两项查询均要求 `assets.read`，不提供资产编辑或导入。
 - `POST /api/laboratory/samples`：以正式资产关联或明确的“身份待确认”方式登记油样；正式关联会保存采样时客户、现场、设备路径和序列号快照，一个油样可登记 1–20 个共享条码的样品容器。
 - `GET /api/laboratory/samples/by-barcode/{barcode}`：扫描或输入油样条码取回同一组收样基本信息和容器；`POST /api/laboratory/samples/{barcode}/label-prints` 在调用浏览器打印前记录审计。两个 POST 均要求同源 Origin 和当前会话 CSRF。
+- `GET /api/laboratory/workbench/{barcode}`：取回油样基础信息、容器、检测中状态、启用的方法配置和全部有效检测。`PATCH /api/laboratory/samples/{barcode}` 修正基础信息；`POST/PUT/DELETE /api/laboratory/samples/{barcode}/tests...` 新增、修改或逻辑删除 DGA、微水和击穿电压记录。重复检测是同一条码下的独立记录，不另建“复测”实体；ND 不保存数值，LT/GT 保存边界数值。正式 ASTM 方法编号、单位、精度和检出限当前明确待配置。
 
 密码使用 Argon2id（19MiB、2 次、并行度 1）；只存哈希。会话为随机不透明凭据，数据库只存会话凭据 SHA-256。退出撤销当前会话，改密撤销全部旧会话并创建新会话；停用/锁定撤销旧会话，重新启用不会复活它们。每次请求读取当前状态/角色。连续 5 次错误密码后账号临时限制 15 分钟；接口不透露账号是否存在。前端每 30 秒及重新聚焦时检查会话，后端每次请求校验，因此撤销后的数据接口立即受限。
 
@@ -88,7 +90,7 @@ docker compose -f compose.browser.yaml --profile test run --build --no-deps --rm
 
 API 测试会启动独立 `test-db` PostgreSQL，先执行与应用一致的 Alembic migration，然后从 HTTP/公开应用接口观察行为。测试 URL 限制为 test-db/dga_test/dga_test，避免误迁移应用数据。测试存储为 tmpfs，停止后不保留。当前 migration downgrade 验证按串行执行；请勿对同一 test-db 并发运行多份套件。不同开发任务可使用不同 Compose project name 隔离。
 
-浏览器套件使用独立 dga-browser Compose 项目、临时 PostgreSQL 和匹配版本的 Playwright Linux 镜像，在 18080 提供测试门户。fixture 脚本严格拒绝非 dga_browser 数据库；测试账号仅存在于此隔离环境，不在正常应用中生成。验证登录/首次改密/退出、权限拒绝、Logo、导航/刷新/返回与服务重试，并覆盖正式资产搜索、收样、标签预览/打印及再次扫码取回。失败重试仅在 HTTP 外部边界注入 503，其余走真实 API；不依赖 React 组件树、CSS 类名或内部表。
+浏览器套件使用独立 dga-browser Compose 项目、临时 PostgreSQL 和匹配版本的 Playwright Linux 镜像，在 18080 提供测试门户。fixture 脚本严格拒绝非 dga_browser 数据库；测试账号仅存在于此隔离环境，不在正常应用中生成。验证登录/权限、Logo、导航与服务重试，并覆盖正式资产搜索、收样条码，以及扫码后连续新增两份 DGA、修改和删除。附件的失败原子性在共享文件端口使用测试实现验证，浏览器套件不替代对象存储验收。失败重试仅在 HTTP 外部边界注入 503，其余走真实 API；不依赖 React 组件树或内部表。
 
 首次改密测试会改变测试账号密码。重复执行前，仅重置隔离 fixture（不能用于正常应用）：
 
@@ -116,7 +118,7 @@ docker compose -f compose.browser.yaml --profile test down
 
 ## 数据库演进
 
-首个 Alembic migration 是空业务 schema 基线；0002 增加用户、角色、权限、关联、会话与身份审计；0003 增加客户、现场、正式资产和带有效期的设备/现场安装关系；0004 增加油样、不可变资产快照、共享条码和样品容器。序列号刻意不唯一，系统资产号唯一。后续业务表归其拥有模块，不提前复制全部设计草案。downgrade 仅允许隔离测试库使用，已有真实数据的环境不得执行。
+首个 Alembic migration 是空业务 schema 基线；0002 增加身份与审计；0003 增加正式资产和安装关系；0004 增加油样、身份快照、共享条码和容器；0005 增加检测中状态、只读方法版本、通用检测头、三类一对一结果表及对象元数据。序列号刻意不唯一，系统资产号唯一。0005 只提供待配置的方法占位，不预置未经确认的 ASTM 参数；完整配置管理属于 #14。downgrade 仅允许隔离测试库使用，已有真实数据的环境不得执行。
 
 ```sh
 docker compose run --rm migrate alembic current
