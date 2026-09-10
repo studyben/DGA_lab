@@ -37,7 +37,7 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "127.0.0.1:18080:8080"
+      - "127.0.0.1:${DGA_BROWSER_PORT:-18080}:8080"
     depends_on:
       api:
         condition: service_healthy

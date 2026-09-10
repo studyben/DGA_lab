@@ -7,6 +7,7 @@ import "./styles.css";
 import { ConnectionStatus } from "./ConnectionStatus";
 import sungrowLogo from "./assets/sungrow-logo.svg";
 import { AuthProvider, AuthBoundary, SessionControls, useAuth } from './Auth';
+import { ReceptionPage } from './features/laboratory/ReceptionPage';
 
 const path =
   window.location.pathname === "/"
@@ -100,7 +101,7 @@ function App() {
               </div>
               <span className="outline-badge">工程基础阶段</span>
             </div>
-            <section className="empty-panel" aria-label="页面内容">
+            {path === '/lab/reception' ? <ReceptionPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>
@@ -117,8 +118,8 @@ function App() {
                   返回资产仪表板
                 </a>
               )}
-            </section>
-            <section className="overview" aria-label="工作区说明">
+            </section>}
+            {path !== '/lab/reception' && <section className="overview" aria-label="工作区说明">
               <article>
                 <span className="step">01 / 资产身份</span>
                 <h2>从现场到设备</h2>
@@ -134,7 +135,7 @@ function App() {
                 <h2>从结果到趋势</h2>
                 <p>围绕同一台物理变压器，追踪可比较的检测结果。</p>
               </article>
-            </section>
+            </section>}
             <footer>
               内部应用 · 中文桌面工作区
               <ConnectionStatus />

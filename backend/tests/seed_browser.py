@@ -13,7 +13,10 @@ def main():
     engine = create_engine(value)
     try:
         with engine.begin() as connection:
-            connection.execute(text('TRUNCATE auth_sessions,user_roles,audit_logs,users CASCADE'))
+            connection.execute(text(
+                'TRUNCATE asset_installations,formal_assets,sites,customers,'
+                'auth_sessions,user_roles,audit_logs,users CASCADE'
+            ))
         service = IdentityService(engine)
         initial = 'Browser initial passphrase 42!'
         changed = 'Browser changed passphrase 84!'
@@ -25,6 +28,37 @@ def main():
         field = service.login('field-user', initial)
         service.change_password(field.token, initial, changed)
         service.logout(admin.token)
+        with engine.begin() as connection:
+            connection.execute(text("""
+                INSERT INTO customers(id,customer_name) VALUES
+                ('10000000-0000-0000-0000-000000000001','Prairie Solar LLC');
+                INSERT INTO sites(id,customer_id,site_name,location_text) VALUES
+                ('20000000-0000-0000-0000-000000000001',
+                 '10000000-0000-0000-0000-000000000001','Prairie Sun','Texas, USA');
+                INSERT INTO formal_assets
+                    (id,system_asset_number,asset_type,serial_number,model,material_number,lifecycle_status)
+                VALUES
+                ('30000000-0000-0000-0000-000000000001','SYS-PV-001','WHOLE_UNIT',
+                 'INV-UNIT-7788','SG4400UD','MAT-UNIT-44','IN_SERVICE'),
+                ('40000000-0000-0000-0000-000000000001','SYS-TX-001','TRANSFORMER',
+                 'TX-OLD-1001','TX-4400','MAT-TX-40','RETIRED'),
+                ('40000000-0000-0000-0000-000000000002','SYS-TX-002','TRANSFORMER',
+                 'TX-CURRENT-2002','TX-4400','MAT-TX-41','IN_SERVICE');
+                INSERT INTO asset_installations
+                    (id,asset_id,parent_asset_id,site_id,valid_from,valid_to)
+                VALUES
+                ('50000000-0000-0000-0000-000000000001',
+                 '30000000-0000-0000-0000-000000000001',NULL,
+                 '20000000-0000-0000-0000-000000000001','2020-01-01T00:00:00Z',NULL),
+                ('50000000-0000-0000-0000-000000000002',
+                 '40000000-0000-0000-0000-000000000001',
+                 '30000000-0000-0000-0000-000000000001',NULL,
+                 '2020-01-01T00:00:00Z','2024-01-01T00:00:00Z'),
+                ('50000000-0000-0000-0000-000000000003',
+                 '40000000-0000-0000-0000-000000000002',
+                 '30000000-0000-0000-0000-000000000001',NULL,
+                 '2024-01-01T00:00:00Z',NULL);
+            """))
     finally:
         engine.dispose()
 
