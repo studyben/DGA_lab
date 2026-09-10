@@ -25,5 +25,7 @@
 - Aggregate deep review `docs/reviews/code-review-20260910-133153.md`: two high findings accepted (implicit selection audit; finalized-data migration round trip); fix/re-review pending.
 - Aggregate findings fixed: implicit selection clears and sole-result auto-selection are audited; `0006` finalized-data downgrade/re-upgrade is covered.
 - Aggregate re-review `docs/reviews/code-review-20260910-133633.md`: PASS; 56 backend/PostgreSQL tests and 12 Playwright tests pass.
-- Current gate: final documentation and delivery verification.
+- Accepted aggregate-review commit: `69a1fb1`.
+- Final closeout: all local gates passed; ready to publish a stacked draft PR after explicit authorization.
+- Draft PR base must be `codex/issue-6-test-entry` while PR #26 remains unmerged.
 - No push, PR, merge, Issue comment, or Issue close has occurred.
