@@ -90,7 +90,7 @@ docker compose -f compose.browser.yaml --profile test run --build --no-deps --rm
 
 API 测试会启动独立 `test-db` PostgreSQL，先执行与应用一致的 Alembic migration，然后从 HTTP/公开应用接口观察行为。测试 URL 限制为 test-db/dga_test/dga_test，避免误迁移应用数据。测试存储为 tmpfs，停止后不保留。当前 migration downgrade 验证按串行执行；请勿对同一 test-db 并发运行多份套件。不同开发任务可使用不同 Compose project name 隔离。
 
-浏览器套件使用独立 dga-browser Compose 项目、临时 PostgreSQL 和匹配版本的 Playwright Linux 镜像，在 18080 提供测试门户。fixture 脚本严格拒绝非 dga_browser 数据库；测试账号仅存在于此隔离环境，不在正常应用中生成。验证登录/权限、Logo、导航与服务重试，并覆盖正式资产搜索、收样条码，以及扫码后连续新增两份 DGA、修改和删除。附件的失败原子性在共享文件端口使用测试实现验证，浏览器套件不替代对象存储验收。失败重试仅在 HTTP 外部边界注入 503，其余走真实 API；不依赖 React 组件树或内部表。
+浏览器套件使用独立 dga-browser Compose 项目、临时 PostgreSQL 和匹配版本的 Playwright Linux 镜像，在 18080 提供测试门户。fixture 脚本严格拒绝非 dga_browser 数据库；测试账号仅存在于此隔离环境，不在正常应用中生成。验证登录/权限、Logo、导航与服务重试，并覆盖正式资产搜索、收样条码，以及扫码后连续新增两份 DGA、修改和删除。附件的失败原子性在共享文件端口使用测试实现验证，浏览器套件不替代对象存储验收。失败重试仅在 HTTP 外部边界注入 503，其余走真实 API；不依赖 React 组件树、CSS 类名或内部表。
 
 首次改密测试会改变测试账号密码。重复执行前，仅重置隔离 fixture（不能用于正常应用）：
 

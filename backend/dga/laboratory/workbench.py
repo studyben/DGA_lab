@@ -11,7 +11,6 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import Engine, text
 
-from dga.assets.public import AssetDirectory
 from dga.shared.auth.public import ActorContext, AuditTrail, require_permission
 from dga.shared.files import FileStore
 
@@ -109,6 +108,7 @@ class MethodConfiguration:
     display_name: str
     standard_reference: str | None
     version_label: str
+    is_active: bool
     fields: tuple[MethodField, ...]
 
 
@@ -162,18 +162,15 @@ class LaboratoryWorkbench:
     def __init__(
         self,
         engine: Engine,
+        sample_registry: 'SampleRegistry',
         audit_trail: AuditTrail,
         object_store: FileStore,
         *,
-        sample_registry: 'SampleRegistry | None' = None,
         clock: Callable[[], datetime] | None = None,
     ):
         self._engine = engine
         self._audit = audit_trail
         self._objects = object_store
-        if sample_registry is None:
-            from .public import SampleRegistry
-            sample_registry = SampleRegistry(engine, AssetDirectory(engine), audit_trail)
         self._samples = sample_registry
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
@@ -187,7 +184,7 @@ class LaboratoryWorkbench:
             ).mappings().first()
             if not sample_row:
                 raise LaboratoryError('sample_not_found', 404)
-            methods = self._methods(connection)
+            methods = self._methods(connection, sample_row['id'])
             tests = tuple(
                 self._record(connection, row, methods)
                 for row in connection.execute(
@@ -218,7 +215,8 @@ class LaboratoryWorkbench:
         try:
             with self._engine.begin() as connection:
                 sample_id = self._editable_sample(connection, self._barcode(barcode_value))
-                self._method(connection, submission.method_version_id, submission.test_type)
+                method = self._method(connection, submission.method_version_id, submission.test_type)
+                self._validate_configured_precision(submission, method)
                 self._insert_header(connection, test_id, sample_id, actor, submission, now)
                 self._replace_result(connection, test_id, submission)
                 if attachment:
@@ -248,13 +246,19 @@ class LaboratoryWorkbench:
             with self._engine.begin() as connection:
                 sample_id = self._editable_sample(connection, self._barcode(barcode_value))
                 existing = connection.execute(
-                    text("""SELECT test_type FROM laboratory_tests
+                    text("""SELECT test_type,method_version_id FROM laboratory_tests
                     WHERE id=:id AND oil_sample_id=:sample AND record_status='ACTIVE' FOR UPDATE"""),
                     {'id': test_id, 'sample': sample_id},
                 ).mappings().first()
                 if not existing:
                     raise LaboratoryError('test_not_found', 404)
-                self._method(connection, submission.method_version_id, submission.test_type)
+                method = self._method(
+                    connection,
+                    submission.method_version_id,
+                    submission.test_type,
+                    allow_inactive=submission.method_version_id == existing['method_version_id'],
+                )
+                self._validate_configured_precision(submission, method)
                 old_table = self._result_table(TestType(existing['test_type']))
                 connection.execute(text(f'DELETE FROM {old_table} WHERE test_id=:id'), {'id': test_id})
                 now = self._clock()
@@ -431,17 +435,22 @@ class LaboratoryWorkbench:
             TestType.BREAKDOWN_VOLTAGE: 'breakdown_voltage_test_results',
         }[test_type]
 
-    def _methods(self, connection):
+    def _methods(self, connection, sample_id):
         rows = connection.execute(
-            text('SELECT * FROM test_method_versions WHERE is_active ORDER BY test_type,display_name,id')
+            text("""SELECT * FROM test_method_versions m
+            WHERE m.is_active OR EXISTS (
+                SELECT 1 FROM laboratory_tests t
+                WHERE t.oil_sample_id=:sample AND t.method_version_id=m.id
+            ) ORDER BY test_type,display_name,id"""),
+            {'sample': sample_id},
         ).mappings().all()
         return tuple(self._method_from_row(connection, row) for row in rows)
 
-    def _method(self, connection, method_id, test_type):
+    def _method(self, connection, method_id, test_type, *, allow_inactive=False):
         row = connection.execute(
-            text('SELECT * FROM test_method_versions WHERE id=:id AND is_active'), {'id': method_id}
+            text('SELECT * FROM test_method_versions WHERE id=:id'), {'id': method_id}
         ).mappings().first()
-        if not row or row['test_type'] != test_type.value:
+        if not row or row['test_type'] != test_type.value or (not row['is_active'] and not allow_inactive):
             raise LaboratoryError('invalid_method')
         return self._method_from_row(connection, row)
 
@@ -456,7 +465,7 @@ class LaboratoryWorkbench:
             ).mappings()
         )
         return MethodConfiguration(row['id'], TestType(row['test_type']), row['display_name'],
-                                   row['standard_reference'], row['version_label'], fields)
+                                   row['standard_reference'], row['version_label'], row['is_active'], fields)
 
     def _record(self, connection, row, methods):
         method = next(item for item in methods if item.id == row['method_version_id'])
@@ -516,6 +525,23 @@ class LaboratoryWorkbench:
                 raise LaboratoryError('qualifier_requires_value')
             if measurement.value is not None and measurement.value < 0:
                 raise LaboratoryError('negative_result')
+            if measurement.value is not None and measurement.value.as_tuple().exponent < -6:
+                raise LaboratoryError('result_precision_exceeded')
+
+    @staticmethod
+    def _validate_configured_precision(submission, method):
+        if submission.test_type == TestType.DGA:
+            measurements = {
+                code.upper(): getattr(submission.result, code)
+                for code in ('h2', 'ch4', 'c2h2', 'c2h4', 'c2h6', 'co', 'co2')
+            }
+        else:
+            measurements = {method.fields[0].code: submission.result.result}
+        for field in method.fields:
+            value = measurements[field.code].value
+            if (value is not None and field.display_decimal_places is not None
+                    and value.as_tuple().exponent < -field.display_decimal_places):
+                raise LaboratoryError('configured_precision_exceeded')
 
     @staticmethod
     def _barcode(value):

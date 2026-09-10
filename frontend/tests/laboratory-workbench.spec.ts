@@ -36,11 +36,11 @@ test('scan barcode, add two DGA records, edit and delete', async ({ page }) => {
   await addDga(page, '12.5');
   await expect(page.getByText('DGA 检测 #2')).toBeVisible();
 
-  const cards = page.locator('.test-card');
+  const cards = page.getByRole('article', { name: /DGA 检测 #/ });
   await cards.nth(0).getByRole('button', { name: '修改' }).click();
   await page.getByLabel('H₂结果', { exact: true }).fill('15');
   await page.getByRole('button', { name: '保存修改' }).click();
-  await expect(cards.nth(0)).toContainText('H2  15');
+  await expect(cards.nth(0)).toContainText('H2 15');
 
   page.once('dialog', dialog => dialog.accept('误录的复测数据'));
   await cards.nth(1).getByRole('button', { name: '删除' }).click();

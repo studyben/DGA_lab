@@ -33,7 +33,7 @@ def upgrade():
             field_code VARCHAR(30) NOT NULL,
             display_name VARCHAR(80) NOT NULL,
             unit_code VARCHAR(40),
-            display_decimal_places SMALLINT CHECK (display_decimal_places BETWEEN 0 AND 9),
+            display_decimal_places SMALLINT CHECK (display_decimal_places BETWEEN 0 AND 6),
             detection_limit NUMERIC(18,6),
             sort_order SMALLINT NOT NULL,
             PRIMARY KEY (method_version_id,field_code)

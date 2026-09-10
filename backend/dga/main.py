@@ -115,7 +115,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(
         laboratory_router(
             sample_registry,
-            LaboratoryWorkbench(engine, AuditTrail(), object_store, sample_registry=sample_registry),
+            LaboratoryWorkbench(engine, sample_registry, AuditTrail(), object_store),
             current_actor,
             mutation_actor,
         )

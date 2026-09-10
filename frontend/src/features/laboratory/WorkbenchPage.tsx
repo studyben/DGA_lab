@@ -18,6 +18,7 @@ type Method = {
   display_name: string;
   standard_reference: string | null;
   version_label: string;
+  is_active: boolean;
   fields: MethodField[];
 };
 type TestRecord = {
@@ -85,14 +86,18 @@ export function WorkbenchPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<TestRecord | null>(null);
   const [testType, setTestType] = useState<TestType>('DGA');
+  const [methodId, setMethodId] = useState('');
   const [measuredAt, setMeasuredAt] = useState('');
   const [instrument, setInstrument] = useState('');
   const [notes, setNotes] = useState('');
   const [measurements, setMeasurements] = useState<Record<string, { qualifier: Qualifier; value: string }>>({});
   const [attachment, setAttachment] = useState<File | null>(null);
   const method = useMemo(
-    () => data?.methods.find(item => item.test_type === testType) ?? null,
-    [data, testType],
+    () => editing?.method
+      ?? data?.methods.find(item => item.id === methodId && item.test_type === testType && item.is_active)
+      ?? data?.methods.find(item => item.test_type === testType && item.is_active)
+      ?? null,
+    [data, editing, methodId, testType],
   );
 
   async function load(value = barcode) {
@@ -111,13 +116,16 @@ export function WorkbenchPage() {
   }
 
   function beginCreate(type: TestType) {
-    setEditing(null); setTestType(type); setMeasuredAt(localDateTime(new Date().toISOString()));
+    setEditing(null); setTestType(type);
+    setMethodId(data?.methods.find(item => item.test_type === type && item.is_active)?.id ?? '');
+    setMeasuredAt(localDateTime(new Date().toISOString()));
     setInstrument(''); setNotes(''); setMeasurements({}); setAttachment(null); setShowForm(true);
   }
 
   function beginEdit(record: TestRecord) {
     const current = resultMeasurements(record);
-    setEditing(record); setTestType(record.test_type); setMeasuredAt(localDateTime(record.measured_at));
+    setEditing(record); setTestType(record.test_type); setMethodId(record.method.id);
+    setMeasuredAt(localDateTime(record.measured_at));
     setInstrument(record.instrument_name ?? ''); setNotes(record.notes ?? '');
     setMeasurements(Object.fromEntries(Object.entries(current).map(([code, item]) => [
       code.toLowerCase(), { qualifier: item.qualifier, value: item.value === null ? '' : String(item.value) },
@@ -228,37 +236,39 @@ export function WorkbenchPage() {
         <div><span className="step">02 / 油样</span><h2>{data.sample.sample_number}</h2></div>
         <span className={`status-pill ${data.testing_status === 'OPEN' ? 'open' : ''}`}>{data.testing_status === 'OPEN' ? '检测中' : '已定稿'}</span>
         <p>{data.sample.site_name} · {data.sample.equipment_serial} · {data.sample.containers.length} 只容器</p>
+        <ul className="container-list" aria-label="样品容器清单">{data.sample.containers.map(container => <li key={container.container_number}>{container.container_number}</li>)}</ul>
       </section>
 
       <section className="reception-panel">
         <div className="section-heading"><div><span className="step">03 / 基础信息</span><h2>核对或修正油样信息</h2></div></div>
         <form className="reception-form" onSubmit={saveBasics}>
-          <label>采样时间<input name="sampled_at" type="datetime-local" defaultValue={localDateTime(data.sample.sampled_at)} required /></label>
-          <label>收样时间<input name="received_at" type="datetime-local" defaultValue={localDateTime(data.sample.received_at)} required /></label>
-          <label>现场名称<input name="site_name" defaultValue={data.sample.site_name} disabled={data.sample.identity_status === 'ASSOCIATED'} required /></label>
-          <label>设备序列号<input name="equipment_serial" defaultValue={data.sample.equipment_serial} disabled={data.sample.identity_status === 'ASSOCIATED'} required /></label>
-          <label className="wide-field">备注<textarea name="notes" defaultValue={data.sample.notes ?? ''} rows={2} /></label>
+          <label>采样时间<input name="sampled_at" type="datetime-local" defaultValue={localDateTime(data.sample.sampled_at)} disabled={data.testing_status !== 'OPEN'} required /></label>
+          <label>收样时间<input name="received_at" type="datetime-local" defaultValue={localDateTime(data.sample.received_at)} disabled={data.testing_status !== 'OPEN'} required /></label>
+          <label>现场名称<input name="site_name" defaultValue={data.sample.site_name} disabled={data.sample.identity_status === 'ASSOCIATED' || data.testing_status !== 'OPEN'} required /></label>
+          <label>设备序列号<input name="equipment_serial" defaultValue={data.sample.equipment_serial} disabled={data.sample.identity_status === 'ASSOCIATED' || data.testing_status !== 'OPEN'} required /></label>
+          <label className="wide-field">备注<textarea name="notes" defaultValue={data.sample.notes ?? ''} disabled={data.testing_status !== 'OPEN'} rows={2} /></label>
           <input type="hidden" name="site_name" value={data.sample.site_name} />
           <input type="hidden" name="equipment_serial" value={data.sample.equipment_serial} />
-          <button className="primary-action wide-field" disabled={busy}>保存基础信息</button>
+          <button className="primary-action wide-field" disabled={busy || data.testing_status !== 'OPEN'}>{data.testing_status === 'OPEN' ? '保存基础信息' : '已定稿，基础信息不可修改'}</button>
         </form>
       </section>
 
       <section className="test-records" aria-labelledby="test-records-title">
         <div className="section-heading"><div><span className="step">04 / 检测</span><h2 id="test-records-title">检测记录</h2></div>
-          <div className="test-actions">{(Object.keys(TYPE_LABEL) as TestType[]).map(type => <button key={type} type="button" onClick={() => beginCreate(type)}>新增{TYPE_LABEL[type]}</button>)}</div>
+          {data.testing_status === 'OPEN' && <div className="test-actions">{(Object.keys(TYPE_LABEL) as TestType[]).map(type => <button key={type} type="button" disabled={!data.methods.some(method => method.test_type === type && method.is_active)} onClick={() => beginCreate(type)}>新增{TYPE_LABEL[type]}</button>)}</div>}
         </div>
-        {data.tests.length === 0 ? <p className="no-results">尚无检测记录。</p> : <div className="test-list">{data.tests.map((record, index) => <article className="test-card" key={record.id}>
+        {data.tests.length === 0 ? <p className="no-results">尚无检测记录。</p> : <div className="test-list">{data.tests.map((record, index) => <article className="test-card" aria-label={`${TYPE_LABEL[record.test_type]} 检测 #${index + 1}`} key={record.id}>
           <div><span className="test-type">{TYPE_LABEL[record.test_type]}</span><strong>{TYPE_LABEL[record.test_type]} 检测 #{index + 1}</strong><p>{new Date(record.measured_at).toLocaleString('zh-CN')} · {record.instrument_name || '未填写仪器'}</p></div>
-          <div className="measurement-preview">{Object.entries(resultMeasurements(record)).slice(0, 3).map(([code, item]) => <span key={code}>{code.toUpperCase()} {item.qualifier === 'EQ' ? '' : item.qualifier} {item.value ?? ''}</span>)}</div>
-          <div className="record-actions"><button type="button" onClick={() => beginEdit(record)}>修改</button><button type="button" className="danger-action" onClick={() => void remove(record)}>删除</button></div>
+          <div className="measurement-preview">{Object.entries(resultMeasurements(record)).slice(0, 3).map(([code, item]) => <span key={code}>{code.toUpperCase()} {item.qualifier === 'EQ' ? '' : `${item.qualifier} `}{item.value ?? ''}</span>)}</div>
+          {data.testing_status === 'OPEN' && <div className="record-actions"><button type="button" onClick={() => beginEdit(record)}>修改</button><button type="button" className="danger-action" onClick={() => void remove(record)}>删除</button></div>}
         </article>)}</div>}
       </section>
 
-      {showForm && method && <section className="test-editor" aria-labelledby="test-editor-title">
+      {showForm && method && data.testing_status === 'OPEN' && <section className="test-editor" aria-labelledby="test-editor-title">
         <div className="section-heading"><div><span className="step">05 / 录入</span><h2 id="test-editor-title">{editing ? `修改${TYPE_LABEL[testType]}` : `新增${TYPE_LABEL[testType]}`}</h2></div><button type="button" className="quiet-action" onClick={() => setShowForm(false)}>取消</button></div>
         <p className="method-note">{method.display_name} · {method.standard_reference ?? 'ASTM 方法编号待配置'}</p>
         <form className="test-form" onSubmit={saveTest}>
+          <label>检测方法<select value={method.id} disabled={Boolean(editing)} onChange={event => setMethodId(event.target.value)}>{data.methods.filter(item => item.test_type === testType && (item.is_active || item.id === editing?.method.id)).map(item => <option value={item.id} key={item.id}>{item.display_name} · {item.version_label}</option>)}</select></label>
           <label>检测时间<input type="datetime-local" value={measuredAt} onChange={event => setMeasuredAt(event.target.value)} required /></label>
           <label>仪器<input value={instrument} onChange={event => setInstrument(event.target.value)} maxLength={160} /></label>
           <div className="measurement-grid wide-field">{method.fields.map(field => {

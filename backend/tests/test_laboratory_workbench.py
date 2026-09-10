@@ -44,6 +44,16 @@ class RecordingObjectStore:
         self.objects.pop(object_key, None)
 
 
+def make_workbench(engine, store):
+    audit = AuditTrail()
+    return LaboratoryWorkbench(
+        engine,
+        SampleRegistry(engine, AssetDirectory(engine), audit),
+        audit,
+        store,
+    )
+
+
 @pytest.fixture
 def workbench_context(database_url):
     engine = create_engine(database_url)
@@ -136,7 +146,7 @@ def test_same_barcode_accepts_multiple_typed_dga_results(workbench_context):
             display_decimal_places=3,detection_limit=0.5
             WHERE method_version_id='66000000-0000-0000-0000-000000000001' AND field_code='H2'""")
         )
-    workbench = LaboratoryWorkbench(engine, AuditTrail(), RecordingObjectStore())
+    workbench = make_workbench(engine, RecordingObjectStore())
     loaded = workbench.load(actor, sample.barcode_value)
     dga_method = next(method for method in loaded.methods if method.test_type == TestType.DGA)
 
@@ -159,7 +169,7 @@ def test_same_barcode_accepts_multiple_typed_dga_results(workbench_context):
 
 def test_object_store_failure_does_not_create_a_test_record(workbench_context):
     engine, _, actor, sample = workbench_context
-    workbench = LaboratoryWorkbench(engine, AuditTrail(), RecordingObjectStore(fail=True))
+    workbench = make_workbench(engine, RecordingObjectStore(fail=True))
     method = next(item for item in workbench.load(actor, sample.barcode_value).methods if item.test_type == TestType.DGA)
 
     with pytest.raises(OSError, match='object store unavailable'):
@@ -176,7 +186,7 @@ def test_object_store_failure_does_not_create_a_test_record(workbench_context):
 def test_three_typed_results_preserve_qualifiers_and_support_edit_and_remove(workbench_context):
     engine, identity, actor, sample = workbench_context
     store = RecordingObjectStore()
-    workbench = LaboratoryWorkbench(engine, AuditTrail(), store)
+    workbench = make_workbench(engine, store)
     methods = {method.test_type: method for method in workbench.load(actor, sample.barcode_value).methods}
 
     dga = workbench.add_test(actor, sample.barcode_value, _dga(methods[TestType.DGA].id))
@@ -232,7 +242,7 @@ def test_three_typed_results_preserve_qualifiers_and_support_edit_and_remove(wor
 
 def test_sample_basics_can_be_corrected_while_testing_is_open(workbench_context):
     engine, _, actor, sample = workbench_context
-    workbench = LaboratoryWorkbench(engine, AuditTrail(), RecordingObjectStore())
+    workbench = make_workbench(engine, RecordingObjectStore())
 
     updated = workbench.update_sample(
         actor,
@@ -260,7 +270,7 @@ def test_sample_basics_can_be_corrected_while_testing_is_open(workbench_context)
 )
 def test_qualifier_and_value_combinations_are_validated(workbench_context, measurement, error):
     engine, _, actor, sample = workbench_context
-    workbench = LaboratoryWorkbench(engine, AuditTrail(), RecordingObjectStore())
+    workbench = make_workbench(engine, RecordingObjectStore())
     method = next(item for item in workbench.load(actor, sample.barcode_value).methods if item.test_type == TestType.MOISTURE)
     submission = TestSubmission(
         TestType.MOISTURE,
@@ -278,7 +288,7 @@ def test_qualifier_and_value_combinations_are_validated(workbench_context, measu
 
 def test_finalized_status_blocks_result_mutation(workbench_context):
     engine, _, actor, sample = workbench_context
-    workbench = LaboratoryWorkbench(engine, AuditTrail(), RecordingObjectStore())
+    workbench = make_workbench(engine, RecordingObjectStore())
     method = next(item for item in workbench.load(actor, sample.barcode_value).methods if item.test_type == TestType.DGA)
     with engine.begin() as connection:
         connection.execute(
@@ -290,4 +300,21 @@ def test_finalized_status_blocks_result_mutation(workbench_context):
         workbench.add_test(actor, sample.barcode_value, _dga(method.id))
     assert getattr(captured.value, 'code', None) == 'sample_finalized'
     assert workbench.load(actor, sample.barcode_value).testing_status.value == 'FINALIZED'
+
+
+def test_historical_result_still_loads_after_its_method_is_disabled(workbench_context):
+    engine, _, actor, sample = workbench_context
+    workbench = make_workbench(engine, RecordingObjectStore())
+    method = next(item for item in workbench.load(actor, sample.barcode_value).methods if item.test_type == TestType.DGA)
+    created = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    with engine.begin() as connection:
+        connection.execute(
+            text('UPDATE test_method_versions SET is_active=FALSE WHERE id=:id'),
+            {'id': method.id},
+        )
+
+    loaded = workbench.load(actor, sample.barcode_value)
+
+    assert loaded.tests[0].id == created.id
+    assert loaded.tests[0].method.is_active is False
     MoistureResultInput,
