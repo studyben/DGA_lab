@@ -25,4 +25,13 @@ test('收样人员按整机序列号查找并明确选择采样时的变压器',
   await result.getByRole('button', { name: '选择变压器 TX-CURRENT-2002' }).click();
   await expect(page.getByRole('region', { name: '资产关联结果' }).getByRole('status'))
     .toContainText('已关联 TX-CURRENT-2002');
+
+  await page.getByRole('textbox', { name: '采样时间', exact: true }).fill('2023-06-01T12:00');
+  await expect(page.getByRole('group', { name: 'INV-UNIT-7788' })).toHaveCount(0);
+  await expect(page.getByText('尚未选择正式资产')).toBeVisible();
+
+  await page.getByRole('button', { name: '搜索正式资产' }).click();
+  const historicalResult = page.getByRole('group', { name: 'INV-UNIT-7788' });
+  await expect(historicalResult).toContainText('TX-OLD-1001');
+  await expect(historicalResult).not.toContainText('TX-CURRENT-2002');
 });

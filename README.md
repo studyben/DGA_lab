@@ -2,7 +2,7 @@
 
 中文现场资产与油样管理门户。当前交付 [Issue #2](https://github.com/studyben/DGA_lab/issues/2) 的工程基础，完整 MVP 规格见 [Issue #1](https://github.com/studyben/DGA_lab/issues/1)。
 
-这是绿地项目的初始生产工程：#2 门户导航、模块入口、迁移和测试基础，以及 #3 本地账号、权限、会话和身份审计已经实现。资产业务、收样、检测和报告仍由后续工单交付；业务页明确显示待开放，不展示原型假数据。
+这是绿地项目的初始生产工程：#2 门户导航、模块入口、迁移和测试基础，#3 本地账号、权限、会话和身份审计，以及 #4 正式资产搜索与历史采样上下文已经实现。实验室收样页可按整机或变压器序列号搜索并明确选择正式资产，但创建油样、条码、检测和报告仍由后续工单交付；其他未实施业务页明确显示待开放，不展示原型假数据。
 
 ## 启动
 
@@ -67,6 +67,8 @@ nginx 提供 React/TypeScript 静态构建，并将 `/api/` 转发给 FastAPI；
 - `GET /api/modules`：登录且完成首次改密后返回获授权模块的稳定代码和标签；不是业务 CRUD。
 - `/api/auth/login`、`/api/auth/password`、`/api/auth/logout`：POST；`/api/auth/session`：GET。会话 cookie 为 HttpOnly/SameSite=Lax，不放 localStorage；改密和退出需当前会话返回的 X-CSRF-Token。
 - `/api/assets/access`、`/api/laboratory/access`、`/api/condition-analysis/access`：受保护的模块访问上下文，匿名 401、无权限/待改密 403，返回已验证 actor_id。不提供提前的业务 CRUD。
+- `GET /api/assets/search?q=...&effective_at=...`：按完整或部分整机/变压器序列号搜索指定时点可关联的正式资产；重复序列号返回客户、现场、型号、状态、系统资产号和匹配原因供消歧，整机结果包含当时安装的可关联变压器。
+- `GET /api/assets/{asset_id}/sampling-context?sampled_at=...`：按带时区的采样时间解析客户、现场和完整设备路径。两项查询均要求 `assets.read`，不提供资产编辑或导入。
 
 密码使用 Argon2id（19MiB、2 次、并行度 1）；只存哈希。会话为随机不透明凭据，数据库只存会话凭据 SHA-256。退出撤销当前会话，改密撤销全部旧会话并创建新会话；停用/锁定撤销旧会话，重新启用不会复活它们。每次请求读取当前状态/角色。连续 5 次错误密码后账号临时限制 15 分钟；接口不透露账号是否存在。前端每 30 秒及重新聚焦时检查会话，后端每次请求校验，因此撤销后的数据接口立即受限。
 
@@ -106,13 +108,13 @@ docker compose -f compose.browser.yaml --profile test down
 | `backend/dga/shared/` | 配置、基础设施与公共协作类型 | 无 |
 | `backend/dga/main.py` | 运行时组装、HTTP 入口 | 各模块公开入口 |
 
-当前业务公开入口暴露不可变模块标识和受权限约束的访问上下文；具体业务命令随各自工单增加。共享身份的公开服务提供认证和 operator 命令，已验证的不可变 ActorContext 由可信组装层传给业务模块；不得从请求 JSON 构造角色/权限上下文。跨模块只允许显式 public import；禁止动态 import/反射绕过检查，禁止调用对方内部实现或直接读写对方私有持久化。`backend/architecture.py` 验证绝对/相对 import 及依赖方向。
+资产公开入口还提供 `AssetDirectory.search` 和 `AssetDirectory.resolve_sampling_context` 两个只读查询；实验室模块复用资产模块拥有的正式资产选择器和 HTTP 适配器，不读取资产私有表。共享身份的公开服务提供认证和 operator 命令，已验证的不可变 ActorContext 由可信组装层传给业务模块；不得从请求 JSON 构造角色/权限上下文。跨模块只允许显式 public import；禁止动态 import/反射绕过检查，禁止调用对方内部实现或直接读写对方私有持久化。`backend/architecture.py` 验证绝对/相对 import 及依赖方向。
 
 前端的三个 `features/` 目录分别拥有页面定义，门户外壳负责导航和公共布局。`/assets` 是业务路由，构建静态文件必须放在 `/static`，避免 nginx 目录冲突。
 
 ## 数据库演进
 
-首个 Alembic migration 是空业务 schema 基线；0002 仅增加用户、角色、权限、关联、会话与身份审计。后续业务表归其拥有模块，不提前复制全部设计草案。0002 downgrade 会删除身份和审计数据，仅允许隔离测试库使用，已有真实账号的环境不得执行。
+首个 Alembic migration 是空业务 schema 基线；0002 增加用户、角色、权限、关联、会话与身份审计；0003 增加客户、现场、正式资产和带有效期的设备/现场安装关系。序列号刻意不唯一，系统资产号唯一。后续业务表归其拥有模块，不提前复制全部设计草案。downgrade 仅允许隔离测试库使用，已有真实数据的环境不得执行。
 
 ```sh
 docker compose run --rm migrate alembic current

@@ -63,6 +63,17 @@ def official_assets(database_url):
         )
         connection.execute(
             text(
+                """INSERT INTO formal_assets
+                (id,system_asset_number,asset_type,serial_number,model,material_number,lifecycle_status)
+                SELECT
+                    ('60000000-0000-0000-0000-' || lpad(number::text,12,'0'))::uuid,
+                    'AAA-DUP-' || lpad(number::text,2,'0'),
+                    'TRANSFORMER','TX-DUP-9009','UNLINKED',NULL,'IN_SERVICE'
+                FROM generate_series(1,20) AS number"""
+            )
+        )
+        connection.execute(
+            text(
                 """INSERT INTO sites(id,customer_id,site_name,location_text)
                 VALUES (:id,:customer,:name,:location)"""
             ),
@@ -188,6 +199,23 @@ def test_partial_duplicate_serials_return_fields_needed_for_disambiguation(
             "SERIAL_CONTAINS",
         ),
     }
+
+
+def test_search_limit_is_applied_after_uninstalled_matches_are_removed(
+    official_assets,
+):
+    directory = AssetDirectory(official_assets)
+
+    matches = directory.search(
+        asset_reader(),
+        "TX-DUP-9009",
+        effective_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+    )
+
+    assert [match.asset.system_asset_number for match in matches] == [
+        "SYS-TX-D01",
+        "SYS-TX-D02",
+    ]
 
 
 def test_sampling_context_uses_the_installation_valid_at_the_historical_time(

@@ -1,6 +1,7 @@
 """Public application interface for official asset identity and history."""
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import StrEnum
 from typing import Callable
 from uuid import UUID
 
@@ -26,15 +27,34 @@ class AssetQueryError(Exception):
         super().__init__(code)
 
 
+class AssetType(StrEnum):
+    WHOLE_UNIT = 'WHOLE_UNIT'
+    TRANSFORMER = 'TRANSFORMER'
+
+
+class LifecycleStatus(StrEnum):
+    COMMISSIONING = 'COMMISSIONING'
+    IN_SERVICE = 'IN_SERVICE'
+    OUT_OF_SERVICE = 'OUT_OF_SERVICE'
+    RETIRED = 'RETIRED'
+    MERGED = 'MERGED'
+
+
+class MatchReason(StrEnum):
+    EXACT_SERIAL = 'EXACT_SERIAL'
+    SERIAL_PREFIX = 'SERIAL_PREFIX'
+    SERIAL_CONTAINS = 'SERIAL_CONTAINS'
+
+
 @dataclass(frozen=True)
 class FormalAsset:
     id: UUID
     system_asset_number: str
-    asset_type: str
+    asset_type: AssetType
     serial_number: str
     model: str | None
     material_number: str | None
-    lifecycle_status: str
+    lifecycle_status: LifecycleStatus
 
 
 @dataclass(frozen=True)
@@ -49,15 +69,8 @@ class SamplingAssetContext:
 
 
 @dataclass(frozen=True)
-class AssetSearchMatch:
-    asset: FormalAsset
-    customer_id: UUID
-    customer_name: str
-    site_id: UUID
-    site_name: str
-    site_location: str | None
-    equipment_path: tuple[FormalAsset, ...]
-    match_reason: str
+class AssetSearchMatch(SamplingAssetContext):
+    match_reason: MatchReason
     linkable_transformers: tuple[FormalAsset, ...]
 
 
@@ -65,11 +78,11 @@ def _asset(row) -> FormalAsset:
     return FormalAsset(
         id=row['id'],
         system_asset_number=row['system_asset_number'],
-        asset_type=row['asset_type'],
+        asset_type=AssetType(row['asset_type']),
         serial_number=row['serial_number'],
         model=row['model'],
         material_number=row['material_number'],
-        lifecycle_status=row['lifecycle_status'],
+        lifecycle_status=LifecycleStatus(row['lifecycle_status']),
     )
 
 
@@ -102,72 +115,83 @@ class AssetDirectory:
             raise AssetQueryError('effective_at_requires_timezone')
 
         with self._engine.connect() as connection:
-            rows = connection.execute(
-                text(
-                    """SELECT * FROM formal_assets
-                    WHERE lower(serial_number) LIKE :contains
-                    ORDER BY
-                        CASE
-                            WHEN lower(serial_number) = :exact THEN 0
-                            WHEN lower(serial_number) LIKE :prefix THEN 1
-                            ELSE 2
-                        END,
-                        serial_number,system_asset_number
-                    LIMIT :limit"""
-                ),
-                {
-                    'exact': query.lower(),
-                    'prefix': query.lower() + '%',
-                    'contains': '%' + query.lower() + '%',
-                    'limit': limit,
-                },
-            ).mappings()
             matches = []
-            for row in rows:
-                try:
-                    context = self._context(connection, row['id'], at)
-                except AssetQueryError:
-                    # An asset without an effective path is not linkable to a sample.
-                    continue
-                normalized_serial = row['serial_number'].lower()
-                reason = (
-                    'EXACT_SERIAL'
-                    if normalized_serial == query.lower()
-                    else 'SERIAL_PREFIX'
-                    if normalized_serial.startswith(query.lower())
-                    else 'SERIAL_CONTAINS'
-                )
-                children = ()
-                if row['asset_type'] == 'WHOLE_UNIT':
-                    children = tuple(
-                        _asset(child)
-                        for child in connection.execute(
-                            text(
-                                """SELECT child.* FROM formal_assets child
-                                JOIN asset_installations installation
-                                  ON installation.asset_id=child.id
-                                WHERE installation.parent_asset_id=:parent
-                                  AND child.asset_type='TRANSFORMER'
-                                  AND installation.valid_from<=:at
-                                  AND (installation.valid_to IS NULL OR installation.valid_to>:at)
-                                ORDER BY child.serial_number,child.system_asset_number"""
-                            ),
-                            {'parent': row['id'], 'at': at},
-                        ).mappings()
+            normalized_query = query.lower()
+            escaped_query = normalized_query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            offset = 0
+            batch_size = max(50, limit)
+            while len(matches) < limit:
+                rows = connection.execute(
+                    text(
+                        """SELECT * FROM formal_assets
+                        WHERE lower(serial_number) LIKE :contains ESCAPE '\\'
+                        ORDER BY
+                            CASE
+                                WHEN lower(serial_number) = :exact THEN 0
+                                WHEN lower(serial_number) LIKE :prefix ESCAPE '\\' THEN 1
+                                ELSE 2
+                            END,
+                            serial_number,system_asset_number
+                        LIMIT :batch_size OFFSET :offset"""
+                    ),
+                    {
+                        'exact': normalized_query,
+                        'prefix': escaped_query + '%',
+                        'contains': '%' + escaped_query + '%',
+                        'batch_size': batch_size,
+                        'offset': offset,
+                    },
+                ).mappings().all()
+                if not rows:
+                    break
+                offset += len(rows)
+                for row in rows:
+                    try:
+                        context = self._context(connection, row['id'], at)
+                    except AssetQueryError:
+                        # An asset without an effective path is not linkable to a sample.
+                        continue
+                    normalized_serial = row['serial_number'].lower()
+                    reason = (
+                        MatchReason.EXACT_SERIAL
+                        if normalized_serial == normalized_query
+                        else MatchReason.SERIAL_PREFIX
+                        if normalized_serial.startswith(normalized_query)
+                        else MatchReason.SERIAL_CONTAINS
                     )
-                matches.append(
-                    AssetSearchMatch(
-                        asset=context.asset,
-                        customer_id=context.customer_id,
-                        customer_name=context.customer_name,
-                        site_id=context.site_id,
-                        site_name=context.site_name,
-                        site_location=context.site_location,
-                        equipment_path=context.equipment_path,
-                        match_reason=reason,
-                        linkable_transformers=children,
+                    children = ()
+                    if row['asset_type'] == AssetType.WHOLE_UNIT:
+                        children = tuple(
+                            _asset(child)
+                            for child in connection.execute(
+                                text(
+                                    """SELECT child.* FROM formal_assets child
+                                    JOIN asset_installations installation
+                                      ON installation.asset_id=child.id
+                                    WHERE installation.parent_asset_id=:parent
+                                      AND child.asset_type='TRANSFORMER'
+                                      AND installation.valid_from<=:at
+                                      AND (installation.valid_to IS NULL OR installation.valid_to>:at)
+                                    ORDER BY child.serial_number,child.system_asset_number"""
+                                ),
+                                {'parent': row['id'], 'at': at},
+                            ).mappings()
+                        )
+                    matches.append(
+                        AssetSearchMatch(
+                            asset=context.asset,
+                            customer_id=context.customer_id,
+                            customer_name=context.customer_name,
+                            site_id=context.site_id,
+                            site_name=context.site_name,
+                            site_location=context.site_location,
+                            equipment_path=context.equipment_path,
+                            match_reason=reason,
+                            linkable_transformers=children,
+                        )
                     )
-                )
+                    if len(matches) == limit:
+                        break
             return tuple(matches)
 
     def resolve_sampling_context(
@@ -240,3 +264,10 @@ class AssetDirectory:
             visited.add(current.id)
             path.append(current)
         raise AssetQueryError('asset_context_unavailable', 409)
+
+
+def http_router(directory: AssetDirectory, actor_dependency: Callable):
+    """Compose the asset-owned HTTP adapter without exposing internal imports."""
+    from .http import assets_router
+
+    return assets_router(directory, actor_dependency)

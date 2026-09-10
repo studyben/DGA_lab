@@ -17,8 +17,8 @@ from dga.assets.public import (
     AssetDirectory,
     AssetQueryError,
     access_context as asset_access,
+    http_router as assets_router,
 )
-from dga.assets.http import assets_router
 from dga.laboratory.public import MODULE as LABORATORY, access_context as laboratory_access
 from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS, access_context as analysis_access
 from dga.shared.contracts import ModuleDescriptor

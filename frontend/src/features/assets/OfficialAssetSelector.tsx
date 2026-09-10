@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 
 
 type FormalAsset = {
@@ -60,6 +60,12 @@ export function OfficialAssetSelector({
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setMatches([]);
+    setSearched(false);
+    setError('');
+  }, [sampledAt]);
 
   async function search(event: FormEvent) {
     event.preventDefault();
