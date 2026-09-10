@@ -1,6 +1,7 @@
 """Public identity application interface. HTTP and trusted operator tools use this seam."""
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from enum import StrEnum
 from hashlib import sha256
 from secrets import token_urlsafe
 from typing import Callable
@@ -38,6 +39,34 @@ def require_permission(actor: ActorContext, permission: str) -> None:
         raise IdentityError('permission_denied', 403)
 
 
+def _append_audit(
+    connection: Connection,
+    *,
+    occurred_at: datetime,
+    action_code: str,
+    result: str,
+    actor_user_id: UUID | None = None,
+    claimed_username: str | None = None,
+    entity_id: UUID | None = None,
+) -> None:
+    connection.execute(
+        text(
+            """INSERT INTO audit_logs
+            (id,actor_user_id,claimed_username,action_code,result,occurred_at,entity_id)
+            VALUES (:id,:actor,:claimed,:action,:result,:time,:entity)"""
+        ),
+        {
+            'id': uuid4(),
+            'actor': actor_user_id,
+            'claimed': claimed_username,
+            'action': action_code,
+            'result': result,
+            'time': occurred_at,
+            'entity': entity_id,
+        },
+    )
+
+
 class AuditTrail:
     """Append business audit events inside the caller's database transaction."""
 
@@ -48,25 +77,17 @@ class AuditTrail:
         self,
         connection: Connection,
         actor: ActorContext,
-        action_code: str,
+        action: StrEnum,
         *,
         entity_id: UUID,
     ) -> None:
-        if not 1 <= len(action_code) <= 50:
-            raise IdentityError('invalid_audit_event', 422)
-        connection.execute(
-            text(
-                """INSERT INTO audit_logs
-                (id,actor_user_id,action_code,result,occurred_at,entity_id)
-                VALUES (:id,:actor,:action,'SUCCESS',:time,:entity)"""
-            ),
-            {
-                'id': uuid4(),
-                'actor': actor.user_id,
-                'action': action_code,
-                'time': self._clock(),
-                'entity': entity_id,
-            },
+        _append_audit(
+            connection,
+            occurred_at=self._clock(),
+            action_code=action.value,
+            result='SUCCESS',
+            actor_user_id=actor.user_id,
+            entity_id=entity_id,
         )
 
 
@@ -101,10 +122,15 @@ class IdentityService:
         self._lifetime = timedelta(hours=session_hours)
 
     def _audit(self, connection, action, result, user=None, claimed=None, entity=None):
-        connection.execute(text('''INSERT INTO audit_logs
-            (id,actor_user_id,claimed_username,action_code,result,occurred_at,entity_id)
-            VALUES (:id,:actor,:claimed,:action,:result,:time,:entity)'''),
-            dict(id=uuid4(), actor=user, claimed=claimed, action=action, result=result, time=self._clock(), entity=entity))
+        _append_audit(
+            connection,
+            occurred_at=self._clock(),
+            action_code=action,
+            result=result,
+            actor_user_id=user,
+            claimed_username=claimed,
+            entity_id=entity,
+        )
 
     def _actor(self, connection, user) -> ActorContext:
         roles = connection.execute(text('''SELECT r.role_code FROM roles r JOIN user_roles ur ON ur.role_id=r.id

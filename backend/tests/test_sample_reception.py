@@ -87,8 +87,8 @@ def test_receive_formally_associated_sample_preserves_snapshot_and_shared_barcod
         ReceiveSample(
             sampled_at=sampled_at,
             received_at=datetime(2025, 6, 2, 9, 30, tzinfo=timezone.utc),
-            site_name="Prairie Sun",
-            equipment_serial="TX-CURRENT-2002",
+            site_name="Contradictory handwritten site",
+            equipment_serial="CONTRADICTORY-SERIAL",
             notes="Routine annual sample",
             container_count=2,
             identity_status=SampleIdentityStatus.ASSOCIATED,
@@ -97,6 +97,8 @@ def test_receive_formally_associated_sample_preserves_snapshot_and_shared_barcod
     )
 
     assert sample.identity_status == SampleIdentityStatus.ASSOCIATED
+    assert sample.site_name == "Prairie Sun"
+    assert sample.equipment_serial == "TX-CURRENT-2002"
     assert sample.sample_number.startswith("DGA-20250602-")
     assert sample.barcode_value == sample.sample_number
     assert [container.container_number for container in sample.containers] == [

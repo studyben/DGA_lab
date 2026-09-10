@@ -20,6 +20,8 @@ test('搜索正式资产、登记油样、预览打印条码并再次扫码取�
   await page.getByRole('textbox', { name: '收样时间', exact: true }).fill('2025-06-02T09:30');
   await expect(page.getByLabel('现场名称')).toHaveValue('Prairie Sun');
   await expect(page.getByLabel('设备序列号')).toHaveValue('TX-CURRENT-2002');
+  await expect(page.getByLabel('现场名称')).toBeDisabled();
+  await expect(page.getByLabel('设备序列号')).toBeDisabled();
   await page.getByLabel('样品容器数量').fill('2');
   await page.getByLabel('备注').fill('Routine annual sample');
   await page.getByRole('button', { name: '登记油样并生成条码' }).click();

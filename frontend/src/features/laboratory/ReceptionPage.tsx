@@ -185,8 +185,8 @@ export function ReceptionPage() {
       </div>
       <form className="reception-form" onSubmit={receive}>
         <label>收样时间<input type="datetime-local" value={receivedAt} onChange={event => setReceivedAt(event.target.value)} required /></label>
-        <label>现场名称<input value={siteName} onChange={event => setSiteName(event.target.value)} maxLength={200} required /></label>
-        <label>设备序列号<input value={equipmentSerial} onChange={event => setEquipmentSerial(event.target.value)} maxLength={160} required /></label>
+        <label>现场名称<input value={siteName} onChange={event => setSiteName(event.target.value)} maxLength={200} required disabled={identityStatus === 'ASSOCIATED'} /></label>
+        <label>设备序列号<input value={equipmentSerial} onChange={event => setEquipmentSerial(event.target.value)} maxLength={160} required disabled={identityStatus === 'ASSOCIATED'} /></label>
         <label>样品容器数量<input type="number" min="1" max="20" value={containerCount} onChange={event => setContainerCount(event.target.value)} required /></label>
         <label className="wide-field">备注<textarea value={notes} onChange={event => setNotes(event.target.value)} maxLength={2000} rows={3} /></label>
         {error && <p role="alert" className="form-error wide-field">{error}</p>}

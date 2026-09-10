@@ -10,7 +10,11 @@ from uuid import UUID, uuid4
 from sqlalchemy import Engine, text
 
 from dga.assets.public import AssetDirectory, AssetType, SamplingAssetContext
-from dga.shared.auth.public import ActorContext, AuditTrail, require_permission
+from dga.shared.auth.public import (
+    ActorContext,
+    AuditTrail,
+    require_permission,
+)
 from dga.shared.contracts import ModuleDescriptor
 
 MODULE = ModuleDescriptor(code='laboratory', label='DGA 实验室')
@@ -33,6 +37,12 @@ class LaboratoryError(Exception):
 class SampleIdentityStatus(StrEnum):
     ASSOCIATED = 'ASSOCIATED'
     IDENTITY_PENDING = 'IDENTITY_PENDING'
+
+
+class _AuditAction(StrEnum):
+    SAMPLE_RECEIVED = 'SAMPLE_RECEIVED'
+    SAMPLE_ASSET_ASSOCIATED = 'SAMPLE_ASSET_ASSOCIATED'
+    BARCODE_LABEL_PRINTED = 'BARCODE_LABEL_PRINTED'
 
 
 @dataclass(frozen=True)
@@ -169,6 +179,13 @@ class SampleRegistry:
                 raise LaboratoryError('sample_requires_transformer')
             snapshot = _snapshot(context)
 
+        site_name = snapshot.site_name if snapshot else command.site_name.strip()
+        equipment_serial = (
+            snapshot.equipment_path[-1].serial_number
+            if snapshot
+            else command.equipment_serial.strip()
+        )
+
         sample_id = uuid4()
         created_at = self._clock()
         with self._engine.begin() as connection:
@@ -192,8 +209,8 @@ class SampleRegistry:
                     'status': command.identity_status.value,
                     'sampled': command.sampled_at,
                     'received': command.received_at,
-                    'site': command.site_name.strip(),
-                    'serial': command.equipment_serial.strip(),
+                    'site': site_name,
+                    'serial': equipment_serial,
                     'notes': command.notes.strip() if command.notes else None,
                     'asset': command.formal_asset_id,
                     'snapshot': json.dumps(asdict(snapshot), default=str) if snapshot else None,
@@ -215,9 +232,19 @@ class SampleRegistry:
                         'ordinal': ordinal,
                     },
                 )
-            self._audit.append(connection, actor, 'SAMPLE_RECEIVED', entity_id=sample_id)
+            self._audit.append(
+                connection,
+                actor,
+                _AuditAction.SAMPLE_RECEIVED,
+                entity_id=sample_id,
+            )
             if snapshot:
-                self._audit.append(connection, actor, 'SAMPLE_ASSET_ASSOCIATED', entity_id=sample_id)
+                self._audit.append(
+                    connection,
+                    actor,
+                    _AuditAction.SAMPLE_ASSET_ASSOCIATED,
+                    entity_id=sample_id,
+                )
         return self.find_by_barcode(actor, sample_number)
 
     def find_by_barcode(self, actor: ActorContext, barcode_value: str) -> OilSample:
@@ -266,7 +293,12 @@ class SampleRegistry:
         require_permission(actor, 'laboratory.write')
         sample = self.find_by_barcode(actor, barcode_value)
         with self._engine.begin() as connection:
-            self._audit.append(connection, actor, 'BARCODE_LABEL_PRINTED', entity_id=sample.id)
+            self._audit.append(
+                connection,
+                actor,
+                _AuditAction.BARCODE_LABEL_PRINTED,
+                entity_id=sample.id,
+            )
 
     @staticmethod
     def _validate(command: ReceiveSample) -> None:

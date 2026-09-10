@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
-from secrets import compare_digest
 
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
@@ -30,7 +29,7 @@ from dga.laboratory.public import (
 from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS, access_context as analysis_access
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
-from dga.shared.auth.http import auth_router, COOKIE
+from dga.shared.auth.http import AuthenticatedRequests, auth_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -53,7 +52,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title='DGA Lab', lifespan=lifespan)
     identity = IdentityService(engine, session_hours=settings.session_hours)
-    app.include_router(auth_router(identity, settings))
+    requests = AuthenticatedRequests(identity, settings)
+    app.include_router(auth_router(identity, settings, requests))
 
     @app.exception_handler(IdentityError)
     async def identity_error(request, error):
@@ -86,22 +86,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return [module for module, permission in [(ASSETS, 'assets.read'), (LABORATORY, 'laboratory.read'), (CONDITION_ANALYSIS, 'analysis.read')]
                 if permission in actor.permissions]
 
-    def current_actor(request: Request):
-        actor = identity.session(request.cookies.get(COOKIE, '')).actor
-        if actor.must_change_password:
-            raise IdentityError('password_change_required', 403)
-        return actor
-
-    def mutation_actor(request: Request):
-        if request.headers.get('origin') not in set(settings.auth_allowed_origins.split(',')):
-            raise IdentityError('origin_rejected', 403)
-        session = identity.session(request.cookies.get(COOKIE, ''))
-        supplied = request.headers.get('x-csrf-token', '').encode('utf-8')
-        if not compare_digest(supplied, session.csrf_token.encode('utf-8')):
-            raise IdentityError('csrf_rejected', 403)
-        if session.actor.must_change_password:
-            raise IdentityError('password_change_required', 403)
-        return session.actor
+    current_actor = requests.actor
+    mutation_actor = requests.mutation_actor
 
     asset_directory = AssetDirectory(engine)
     app.include_router(assets_router(asset_directory, current_actor))
