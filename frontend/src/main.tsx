@@ -9,13 +9,15 @@ import sungrowLogo from "./assets/sungrow-logo.svg";
 import { AuthProvider, AuthBoundary, SessionControls, useAuth } from './Auth';
 import { ReceptionPage } from './features/laboratory/ReceptionPage';
 import { WorkbenchPage } from './features/laboratory/WorkbenchPage';
+import { DashboardPage, SiteDetailPage } from './features/assets/DashboardPage';
 
 const path =
   window.location.pathname === "/"
     ? "/assets"
     : window.location.pathname.replace(/\/$/, "");
 const allPages = [...assetPages, ...laboratoryPages, ...analysisPages];
-const current = allPages.find((page) => page.path === path);
+const siteId = path.match(/^\/assets\/sites\/([^/]+)$/)?.[1];
+const current = siteId ? { title: '现场详情', description: '查看现场基础资料及当前一级设备。', permission: 'assets.read' } : allPages.find((page) => page.path === path);
 const inLab = path === "/lab" || path.startsWith("/lab/");
 const workspace = inLab ? "DGA 实验室" : "资产管理与仪表板";
 
@@ -100,9 +102,9 @@ function App() {
                     "这个地址暂时无法访问，请从工作区导航选择页面。"}
                 </p>
               </div>
-              <span className="outline-badge">工程基础阶段</span>
+              {!(siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
             </div>
-            {path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : <section className="empty-panel" aria-label="页面内容">
+            {siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>
@@ -119,23 +121,6 @@ function App() {
                   返回资产仪表板
                 </a>
               )}
-            </section>}
-            {!['/lab/reception', '/lab/workbench'].includes(path) && <section className="overview" aria-label="工作区说明">
-              <article>
-                <span className="step">01 / 资产身份</span>
-                <h2>从现场到设备</h2>
-                <p>以正式资产记录为基础，保留清晰的设备层级与历史关系。</p>
-              </article>
-              <article>
-                <span className="step">02 / 油样检测</span>
-                <h2>从收样到报告</h2>
-                <p>通过油样条码连接采样信息、检测记录和报告结果。</p>
-              </article>
-              <article>
-                <span className="step">03 / 状态分析</span>
-                <h2>从结果到趋势</h2>
-                <p>围绕同一台物理变压器，追踪可比较的检测结果。</p>
-              </article>
             </section>}
             <footer>
               内部应用 · 中文桌面工作区

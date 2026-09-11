@@ -63,6 +63,25 @@ def main():
                  '30000000-0000-0000-0000-000000000001',NULL,
                  '2024-01-01T00:00:00Z',NULL);
             """))
+        with engine.begin() as connection:
+            connection.execute(text("""
+                INSERT INTO customers VALUES ('10000000-0000-0000-0000-000000000002','Desert Storage Inc');
+                INSERT INTO sites(id,customer_id,site_name,location_text) VALUES
+                  ('20000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002','Desert Star','Arizona, USA');
+                UPDATE sites SET grid_year=2020,grid_status='COMPLETED',operation_status='OPERATIONAL',commissioning_date='2020-06-01';
+                INSERT INTO site_product_lines VALUES
+                  ('20000000-0000-0000-0000-000000000001','PV',100,NULL),
+                  ('20000000-0000-0000-0000-000000000001','ESS',20,80),
+                  ('20000000-0000-0000-0000-000000000002','ESS',NULL,NULL);
+                UPDATE formal_assets SET product_line='PV',machine_type='INVERTER_UNIT',power_mw=4.4 WHERE system_asset_number='SYS-PV-001';
+                UPDATE formal_assets SET machine_type='TRANSFORMER' WHERE asset_type='TRANSFORMER';
+                INSERT INTO formal_assets(id,system_asset_number,asset_type,serial_number,model,lifecycle_status,product_line,machine_type,power_mw,energy_mwh) VALUES
+                  ('30000000-0000-0000-0000-000000000011','SYS-ESS-011','WHOLE_UNIT','ESS-ROOT-001','PowerTitan','IN_SERVICE','ESS','ESS_SYSTEM',5,20),
+                  ('30000000-0000-0000-0000-000000000012','SYS-PCS-012','WHOLE_UNIT','PCS-CHILD-001','SC5000UD','IN_SERVICE','ESS','PCS_UNIT',5,NULL);
+                INSERT INTO asset_installations VALUES
+                  ('50000000-0000-0000-0000-000000000011','30000000-0000-0000-0000-000000000011',NULL,'20000000-0000-0000-0000-000000000001','2020-01-01',NULL),
+                  ('50000000-0000-0000-0000-000000000012','30000000-0000-0000-0000-000000000012','30000000-0000-0000-0000-000000000011',NULL,'2020-01-01',NULL);
+            """))
         sample = SampleRegistry(engine, AssetDirectory(engine), AuditTrail()).receive(
             admin.actor,
             ReceiveSample(

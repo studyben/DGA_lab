@@ -5,11 +5,19 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
-from .public import AssetDirectory
+from .public import AssetDirectory, DashboardQuery, EquipmentQuery
 
 
 def assets_router(directory: AssetDirectory, actor_dependency: Callable):
     router = APIRouter(prefix='/api/assets')
+
+    @router.get('/dashboard')
+    def dashboard(query: DashboardQuery = Query(), actor=Depends(actor_dependency)):
+        return directory.dashboard(actor, **query.model_dump())
+
+    @router.get('/sites/{site_id}')
+    def site_detail(site_id: UUID, query: EquipmentQuery = Query(), actor=Depends(actor_dependency)):
+        return directory.site_detail(actor, site_id, **query.model_dump())
 
     @router.get('/search')
     def search(

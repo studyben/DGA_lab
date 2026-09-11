@@ -6,6 +6,9 @@ from typing import Callable
 from uuid import UUID
 
 from sqlalchemy import Engine, text
+from pydantic import ValidationError
+
+from .dashboard import DashboardQuery, EquipmentQuery
 
 from dga.shared.auth.public import ActorContext, require_permission
 from dga.shared.contracts import ModuleDescriptor
@@ -97,6 +100,27 @@ class AssetDirectory:
     ):
         self._engine = engine
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+
+    def dashboard(self, actor: ActorContext, **filters) -> dict:
+        require_permission(actor, 'assets.read')
+        from .dashboard import dashboard
+        try:
+            query = DashboardQuery(**filters)
+        except ValidationError as error:
+            raise AssetQueryError('invalid_dashboard_query') from error
+        return dashboard(self._engine, query, self._clock())
+
+    def site_detail(self, actor: ActorContext, site_id: UUID, **filters) -> dict:
+        require_permission(actor, 'assets.read')
+        from .dashboard import site_detail
+        try:
+            query = EquipmentQuery(**filters)
+        except ValidationError as error:
+            raise AssetQueryError('invalid_equipment_query') from error
+        result = site_detail(self._engine, site_id, query, self._clock())
+        if result is None:
+            raise AssetQueryError('site_not_found', 404)
+        return result
 
     def search(
         self,
