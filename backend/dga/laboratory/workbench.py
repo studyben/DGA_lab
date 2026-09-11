@@ -166,6 +166,15 @@ class FinalizationWarningSource(Protocol):
     def __call__(self, tests: tuple[TestRecord, ...]) -> tuple[str, ...]: ...
 
 
+class ReportLifecycle(Protocol):
+    def queue_current(
+        self, connection, actor, sample_id, finalization_token, finalized_at,
+        acknowledged_warning_codes,
+    ) -> None: ...
+
+    def invalidate_current(self, connection, sample_id, now) -> None: ...
+
+
 @dataclass(frozen=True)
 class WorkbenchSample:
     sample: 'OilSample'
@@ -200,6 +209,7 @@ class LaboratoryWorkbench:
         sample_registry: 'SampleRegistry',
         audit_trail: AuditTrail,
         object_store: FileStore,
+        report_lifecycle: ReportLifecycle,
         *,
         clock: Callable[[], datetime] | None = None,
         warning_source: FinalizationWarningSource | None = None,
@@ -207,6 +217,7 @@ class LaboratoryWorkbench:
         self._engine = engine
         self._audit = audit_trail
         self._objects = object_store
+        self._reports = report_lifecycle
         self._samples = sample_registry
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._warning_source = warning_source or (lambda _tests: ())
@@ -459,6 +470,7 @@ class LaboratoryWorkbench:
                         details={'warning_codes': missing_warnings},
                     )
                 now = self._clock()
+                finalization_token = uuid4()
                 by_type: dict[TestType, list[TestRecord]] = {}
                 for record in tests:
                     by_type.setdefault(record.test_type, []).append(record)
@@ -478,8 +490,18 @@ class LaboratoryWorkbench:
                 connection.execute(
                     text("""UPDATE oil_samples SET testing_status='FINALIZED',
                     testing_finalized_by=:actor,testing_finalized_at=:now,
+                    testing_finalization_token=:token,
                     updated_by=:actor,updated_at=:now WHERE id=:id"""),
-                    {'id': sample_id, 'actor': actor.user_id, 'now': now},
+                    {'id': sample_id, 'actor': actor.user_id, 'now': now,
+                     'token': finalization_token},
+                )
+                self._reports.queue_current(
+                    connection,
+                    actor,
+                    sample_id,
+                    finalization_token,
+                    now,
+                    tuple(code for code in assessment.warning_codes if code in acknowledged),
                 )
                 self._insert_event(
                     connection, sample_id, actor, FinalizationEventType.FINALIZED, now
@@ -522,9 +544,11 @@ class LaboratoryWorkbench:
             connection.execute(
                 text("""UPDATE oil_samples SET testing_status='OPEN',
                 testing_finalized_by=NULL,testing_finalized_at=NULL,
+                testing_finalization_token=NULL,
                 updated_by=:actor,updated_at=:now WHERE id=:id"""),
                 {'id': sample['id'], 'actor': actor.user_id, 'now': now},
             )
+            self._reports.invalidate_current(connection, sample['id'], now)
             self._insert_event(
                 connection,
                 sample['id'],

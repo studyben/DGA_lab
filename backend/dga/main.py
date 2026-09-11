@@ -23,6 +23,7 @@ from dga.laboratory.public import (
     MODULE as LABORATORY,
     LaboratoryError,
     LaboratoryWorkbench,
+    LaboratoryReports,
     SampleRegistry,
     access_context as laboratory_access,
     http_router as laboratory_router,
@@ -115,10 +116,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             headers={'Cache-Control': 'no-store'},
         )
     sample_registry = SampleRegistry(engine, asset_directory, AuditTrail())
+    audit_trail = AuditTrail()
+    reports = LaboratoryReports(engine, audit_trail)
     app.include_router(
         laboratory_router(
             sample_registry,
-            LaboratoryWorkbench(engine, sample_registry, AuditTrail(), object_store),
+            LaboratoryWorkbench(engine, sample_registry, audit_trail, object_store, reports),
+            reports,
             current_actor,
             mutation_actor,
         )

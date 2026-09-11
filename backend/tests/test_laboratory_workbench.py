@@ -28,6 +28,7 @@ from dga.laboratory.public import (
     TestType as LaboratoryTestType,
     TestingStatus,
     UpdateSampleBasics,
+    LaboratoryReports,
 )
 from dga.shared.auth.public import AuditTrail, IdentityError, IdentityService
 from dga.main import create_app
@@ -55,11 +56,13 @@ class RecordingObjectStore:
 
 def make_workbench(engine, store, **kwargs):
     audit = AuditTrail()
+    report_lifecycle = kwargs.pop('report_lifecycle', LaboratoryReports(engine, audit))
     return LaboratoryWorkbench(
         engine,
         SampleRegistry(engine, AssetDirectory(engine), audit),
         audit,
         store,
+        report_lifecycle,
         **kwargs,
     )
 
