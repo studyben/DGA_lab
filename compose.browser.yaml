@@ -18,7 +18,7 @@ services:
     environment: &browser-env
       DATABASE_URL: postgresql+psycopg://dga_browser:isolated-browser-only@db:5432/dga_browser
       COOKIE_SECURE: "false"
-      AUTH_ALLOWED_ORIGINS: http://frontend:8080,http://127.0.0.1:18080
+      AUTH_ALLOWED_ORIGINS: http://frontend:8080,http://127.0.0.1:${DGA_BROWSER_PORT:-18080}
     command: ["sh", "-c", "alembic upgrade head && python -m tests.seed_browser"]
     depends_on:
       db:
