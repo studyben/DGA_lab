@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../Auth';
-import { DataTable, machineNames, useQuery, useRead } from './DashboardPage';
+import { DataTable, useQuery, useRead } from './assetUi';
+import { machineNames, lifecycleNames as statuses } from './assetPresentation';
 import { EquipmentDetails, equipmentLayouts, fieldValue, unknownLayout } from './equipmentLayouts';
 
 type Detail = { equipment: EquipmentDetails; path: EquipmentDetails[]; children: EquipmentDetails[];
@@ -8,7 +9,6 @@ type Detail = { equipment: EquipmentDetails; path: EquipmentDetails[]; children:
 type History = { total: number; samples: { id: string; barcode_value: string; sampled_at: string;
   equipment_serial: string; test_types: string[]; test_count: number; testing_status: string }[] };
 const testNames: Record<string, string> = { DGA: 'DGA', MOISTURE: '微水', BREAKDOWN_VOLTAGE: '击穿电压' };
-const statuses: Record<string, string> = { COMMISSIONING: '调试中', IN_SERVICE: '在役', OUT_OF_SERVICE: '离役', RETIRED: '停用', MERGED: '已合并' };
 
 function TestHistory({ assetId }: { assetId: string }) {
   const { can } = useAuth();

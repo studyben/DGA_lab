@@ -126,7 +126,7 @@ class AssetDirectory:
         """Current parent path and direct children; repeat this query to walk the tree."""
         require_permission(actor, 'assets.read')
         at = self._clock()
-        with self._engine.connect() as connection:
+        with self._engine.connect().execution_options(isolation_level='REPEATABLE READ') as connection:
             context = self._context(connection, asset_id, at)
             columns = ('id,system_asset_number,serial_number,model,material_number,'
                        'machine_type,lifecycle_status,power_mw,energy_mwh,product_line,'

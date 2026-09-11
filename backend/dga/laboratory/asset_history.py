@@ -24,7 +24,7 @@ def asset_test_history(engine, asset_id: UUID, query: AssetHistoryQuery) -> dict
     params = {**query.model_dump(), 'asset': asset_id,
               'path': json.dumps([{'id': str(asset_id)}]),
               'offset': (query.page - 1) * query.page_size}
-    with engine.connect() as connection:
+    with engine.connect().execution_options(isolation_level='REPEATABLE READ') as connection:
         total = connection.execute(text('SELECT count(*) ' + predicate), params).scalar_one()
         rows = connection.execute(text('''SELECT s.id,s.barcode_value,s.sampled_at,
             s.equipment_serial,s.formal_asset_id,s.testing_status,

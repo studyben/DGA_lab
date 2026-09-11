@@ -14,6 +14,10 @@ from tests.test_sample_reception import reception_context, WHOLE_UNIT_ID, TRANSF
 
 def test_asset_reader_gets_laboratory_owned_summary_not_raw_results(workbench_context):
     engine, _, actor, sample = workbench_context
+    # The shared test database may retain method deactivations from earlier suites.
+    # Method administration is not implemented yet; prepare catalog fixture explicitly.
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE test_method_versions SET is_active=true WHERE test_type='DGA'"))
     registry = SampleRegistry(engine, AssetDirectory(engine), AuditTrail())
     workbench = make_workbench(engine, RecordingObjectStore())
     method = next(m for m in workbench.load(actor, sample.barcode_value).methods if m.test_type == 'DGA')

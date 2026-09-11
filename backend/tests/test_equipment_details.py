@@ -45,7 +45,7 @@ def test_optional_type_fields_and_access_errors(dashboard_assets):
         directory.equipment_detail(asset_reader(), UUID(int=0))
 
 
-def test_device_tree_rejects_cycles_and_overlapping_effective_parents(dashboard_assets):
+def test_device_tree_rejects_cycles(dashboard_assets):
     directory = AssetDirectory(dashboard_assets)
     child_id = directory.equipment_detail(asset_reader(), UNIT)['children'][0]['id']
     with dashboard_assets.begin() as connection:
@@ -61,3 +61,13 @@ def test_site_equipment_can_be_filtered_by_displayed_name(dashboard_assets):
     result = directory.site_detail(asset_reader(), UUID('20000000-0000-0000-0000-000000000001'), name='INV-01', sort='display_name')
     assert result['equipment_count'] == 1
     assert result['equipment'][0]['display_name'] == 'INV-01'
+
+
+def test_device_tree_rejects_overlapping_effective_parents(dashboard_assets):
+    with dashboard_assets.begin() as connection:
+        connection.execute(text("""INSERT INTO asset_installations(id,asset_id,site_id,valid_from,valid_to)
+            VALUES ('66000000-0000-0000-0000-000000000001',:id,
+            '20000000-0000-0000-0000-000000000002','2025-01-01','2027-01-01')"""), {'id': UNIT})
+    directory = AssetDirectory(dashboard_assets, clock=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
+    with pytest.raises(AssetQueryError, match='asset_context_unavailable'):
+        directory.equipment_detail(asset_reader(), UNIT)
