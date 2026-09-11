@@ -96,7 +96,9 @@ def site_detail(engine, site_id, query: EquipmentQuery, at):
         AND (CAST(:machine_type AS text) IS NULL OR a.machine_type=:machine_type)
         AND (CAST(:lifecycle_status AS text) IS NULL OR a.lifecycle_status=:lifecycle_status)'''
     with engine.connect().execution_options(isolation_level='REPEATABLE READ') as c:
-        site = c.execute(text('''SELECT s.*,c.customer_name,p.product_line,p.power_mw,p.energy_mwh
+        site = c.execute(text('''SELECT s.id,s.customer_id,s.site_name,s.location_text,
+            s.grid_year,s.grid_status,s.operation_status,s.commissioning_date,
+            c.customer_name,p.product_line,p.power_mw,p.energy_mwh
             FROM sites s JOIN customers c ON c.id=s.customer_id
             JOIN site_product_lines p ON p.site_id=s.id
             WHERE s.id=:site_id AND p.product_line=:product_line'''), params).mappings().first()
