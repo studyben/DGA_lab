@@ -5,7 +5,7 @@ type Values = Record<string, string>;
 type Site = {
   id: string; site_name: string; location_text: string | null; customer_id: string; customer_name: string;
   product_line: 'PV' | 'ESS'; power_mw: number | null; energy_mwh: number | null;
-  grid_year: number | null; grid_status: string | null; operation_status: string | null; commissioning_date: string | null;
+  grid_status: string | null; operation_status: string | null; commissioning_date: string | null;
 };
 type Equipment = {
   id: string; system_asset_number: string; serial_number: string; model: string | null; material_number: string | null;
@@ -105,14 +105,14 @@ function DataTable<T extends { id: string }>({ name, rows, total, columns, query
 
 const siteFields = [
   { key: 'site', label: '现场筛选' }, { key: 'customer', label: '客户筛选' }, { key: 'location', label: '位置筛选' },
-  { key: 'grid_year', label: '并网年份筛选', number: true }, { key: 'grid_status', label: '并网调试状态筛选', options: gridNames },
+  { key: 'grid_status', label: '并网调试状态筛选', options: gridNames },
   { key: 'operation_status', label: '投运状态筛选', options: operationNames },
 ];
 function siteColumns(ess: boolean): Column<Site>[] {
   return [{ key: 'site_name', label: '现场名称' }, { key: 'location_text', label: '位置' }, { key: 'customer_name', label: '客户' },
     { key: 'power_mw', label: ess ? '装机功率 MW' : '装机容量 MW', render: r => quantity(r.power_mw, 'MW') },
     ...(ess ? [{ key: 'energy_mwh' as const, label: '电池容量 MWh', render: (r: Site) => quantity(r.energy_mwh, 'MWh') }] : []),
-    { key: 'grid_year', label: '并网年份' }, { key: 'grid_status', label: '并网调试状态', render: r => label(gridNames, r.grid_status) },
+    { key: 'grid_status', label: '并网调试状态', render: r => label(gridNames, r.grid_status) },
     { key: 'operation_status', label: '投运状态', render: r => label(operationNames, r.operation_status) }, { key: 'commissioning_date', label: 'Commissioning date' }];
 }
 

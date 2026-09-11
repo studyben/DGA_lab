@@ -122,23 +122,6 @@ function App() {
                 </a>
               )}
             </section>}
-            {!['/lab/reception', '/lab/workbench'].includes(path) && <section className="overview" aria-label="工作区说明">
-              <article>
-                <span className="step">01 / 资产身份</span>
-                <h2>从现场到设备</h2>
-                <p>以正式资产记录为基础，保留清晰的设备层级与历史关系。</p>
-              </article>
-              <article>
-                <span className="step">02 / 油样检测</span>
-                <h2>从收样到报告</h2>
-                <p>通过油样条码连接采样信息、检测记录和报告结果。</p>
-              </article>
-              <article>
-                <span className="step">03 / 状态分析</span>
-                <h2>从结果到趋势</h2>
-                <p>围绕同一台物理变压器，追踪可比较的检测结果。</p>
-              </article>
-            </section>}
             <footer>
               内部应用 · 中文桌面工作区
               <ConnectionStatus />

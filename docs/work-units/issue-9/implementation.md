@@ -1,5 +1,9 @@
 # Issue #9 implementation result
 
+## Subsequent user review — 2026-09-11
+
+User requested removing the three static workspace-explanation cards and the redundant grid-year field. Removed the cards throughout the portal and removed grid year from site table columns, detail attributes and filter controls. Commissioning date and the two distinct site statuses remain. This supersedes the original Issue #9 frontend grid-year requirement. Existing database/API grid-year compatibility is retained; no stored data is deleted.
+
 Status: implemented, locally tested and reviewed. Branch codex/issue-9-asset-dashboard, base dc45a26 (main). No GitHub publication or merge performed for this issue.
 
 ## Delivered
