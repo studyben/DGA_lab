@@ -9,6 +9,7 @@ import sungrowLogo from "./assets/sungrow-logo.svg";
 import { AuthProvider, AuthBoundary, SessionControls, useAuth } from './Auth';
 import { ReceptionPage } from './features/laboratory/ReceptionPage';
 import { WorkbenchPage } from './features/laboratory/WorkbenchPage';
+import { ReportPage } from './features/laboratory/ReportPage';
 
 const path =
   window.location.pathname === "/"
@@ -102,7 +103,7 @@ function App() {
               </div>
               <span className="outline-badge">工程基础阶段</span>
             </div>
-            {path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : <section className="empty-panel" aria-label="页面内容">
+            {path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>
@@ -120,7 +121,7 @@ function App() {
                 </a>
               )}
             </section>}
-            {!['/lab/reception', '/lab/workbench'].includes(path) && <section className="overview" aria-label="工作区说明">
+            {!['/lab/reception', '/lab/workbench', '/lab/reports'].includes(path) && <section className="overview" aria-label="工作区说明">
               <article>
                 <span className="step">01 / 资产身份</span>
                 <h2>从现场到设备</h2>

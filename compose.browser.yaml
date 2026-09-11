@@ -13,12 +13,35 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+  object-store:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: dga-browser
+      MINIO_ROOT_PASSWORD: isolated-browser-object-storage
+    tmpfs:
+      - /data
+  object-store-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        until mc alias set browser http://object-store:9000 dga-browser isolated-browser-object-storage;
+        do sleep 1; done;
+        mc mb --ignore-existing browser/dga-lab
+    depends_on:
+      object-store:
+        condition: service_started
   migrate:
     build: ./backend
     environment: &browser-env
       DATABASE_URL: postgresql+psycopg://dga_browser:isolated-browser-only@db:5432/dga_browser
       COOKIE_SECURE: "false"
-      AUTH_ALLOWED_ORIGINS: http://frontend:8080,http://127.0.0.1:18080
+      AUTH_ALLOWED_ORIGINS: http://frontend:8080,http://127.0.0.1:${DGA_BROWSER_PORT:-18080}
+      OBJECT_STORE_ENDPOINT: http://object-store:9000
+      OBJECT_STORE_BUCKET: dga-lab
+      OBJECT_STORE_ACCESS_KEY: dga-browser
+      OBJECT_STORE_SECRET_KEY: isolated-browser-object-storage
     command: ["sh", "-c", "alembic upgrade head && python -m tests.seed_browser"]
     depends_on:
       db:
@@ -29,11 +52,22 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      object-store-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=8)"]
       interval: 3s
       timeout: 10s
       retries: 20
+  report-worker:
+    build: ./backend
+    environment: *browser-env
+    command: ["python", "-m", "dga.laboratory.report_worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      object-store-init:
+        condition: service_completed_successfully
   frontend:
     build: ./frontend
     ports:
@@ -41,6 +75,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      report-worker:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
       interval: 3s

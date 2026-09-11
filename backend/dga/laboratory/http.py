@@ -14,6 +14,7 @@ from .public import (
     DgaResultInput,
     LaboratoryError,
     LaboratoryWorkbench,
+    LaboratoryReports,
     MoistureResultInput,
     QualifiedMeasurement,
     RawAttachment,
@@ -133,6 +134,7 @@ def _attachment(payload: AttachmentInput | None):
 def laboratory_router(
     registry: SampleRegistry,
     workbench: LaboratoryWorkbench,
+    reports: LaboratoryReports,
     actor_dependency: Callable,
     mutation_actor_dependency: Callable,
 ):
@@ -157,6 +159,31 @@ def laboratory_router(
     @router.get('/workbench/{barcode_value}')
     def load_workbench(barcode_value: str, actor=Depends(actor_dependency)):
         return workbench.load(actor, barcode_value)
+
+    @router.get('/reports/by-barcode/{barcode_value}')
+    def report_status(barcode_value: str, actor=Depends(actor_dependency)):
+        return reports.get_report_by_barcode(actor, barcode_value)
+
+    @router.post('/reports/by-barcode/{barcode_value}/retry')
+    def retry_report(barcode_value: str, actor=Depends(mutation_actor_dependency)):
+        return reports.retry_report(actor, barcode_value)
+
+    @router.get('/reports/by-barcode/{barcode_value}/file')
+    def report_file(
+        barcode_value: str,
+        disposition: Literal['inline', 'attachment'] = 'inline',
+        actor=Depends(actor_dependency),
+    ):
+        current = reports.read_report_file(actor, barcode_value)
+        return Response(
+            content=current.content,
+            media_type='application/pdf',
+            headers={
+                'Content-Disposition': f'{disposition}; filename="{current.filename}"',
+                'Cache-Control': 'private, no-store',
+                'X-Content-Type-Options': 'nosniff',
+            },
+        )
 
     @router.patch('/samples/{barcode_value}')
     def update_sample(barcode_value: str, payload: SampleBasicsInput, actor=Depends(mutation_actor_dependency)):

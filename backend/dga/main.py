@@ -23,6 +23,7 @@ from dga.laboratory.public import (
     MODULE as LABORATORY,
     LaboratoryError,
     LaboratoryWorkbench,
+    LaboratoryReports,
     SampleRegistry,
     access_context as laboratory_access,
     http_router as laboratory_router,
@@ -34,7 +35,7 @@ from dga.shared.auth.http import AuthenticatedRequests, auth_router
 from dga.shared.files import ObjectStorageError, S3CompatibleFileStore, UnavailableFileStore
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, object_store=None) -> FastAPI:
     settings = settings or Settings()
     migrations = Config(str(Path(__file__).resolve().parents[1] / 'alembic.ini'))
     expected_heads = set(ScriptDirectory.from_config(migrations).get_heads())
@@ -96,10 +97,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     asset_directory = AssetDirectory(engine)
     app.include_router(assets_router(asset_directory, current_actor))
-    object_store = UnavailableFileStore()
-    if all((settings.object_store_endpoint, settings.object_store_bucket,
+    configured_object_store = object_store or UnavailableFileStore()
+    if object_store is None and all((settings.object_store_endpoint, settings.object_store_bucket,
             settings.object_store_access_key, settings.object_store_secret_key)):
-        object_store = S3CompatibleFileStore(
+        configured_object_store = S3CompatibleFileStore(
             settings.object_store_endpoint,
             settings.object_store_bucket,
             settings.object_store_access_key.get_secret_value(),
@@ -115,10 +116,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             headers={'Cache-Control': 'no-store'},
         )
     sample_registry = SampleRegistry(engine, asset_directory, AuditTrail())
+    audit_trail = AuditTrail()
+    reports = LaboratoryReports(engine, audit_trail, configured_object_store)
     app.include_router(
         laboratory_router(
             sample_registry,
-            LaboratoryWorkbench(engine, sample_registry, AuditTrail(), object_store),
+            LaboratoryWorkbench(
+                engine, sample_registry, audit_trail, configured_object_store, reports
+            ),
+            reports,
             current_actor,
             mutation_actor,
         )

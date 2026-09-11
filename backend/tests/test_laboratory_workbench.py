@@ -28,6 +28,7 @@ from dga.laboratory.public import (
     TestType as LaboratoryTestType,
     TestingStatus,
     UpdateSampleBasics,
+    LaboratoryReports,
 )
 from dga.shared.auth.public import AuditTrail, IdentityError, IdentityService
 from dga.main import create_app
@@ -52,14 +53,21 @@ class RecordingObjectStore:
     def delete(self, *, object_key: str) -> None:
         self.objects.pop(object_key, None)
 
+    def get(self, *, object_key: str) -> bytes:
+        return self.objects[object_key]
+
 
 def make_workbench(engine, store, **kwargs):
     audit = AuditTrail()
+    report_lifecycle = kwargs.pop(
+        'report_lifecycle', LaboratoryReports(engine, audit, store)
+    )
     return LaboratoryWorkbench(
         engine,
         SampleRegistry(engine, AssetDirectory(engine), audit),
         audit,
         store,
+        report_lifecycle,
         **kwargs,
     )
 
