@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 
 class FileStore(Protocol):
     def put(self, *, object_key: str, content: bytes, content_type: str) -> None: ...
+    def get(self, *, object_key: str) -> bytes: ...
     def delete(self, *, object_key: str) -> None: ...
 
 
@@ -23,6 +24,9 @@ class UnavailableFileStore:
         raise ObjectStorageError('object_storage_not_configured')
 
     def delete(self, *, object_key: str) -> None:
+        raise ObjectStorageError('object_storage_not_configured')
+
+    def get(self, *, object_key: str) -> bytes:
         raise ObjectStorageError('object_storage_not_configured')
 
 
@@ -42,7 +46,10 @@ class S3CompatibleFileStore:
     def delete(self, *, object_key: str) -> None:
         self._request('DELETE', object_key, b'', 'application/octet-stream')
 
-    def _request(self, method: str, object_key: str, content: bytes, content_type: str) -> None:
+    def get(self, *, object_key: str) -> bytes:
+        return self._request('GET', object_key, b'', 'application/octet-stream')
+
+    def _request(self, method: str, object_key: str, content: bytes, content_type: str) -> bytes:
         encoded_key = '/'.join(quote(part, safe='') for part in object_key.split('/'))
         url = f'{self._endpoint}/{quote(self._bucket, safe="")}/{encoded_key}'
         parsed = urlsplit(url)
@@ -84,6 +91,7 @@ class S3CompatibleFileStore:
             with urlopen(request, timeout=10) as response:
                 if response.status not in {200, 204}:
                     raise ObjectStorageError(f'object_storage_status_{response.status}')
+                return response.read()
         except (HTTPError, URLError, TimeoutError) as error:
             raise ObjectStorageError('object_storage_unavailable') from error
 

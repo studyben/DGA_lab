@@ -1,11 +1,21 @@
-from datetime import datetime, timezone
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from hashlib import sha256
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from dga.laboratory.public import LaboratoryError, LaboratoryReports, ReportState
+from dga.laboratory.public import (
+    LaboratoryError,
+    LaboratoryReports,
+    ReportState,
+    StaleReportClaim,
+)
+from dga.laboratory.report_worker import ReportWorker
 from dga.main import create_app
 from dga.shared.auth.public import AuditTrail
 from dga.shared.config import Settings
@@ -20,9 +30,39 @@ from tests.test_laboratory_workbench import (
 )
 
 
+class MemoryFileStore:
+    def __init__(self, *, fail_put=False):
+        self.objects = {}
+        self.fail_put = fail_put
+
+    def put(self, *, object_key, content, content_type):
+        if self.fail_put:
+            raise OSError('storage unavailable')
+        self.objects[object_key] = content
+
+    def get(self, *, object_key):
+        return self.objects[object_key]
+
+    def delete(self, *, object_key):
+        self.objects.pop(object_key, None)
+
+
+def _queue_one(workbench_context, store=None):
+    engine, _, actor, sample = workbench_context
+    store = store or MemoryFileStore()
+    workbench = make_workbench(engine, store)
+    method = next(
+        item for item in workbench.load(actor, sample.barcode_value).methods
+        if item.test_type == TestType.DGA
+    )
+    workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    workbench.finalize(actor, sample.barcode_value)
+    return engine, actor, sample, store
+
+
 def test_open_sample_report_is_unavailable(workbench_context):
     engine, _, actor, sample = workbench_context
-    reports = LaboratoryReports(engine, AuditTrail())
+    reports = LaboratoryReports(engine, AuditTrail(), MemoryFileStore())
 
     status = reports.get_report_by_barcode(actor, sample.barcode_value)
 
@@ -42,7 +82,7 @@ def test_finalization_atomically_queues_exact_snapshot(workbench_context):
 
     workbench.finalize(actor, sample.barcode_value)
 
-    status = LaboratoryReports(engine, AuditTrail()).get_report_by_barcode(
+    status = LaboratoryReports(engine, AuditTrail(), MemoryFileStore()).get_report_by_barcode(
         actor, sample.barcode_value
     )
     assert status.state == ReportState.QUEUED
@@ -102,7 +142,7 @@ def test_withdrawal_invalidates_and_refinalization_reuses_current_row(workbench_
         ).mappings().one()
 
     workbench.withdraw_finalization(actor, sample.barcode_value, 'correct result')
-    unavailable = LaboratoryReports(engine, AuditTrail()).get_report_by_barcode(
+    unavailable = LaboratoryReports(engine, AuditTrail(), MemoryFileStore()).get_report_by_barcode(
         actor, sample.barcode_value
     )
     assert unavailable.state == ReportState.UNAVAILABLE
@@ -175,7 +215,7 @@ def test_pre_migration_finalization_token_requires_refinalization(workbench_cont
             },
         )
 
-    status = LaboratoryReports(engine, AuditTrail()).get_report_by_barcode(
+    status = LaboratoryReports(engine, AuditTrail(), MemoryFileStore()).get_report_by_barcode(
         actor, sample.barcode_value
     )
 
@@ -211,3 +251,210 @@ def test_http_report_lookup_exposes_safe_current_state(workbench_context):
         'requested_at': None,
         'generated_at': None,
     }
+
+
+def test_worker_claim_completion_and_verified_file_read(workbench_context):
+    engine, actor, sample, store = _queue_one(workbench_context)
+    now = datetime(2026, 8, 6, 10, 0, tzinfo=timezone.utc)
+    reports = LaboratoryReports(engine, AuditTrail(clock=lambda: now), store, clock=lambda: now)
+
+    claim = reports.claim_next_report('worker-a', lease_seconds=30)
+    assert claim is not None
+    assert claim.snapshot['sample']['barcode'] == sample.barcode_value
+    content = b'%PDF-1.4 test report'
+    key = f'laboratory/reports/{claim.generation_token}/{claim.claim_token}.pdf'
+    store.put(object_key=key, content=content, content_type='application/pdf')
+    reports.complete_report(
+        claim,
+        object_key=key,
+        content_sha256=sha256(content).hexdigest(),
+        byte_size=len(content),
+        generated_at=now,
+    )
+
+    status = reports.get_report_by_barcode(actor, sample.barcode_value)
+    report_file = reports.read_report_file(actor, sample.barcode_value)
+    assert status.state == ReportState.READY
+    assert report_file.content == content
+    assert report_file.filename == f'{sample.barcode_value}.pdf'
+    assert report_file.generated_at == now
+
+
+def test_expired_lease_is_reclaimed_and_stale_completion_is_rejected(workbench_context):
+    engine, _, _, store = _queue_one(workbench_context)
+    clock_value = [datetime(2026, 8, 6, 10, 0, tzinfo=timezone.utc)]
+    reports = LaboratoryReports(
+        engine, AuditTrail(), store, clock=lambda: clock_value[0]
+    )
+    stale = reports.claim_next_report('worker-a', lease_seconds=10)
+    assert stale is not None
+    clock_value[0] += timedelta(seconds=11)
+    current = reports.claim_next_report('worker-b', lease_seconds=10)
+    assert current is not None
+    assert current.claim_token != stale.claim_token
+
+    with pytest.raises(StaleReportClaim):
+        reports.complete_report(
+            stale,
+            object_key='stale.pdf',
+            content_sha256=sha256(b'stale').hexdigest(),
+            byte_size=5,
+            generated_at=clock_value[0],
+        )
+
+
+def test_failure_is_visible_and_retry_preserves_snapshot(workbench_context):
+    engine, actor, sample, store = _queue_one(workbench_context)
+    reports = LaboratoryReports(engine, AuditTrail(), store)
+    claim = reports.claim_next_report('worker-a', lease_seconds=30)
+    assert claim is not None
+    reports.fail_report(claim, 'object_storage_unavailable')
+    failed = reports.get_report_by_barcode(actor, sample.barcode_value)
+    assert failed.state == ReportState.FAILED
+    assert failed.error_code == 'object_storage_unavailable'
+
+    retried = reports.retry_report(actor, sample.barcode_value)
+    next_claim = reports.claim_next_report('worker-b', lease_seconds=30)
+    assert retried.state == ReportState.QUEUED
+    assert next_claim is not None
+    assert next_claim.generation_token != claim.generation_token
+    assert next_claim.snapshot == claim.snapshot
+
+
+def test_retry_requires_finalize_permission(workbench_context):
+    engine, actor, sample, store = _queue_one(workbench_context)
+    reports = LaboratoryReports(engine, AuditTrail(), store)
+    claim = reports.claim_next_report('worker-a', lease_seconds=30)
+    assert claim is not None
+    reports.fail_report(claim, 'render_failed')
+    read_only = replace(actor, permissions=frozenset({'laboratory.read'}))
+
+    with pytest.raises(Exception, match='permission_denied'):
+        reports.retry_report(read_only, sample.barcode_value)
+
+
+def test_checksum_mismatch_blocks_file_and_does_not_audit_download(workbench_context):
+    engine, actor, sample, store = _queue_one(workbench_context)
+    reports = LaboratoryReports(engine, AuditTrail(), store)
+    claim = reports.claim_next_report('worker-a', lease_seconds=30)
+    assert claim is not None
+    store.put(object_key='current.pdf', content=b'changed', content_type='application/pdf')
+    reports.complete_report(
+        claim,
+        object_key='current.pdf',
+        content_sha256=sha256(b'original').hexdigest(),
+        byte_size=len(b'original'),
+        generated_at=datetime.now(timezone.utc),
+    )
+
+    with pytest.raises(LaboratoryError) as captured:
+        reports.read_report_file(actor, sample.barcode_value)
+    assert captured.value.code == 'report_integrity_failure'
+    with engine.connect() as connection:
+        audits = connection.execute(
+            text("SELECT count(*) FROM audit_logs WHERE action_code='LAB_REPORT_DOWNLOADED'")
+        ).scalar_one()
+    assert audits == 0
+
+
+def test_worker_moves_storage_failure_to_failed_and_success_to_ready(workbench_context):
+    engine, actor, sample, _ = _queue_one(workbench_context)
+    failing_store = MemoryFileStore(fail_put=True)
+    reports = LaboratoryReports(engine, AuditTrail(), failing_store)
+    worker = ReportWorker(reports, failing_store, lambda snapshot, generated_at: b'%PDF')
+
+    assert worker.process_one('worker-a') is True
+    assert reports.get_report_by_barcode(actor, sample.barcode_value).state == ReportState.FAILED
+
+    working_store = MemoryFileStore()
+    reports = LaboratoryReports(engine, AuditTrail(), working_store)
+    reports.retry_report(actor, sample.barcode_value)
+    worker = ReportWorker(reports, working_store, lambda snapshot, generated_at: b'%PDF')
+    assert worker.process_one('worker-b') is True
+    assert reports.get_report_by_barcode(actor, sample.barcode_value).state == ReportState.READY
+
+
+def test_http_file_response_has_safe_inline_and_attachment_headers(workbench_context):
+    engine, actor, sample, store = _queue_one(workbench_context)
+    reports = LaboratoryReports(engine, AuditTrail(), store)
+    claim = reports.claim_next_report('worker-a', lease_seconds=30)
+    assert claim is not None
+    content = b'%PDF current'
+    store.put(object_key='http.pdf', content=content, content_type='application/pdf')
+    reports.complete_report(
+        claim,
+        object_key='http.pdf',
+        content_sha256=sha256(content).hexdigest(),
+        byte_size=len(content),
+        generated_at=datetime.now(timezone.utc),
+    )
+    settings = Settings(
+        database_url=engine.url.render_as_string(hide_password=False),
+        cookie_secure=False,
+        auth_allowed_origins='http://127.0.0.1:8080',
+    )
+
+    with TestClient(create_app(settings, object_store=store)) as client:
+        login = client.post(
+            '/api/auth/login',
+            headers={'Origin': 'http://127.0.0.1:8080'},
+            json={'username': 'workbench-admin', 'password': CHANGED_PASSWORD},
+        )
+        assert login.status_code == 200
+        inline = client.get(
+            f'/api/laboratory/reports/by-barcode/{sample.barcode_value}/file?disposition=inline'
+        )
+        attachment = client.get(
+            f'/api/laboratory/reports/by-barcode/{sample.barcode_value}/file?disposition=attachment'
+        )
+
+    assert inline.status_code == 200
+    assert inline.content == content
+    assert inline.headers['content-type'] == 'application/pdf'
+    assert inline.headers['content-disposition'] == f'inline; filename="{sample.barcode_value}.pdf"'
+    assert inline.headers['cache-control'] == 'private, no-store'
+    assert inline.headers['x-content-type-options'] == 'nosniff'
+    assert attachment.headers['content-disposition'] == f'attachment; filename="{sample.barcode_value}.pdf"'
+
+
+def test_withdrawal_waits_for_inflight_download_then_blocks_new_reads(workbench_context):
+    started, release = Event(), Event()
+
+    class BlockingFileStore(MemoryFileStore):
+        def get(self, *, object_key):
+            started.set()
+            assert release.wait(3)
+            return super().get(object_key=object_key)
+
+    store = BlockingFileStore()
+    engine, actor, sample, _ = _queue_one(workbench_context, store)
+    reports = LaboratoryReports(engine, AuditTrail(), store)
+    claim = reports.claim_next_report('worker-a', lease_seconds=30)
+    content = b'%PDF current'
+    store.put(object_key='locked.pdf', content=content, content_type='application/pdf')
+    reports.complete_report(
+        claim,
+        object_key='locked.pdf',
+        content_sha256=sha256(content).hexdigest(),
+        byte_size=len(content),
+        generated_at=datetime.now(timezone.utc),
+    )
+    workbench = make_workbench(engine, store)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        download = pool.submit(reports.read_report_file, actor, sample.barcode_value)
+        assert started.wait(2)
+        withdrawal = pool.submit(
+            workbench.withdraw_finalization,
+            actor,
+            sample.barcode_value,
+            'invalidate report',
+        )
+        assert not withdrawal.done()
+        release.set()
+        assert download.result(timeout=3).content == content
+        assert withdrawal.result(timeout=3).testing_status.value == 'OPEN'
+
+    with pytest.raises(LaboratoryError) as captured:
+        reports.read_report_file(actor, sample.barcode_value)
+    assert captured.value.code == 'report_unavailable'

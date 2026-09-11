@@ -59,6 +59,16 @@ services:
       interval: 5s
       timeout: 10s
       retries: 12
+  report-worker:
+    build: ./backend
+    environment: *app-env
+    command: ["python", "-m", "dga.laboratory.report_worker"]
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      object-store-init:
+        condition: service_completed_successfully
   test-db:
     image: postgres:17-bookworm
     profiles: [test]

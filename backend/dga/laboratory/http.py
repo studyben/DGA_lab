@@ -164,6 +164,27 @@ def laboratory_router(
     def report_status(barcode_value: str, actor=Depends(actor_dependency)):
         return reports.get_report_by_barcode(actor, barcode_value)
 
+    @router.post('/reports/by-barcode/{barcode_value}/retry')
+    def retry_report(barcode_value: str, actor=Depends(mutation_actor_dependency)):
+        return reports.retry_report(actor, barcode_value)
+
+    @router.get('/reports/by-barcode/{barcode_value}/file')
+    def report_file(
+        barcode_value: str,
+        disposition: Literal['inline', 'attachment'] = 'inline',
+        actor=Depends(actor_dependency),
+    ):
+        current = reports.read_report_file(actor, barcode_value)
+        return Response(
+            content=current.content,
+            media_type='application/pdf',
+            headers={
+                'Content-Disposition': f'{disposition}; filename="{current.filename}"',
+                'Cache-Control': 'private, no-store',
+                'X-Content-Type-Options': 'nosniff',
+            },
+        )
+
     @router.patch('/samples/{barcode_value}')
     def update_sample(barcode_value: str, payload: SampleBasicsInput, actor=Depends(mutation_actor_dependency)):
         return workbench.update_sample(actor, barcode_value, UpdateSampleBasics(**payload.model_dump()))

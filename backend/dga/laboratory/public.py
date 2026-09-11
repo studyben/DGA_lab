@@ -345,4 +345,10 @@ from .workbench import (  # noqa: E402
     WorkbenchSample,
 )
 
-from .reports import LaboratoryReports, ReportState, ReportStatus  # noqa: E402
+from .reports import (  # noqa: E402
+    LaboratoryReports,
+    ReportFile,
+    ReportState,
+    ReportStatus,
+    StaleReportClaim,
+)

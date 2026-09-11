@@ -74,13 +74,14 @@ nginx 提供 React/TypeScript 静态构建，并将 `/api/` 转发给 FastAPI；
 - `GET /api/laboratory/samples/by-barcode/{barcode}`：扫描或输入油样条码取回同一组收样基本信息和容器；`POST /api/laboratory/samples/{barcode}/label-prints` 在调用浏览器打印前记录审计。两个 POST 均要求同源 Origin 和当前会话 CSRF。
 - `GET /api/laboratory/workbench/{barcode}`：取回油样基础信息、容器、检测中状态、启用的方法配置和全部有效检测。`PATCH /api/laboratory/samples/{barcode}` 修正基础信息；`POST/PUT/DELETE /api/laboratory/samples/{barcode}/tests...` 新增、修改或逻辑删除 DGA、微水和击穿电压记录。重复检测是同一条码下的独立记录，不另建“复测”实体；ND 不保存数值，LT/GT 保存边界数值。正式 ASTM 方法编号、单位、精度和检出限当前明确待配置。
 - `PUT /api/laboratory/samples/{barcode}/report-result`：同类型存在多份有效检测时选择该条码报告采用的结果；只有一份时整体定稿自动选择。`POST /api/laboratory/samples/{barcode}/finalization` 执行整体检测定稿，身份待确认、没有有效检测、缺少多结果选择或未确认 QA 警示时返回结构化阻塞原因；定稿后基础信息、检测和报告结果选择均只读。
-- `POST /api/laboratory/samples/{barcode}/finalization-withdrawals`：具有 `laboratory.finalize` 权限的人员填写原因后撤回定稿并恢复编辑；条码标签仍可重打。PDF/条码报告生成不在 #7 范围，属于 #8。
+- `POST /api/laboratory/samples/{barcode}/finalization-withdrawals`：具有 `laboratory.finalize` 权限的人员填写原因后撤回定稿并恢复编辑；条码标签仍可重打，当前报告同步失效。
+- `GET /api/laboratory/reports/by-barcode/{barcode}`：查询当前条码报告的不可用、排队、生成中、就绪或失败状态；`POST .../retry` 由具有定稿权限的人员安全重试失败任务；`GET .../file?disposition=inline|attachment` 代理返回校验过 SHA-256 的当前 PDF。未定稿不出报告，撤回后旧文件不可访问，重新定稿只替换当前报告，不显示版本历史。独立 `report-worker` 从 PostgreSQL 领取带租约的任务，将中文简版报告写入 S3 兼容对象存储。
 
 密码使用 Argon2id（19MiB、2 次、并行度 1）；只存哈希。会话为随机不透明凭据，数据库只存会话凭据 SHA-256。退出撤销当前会话，改密撤销全部旧会话并创建新会话；停用/锁定撤销旧会话，重新启用不会复活它们。每次请求读取当前状态/角色。连续 5 次错误密码后账号临时限制 15 分钟；接口不透露账号是否存在。前端每 30 秒及重新聚焦时检查会话，后端每次请求校验，因此撤销后的数据接口立即受限。
 
 审计只追加（登录成功/失败、退出、密码变更、账号/角色/状态操作，以及收样、资产关联、条码打印、检测变更、报告结果选择、定稿尝试与撤回），通过受权共享公开查询读取。未匹配账号的失败登录 actor 为空，另保存声称的用户名；不伪造用户 ID，不记录密码/会话/CSRF。结构化非法请求在认证前返回通用错误，不回显输入。审计查询为最小 operator/application 接口，无审计管理 UI。生产还需 #20 的 TLS、反向代理级限流、监控和最小数据库权限；应用内账号节流不替代外围防滥用。
 
-未来 Lightsail 的外部托管数据库、对象存储、worker 和备份配置由 #20 与对应业务工单提供，本地 Compose 不作为生产配置。
+未来 Lightsail 的外部托管数据库、对象存储和备份配置由 #20 提供；本地 Compose 已包含报告 worker，但不作为生产配置。
 
 ## 测试
 

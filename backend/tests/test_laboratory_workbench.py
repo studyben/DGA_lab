@@ -53,10 +53,15 @@ class RecordingObjectStore:
     def delete(self, *, object_key: str) -> None:
         self.objects.pop(object_key, None)
 
+    def get(self, *, object_key: str) -> bytes:
+        return self.objects[object_key]
+
 
 def make_workbench(engine, store, **kwargs):
     audit = AuditTrail()
-    report_lifecycle = kwargs.pop('report_lifecycle', LaboratoryReports(engine, audit))
+    report_lifecycle = kwargs.pop(
+        'report_lifecycle', LaboratoryReports(engine, audit, store)
+    )
     return LaboratoryWorkbench(
         engine,
         SampleRegistry(engine, AssetDirectory(engine), audit),
