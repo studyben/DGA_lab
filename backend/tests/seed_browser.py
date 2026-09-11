@@ -63,7 +63,8 @@ def main():
                  '30000000-0000-0000-0000-000000000001',NULL,
                  '2024-01-01T00:00:00Z',NULL);
             """))
-        sample = SampleRegistry(engine, AssetDirectory(engine), AuditTrail()).receive(
+        registry = SampleRegistry(engine, AssetDirectory(engine), AuditTrail())
+        sample = registry.receive(
             admin.actor,
             ReceiveSample(
                 sampled_at=datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc),
@@ -78,6 +79,21 @@ def main():
         )
         if sample.barcode_value != 'DGA-20260802-000001':
             raise RuntimeError('Unexpected browser sample barcode')
+        report_sample = registry.receive(
+            admin.actor,
+            ReceiveSample(
+                sampled_at=datetime(2026, 8, 1, 14, 0, tzinfo=timezone.utc),
+                received_at=datetime(2026, 8, 2, 10, 0, tzinfo=timezone.utc),
+                site_name='ignored',
+                equipment_serial='ignored',
+                notes='条码报告浏览器验收样品',
+                container_count=1,
+                identity_status=SampleIdentityStatus.ASSOCIATED,
+                formal_asset_id='40000000-0000-0000-0000-000000000002',
+            ),
+        )
+        if report_sample.barcode_value != 'DGA-20260802-000002':
+            raise RuntimeError('Unexpected browser report sample barcode')
         service.logout(admin.token)
     finally:
         engine.dispose()
