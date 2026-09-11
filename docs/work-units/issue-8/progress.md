@@ -2,7 +2,7 @@
 
 - Preflight: dirty root `main` preserved; user authorized isolated worktree creation.
 - Branch: `codex/issue-8-barcode-report`, based on `origin/codex/issue-6-test-entry` at merge commit `13a25ca` (includes PR #27 / Issue #7 implementation).
-- Current gate: PR #28 review accepted; accepted-review commit pending.
+- Current gate: PR #28 required-check finding PR-201 fixed and locally re-reviewed; fix commit/push and remote check pending.
 - Goal confirmation accepted. Push and merge are authorized after all review and verification gates pass.
 - No push, PR, merge, Issue comment or Issue close has occurred.
 - Plan review failed with three material findings in `docs/reviews/plan-review-20260911-000220.md`; all three were fixed and the re-review passed in `docs/reviews/plan-review-20260911-000502.md`.
@@ -17,3 +17,5 @@
 - Aggregate deep review found and fixed one medium documentation drift (old versioned report publication model) in `docs/reviews/deep-review-20260911-004331.md`; no code or behavior findings remain.
 - Branch pushed and draft PR #28 created against `codex/issue-6-test-entry`.
 - Remote PR diff at `794d614` reviewed and accepted with no findings in `docs/reviews/pr-review-28-20260911-004818.md`.
+- The required browser check then exposed PR-201: its documented `up ... frontend` target omitted the sibling report worker, leaving the report queued. The browser Compose dependency is fixed and must be re-verified before readiness.
+- Exact CI-command reproduction after the fix passed all 13 browser scenarios; re-review is `docs/reviews/pr-review-28-20260911-005457.md`.

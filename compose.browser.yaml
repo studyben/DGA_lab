@@ -75,6 +75,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      report-worker:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
       interval: 3s
