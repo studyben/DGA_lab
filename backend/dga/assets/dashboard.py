@@ -22,12 +22,13 @@ class DashboardQuery(BaseModel):
 
 class EquipmentQuery(BaseModel):
     model_config = ConfigDict(extra='forbid')
+    name: str = Field(default='', max_length=200)
     product_line: Literal['PV', 'ESS'] = 'PV'
     serial: str = Field(default='', max_length=160)
     model: str = Field(default='', max_length=120)
     machine_type: Literal['INVERTER_UNIT', 'INVERTER', 'ESS_SYSTEM', 'PCS_UNIT', 'PCS', 'BATTERY_CABINET', 'TRANSFORMER'] | None = None
     lifecycle_status: Literal['COMMISSIONING', 'IN_SERVICE', 'OUT_OF_SERVICE', 'RETIRED', 'MERGED'] | None = None
-    sort: Literal['system_asset_number', 'serial_number', 'model', 'material_number', 'machine_type', 'lifecycle_status', 'power_mw', 'energy_mwh'] = 'system_asset_number'
+    sort: Literal['display_name', 'system_asset_number', 'serial_number', 'model', 'material_number', 'machine_type', 'lifecycle_status', 'power_mw', 'energy_mwh'] = 'system_asset_number'
     direction: Literal['asc', 'desc'] = 'asc'
     page: int = Field(default=1, ge=1, le=100000)
     page_size: int = Field(default=20, ge=1, le=100)
@@ -89,6 +90,7 @@ def site_detail(engine, site_id, query: EquipmentQuery, at):
     params['serial'] = params['serial'].strip()
     params['model'] = params['model'].strip()
     equipment_sql = '''FROM formal_assets a WHERE a.product_line=:product_line
+        AND position(lower(:name) in lower(concat_ws(' ',a.tag_number,a.equipment_name,a.system_asset_number)))>0
         AND EXISTS (SELECT 1 FROM asset_installations i WHERE i.asset_id=a.id
             AND i.site_id=:site_id AND i.valid_from<=:at AND (i.valid_to IS NULL OR i.valid_to>:at))
         AND position(lower(:serial) in lower(a.serial_number))>0
@@ -106,7 +108,8 @@ def site_detail(engine, site_id, query: EquipmentQuery, at):
             return None
         count = c.execute(text('SELECT count(*) ' + equipment_sql), params).scalar_one()
         rows = c.execute(text('''SELECT a.id,a.system_asset_number,a.serial_number,a.model,
-            a.material_number,a.machine_type,a.lifecycle_status,a.power_mw,a.energy_mwh '''
-            + equipment_sql + f' ORDER BY a.{query.sort} {query.direction} NULLS LAST,a.id LIMIT :page_size OFFSET :offset'), params).mappings().all()
+            a.material_number,a.machine_type,a.lifecycle_status,a.power_mw,a.energy_mwh,
+            COALESCE(NULLIF(a.tag_number,''),NULLIF(a.equipment_name,''),a.system_asset_number) AS display_name '''
+            + equipment_sql + f' ORDER BY {query.sort} {query.direction} NULLS LAST,a.id LIMIT :page_size OFFSET :offset'), params).mappings().all()
         return {'site': dict(site), 'equipment_count': count, 'equipment': [dict(r) for r in rows],
                 'page': query.page, 'page_size': query.page_size}

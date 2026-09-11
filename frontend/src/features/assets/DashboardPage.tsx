@@ -8,6 +8,7 @@ type Site = {
   grid_status: string | null; operation_status: string | null; commissioning_date: string | null;
 };
 type Equipment = {
+  display_name: string;
   id: string; system_asset_number: string; serial_number: string; model: string | null; material_number: string | null;
   machine_type: string | null; lifecycle_status: string; power_mw: number | null; energy_mwh: number | null;
 };
@@ -15,7 +16,7 @@ type Machine = { machine_type: string | null; count: number; power_mw: number | 
 type Dashboard = { site_count: number; customer_count: number; sites: Site[]; machine_totals: Machine[] };
 type Detail = { site: Site; equipment_count: number; equipment: Equipment[] };
 type Column<T> = { key: Extract<keyof T, string>; label: string; render?: (row: T) => ReactNode };
-const machineNames: Values = { INVERTER_UNIT: '逆变器整机', INVERTER: '逆变器', ESS_SYSTEM: '储能系统', PCS_UNIT: 'PCS整机', PCS: 'PCS本体', BATTERY_CABINET: '电池柜', TRANSFORMER: '变压器' };
+export const machineNames: Values = { INVERTER_UNIT: '逆变器整机', INVERTER: '逆变器', ESS_SYSTEM: '储能系统', PCS_UNIT: 'PCS整机', PCS: 'PCS本体', BATTERY_CABINET: '电池柜', TRANSFORMER: '变压器' };
 const gridNames: Values = { NOT_STARTED: '未开始', IN_PROGRESS: '调试中', COMPLETED: '已完成' };
 const operationNames: Values = { NOT_OPERATIONAL: '未投运', PARTIAL: '部分投运', OPERATIONAL: '已投运', DECOMMISSIONED: '已退役' };
 const lifecycleNames: Values = { COMMISSIONING: '调试中', IN_SERVICE: '在役', OUT_OF_SERVICE: '离役', RETIRED: '停用', MERGED: '已合并' };
@@ -23,7 +24,7 @@ const quantity = (value: string | number | null, unit: string) => value == null 
 const label = (names: Values, value: string | number | null) => value == null ? '未提供' : names[String(value)] ?? String(value);
 const cellText = (value: unknown) => typeof value === 'string' || typeof value === 'number' ? value : '未提供';
 
-function useQuery() {
+export function useQuery() {
   const [query, setQuery] = useState<Values>(() => Object.fromEntries(new URLSearchParams(location.search)));
   function update(patch: Values, reset = false) {
     const next = { ...(reset ? { product_line: query.product_line ?? 'PV', columns: query.columns ?? '' } : query), ...patch };
@@ -34,7 +35,7 @@ function useQuery() {
   return { query, update };
 }
 
-function useRead<T>(url: string) {
+export function useRead<T>(url: string) {
   const [attempt, retry] = useState(0);
   const [state, setState] = useState<{ url: string; data?: T; error?: string }>({ url: '' });
   useEffect(() => {
@@ -45,7 +46,7 @@ function useRead<T>(url: string) {
     void (async () => {
       try {
         const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
-        if (!response.ok) throw new Error(response.status === 404 ? '未找到该产品线的现场。' : response.status === 401 ? '登录已失效，请重新登录。' : response.status === 403 ? '没有查看资产的权限。' : response.status === 422 ? '筛选条件无效，请清除筛选后重试。' : '资产服务暂不可用，请重试。');
+        if (!response.ok) throw new Error(response.status === 404 ? '未找到请求的资料。' : response.status === 401 ? '登录已失效，请重新登录。' : response.status === 403 ? '没有查看资料的权限。' : response.status === 409 ? '设备安装关系不完整或存在冲突，请联系管理员。' : response.status === 422 ? '筛选条件无效，请清除筛选后重试。' : '资产服务暂不可用，请重试。');
         const data: T = await response.json();
         if (active) setState({ url, data });
       } catch (error) {
@@ -74,7 +75,7 @@ function Filters({ fields, query, update }: { fields: { key: string; label: stri
   </form>;
 }
 
-function DataTable<T extends { id: string }>({ name, rows, total, columns, query, update, href }: {
+export function DataTable<T extends { id: string }>({ name, rows, total, columns, query, update, href }: {
   name: string; rows: T[]; total: number; columns: Column<T>[]; query: Values;
   update: (patch: Values) => void; href?: (row: T) => string;
 }) {
@@ -133,17 +134,17 @@ export function DashboardPage() {
   </div>;
 }
 
-const equipmentFields = [{ key: 'serial', label: '序列号筛选' }, { key: 'model', label: '型号筛选' }, { key: 'machine_type', label: '机器类型筛选', options: machineNames }, { key: 'lifecycle_status', label: '设备状态筛选', options: lifecycleNames }];
+const equipmentFields = [{ key: 'name', label: '设备名称 / Tag 筛选' }, { key: 'serial', label: '序列号筛选' }, { key: 'model', label: '型号筛选' }, { key: 'machine_type', label: '机器类型筛选', options: machineNames }, { key: 'lifecycle_status', label: '设备状态筛选', options: lifecycleNames }];
 export function SiteDetailPage({ siteId }: { siteId: string }) {
   const { query, update } = useQuery();
   const ess = query.product_line === 'ESS';
   const { data, error, retry } = useRead<Detail>(`/api/assets/sites/${encodeURIComponent(siteId)}?` + apiQuery(query, [...pagingKeys, ...equipmentFields.map(f => f.key)]));
   const requestedReturn = query.return_to ?? '';
   const returnTo = /^\/assets(?:\/sites)?(?:\?|$)/.test(requestedReturn) ? requestedReturn : `/assets?product_line=${ess ? 'ESS' : 'PV'}`;
-  const columns: Column<Equipment>[] = [{ key: 'system_asset_number', label: '系统资产号' }, { key: 'serial_number', label: '序列号' }, { key: 'model', label: '设备型号' }, { key: 'material_number', label: '设备物料号' }, { key: 'machine_type', label: '机器类型', render: r => label(machineNames, r.machine_type) }, { key: 'lifecycle_status', label: '设备状态', render: r => label(lifecycleNames, r.lifecycle_status) }, { key: 'power_mw', label: '功率 MW', render: r => quantity(r.power_mw, 'MW') }, ...(ess ? [{ key: 'energy_mwh' as const, label: '电池容量 MWh', render: (r: Equipment) => quantity(r.energy_mwh, 'MWh') }] : [])];
+  const columns: Column<Equipment>[] = [{ key: 'display_name', label: '设备名称 / Tag number' }, { key: 'system_asset_number', label: '系统资产号' }, { key: 'serial_number', label: '序列号' }, { key: 'model', label: '设备型号' }, { key: 'material_number', label: '设备物料号' }, { key: 'machine_type', label: '机器类型', render: r => label(machineNames, r.machine_type) }, { key: 'lifecycle_status', label: '设备状态', render: r => label(lifecycleNames, r.lifecycle_status) }, { key: 'power_mw', label: '功率 MW', render: r => quantity(r.power_mw, 'MW') }, ...(ess ? [{ key: 'energy_mwh' as const, label: '电池容量 MWh', render: (r: Equipment) => quantity(r.energy_mwh, 'MWh') }] : [])];
   return <div className="asset-dashboard"><a className="dashboard-back" href={returnTo}>返回现场列表</a>
     {error ? <p role="alert">{error} <button onClick={retry}>重试</button></p> : !data ? <p role="status">正在加载现场资料…</p> : <section className="site-facts" aria-label="现场资料"><h2>{data.site.site_name}</h2><dl>{siteColumns(ess).slice(1).map(c => <div key={c.key}><dt>{c.label}</dt><dd>{c.render ? c.render(data.site) : data.site[c.key] ?? '未提供'}</dd></div>)}</dl></section>}
     <Filters fields={equipmentFields} query={query} update={(patch, reset) => update(reset ? { ...patch, return_to: query.return_to ?? '' } : patch, reset)} />
-    {data && <DataTable name="一级设备清单" rows={data.equipment} total={data.equipment_count} columns={columns} query={query} update={update} />}
+    {data && <DataTable name="一级设备清单" rows={data.equipment} total={data.equipment_count} columns={columns} query={query} update={update} href={row => `/assets/equipment/${row.id}?return_to=${encodeURIComponent(location.pathname + location.search)}`} />}
   </div>;
 }

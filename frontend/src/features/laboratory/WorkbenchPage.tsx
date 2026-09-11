@@ -79,7 +79,7 @@ async function attachmentPayload(file: File | null) {
 
 export function WorkbenchPage() {
   const { session } = useAuth();
-  const [barcode, setBarcode] = useState('');
+  const [barcode, setBarcode] = useState(() => (new URLSearchParams(location.search).get('barcode') ?? '').slice(0, 160));
   const [data, setData] = useState<Workbench | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);

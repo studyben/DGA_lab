@@ -6,10 +6,11 @@ from decimal import Decimal
 from typing import Callable, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Response, Query
 from pydantic import BaseModel, Field
 
 from .public import (
+    AssetHistoryQuery,
     BreakdownVoltageResultInput,
     DgaResultInput,
     LaboratoryError,
@@ -125,6 +126,10 @@ def laboratory_router(
     mutation_actor_dependency: Callable,
 ):
     router = APIRouter(prefix='/api/laboratory')
+
+    @router.get('/assets/{asset_id}/test-history')
+    def asset_test_history(asset_id: UUID, query: AssetHistoryQuery = Query(), actor=Depends(actor_dependency)):
+        return registry.asset_test_history(actor, asset_id, **query.model_dump())
 
     @router.post('/samples', status_code=201)
     def receive(payload: ReceptionInput, actor=Depends(mutation_actor_dependency)):

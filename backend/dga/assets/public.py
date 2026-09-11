@@ -122,6 +122,32 @@ class AssetDirectory:
             raise AssetQueryError('site_not_found', 404)
         return result
 
+    def equipment_detail(self, actor: ActorContext, asset_id: UUID) -> dict:
+        """Current parent path and direct children; repeat this query to walk the tree."""
+        require_permission(actor, 'assets.read')
+        at = self._clock()
+        with self._engine.connect() as connection:
+            context = self._context(connection, asset_id, at)
+            columns = ('id,system_asset_number,serial_number,model,material_number,'
+                       'machine_type,lifecycle_status,power_mw,energy_mwh,product_line,'
+                       'equipment_name,tag_number,commissioning_date,battery_manufacturer,'
+                       "COALESCE(NULLIF(tag_number,''),NULLIF(equipment_name,''),system_asset_number) AS display_name")
+            path = [dict(connection.execute(text(f'SELECT {columns} FROM formal_assets WHERE id=:id'),
+                                            {'id': node.id}).mappings().one())
+                    for node in context.equipment_path]
+            children = connection.execute(text(f'''SELECT {columns} FROM formal_assets
+                WHERE id IN (SELECT asset_id FROM asset_installations
+                    WHERE parent_asset_id=:id AND valid_from<=:at
+                    AND (valid_to IS NULL OR valid_to>:at))
+                ORDER BY system_asset_number,id'''), {'id': asset_id, 'at': at}).mappings().all()
+            # Reject ambiguous effective installations instead of showing a misleading tree.
+            for child in children:
+                self._context(connection, child['id'], at)
+            return {'equipment': path[-1], 'path': path,
+                    'site': {'id': context.site_id, 'site_name': context.site_name,
+                             'customer_name': context.customer_name, 'location_text': context.site_location},
+                    'children': [dict(child) for child in children], 'health_status': 'UNASSESSED'}
+
     def search(
         self,
         actor: ActorContext,

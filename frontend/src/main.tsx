@@ -10,6 +10,7 @@ import { AuthProvider, AuthBoundary, SessionControls, useAuth } from './Auth';
 import { ReceptionPage } from './features/laboratory/ReceptionPage';
 import { WorkbenchPage } from './features/laboratory/WorkbenchPage';
 import { DashboardPage, SiteDetailPage } from './features/assets/DashboardPage';
+import { EquipmentDetailPage } from './features/assets/EquipmentDetailPage';
 
 const path =
   window.location.pathname === "/"
@@ -17,7 +18,8 @@ const path =
     : window.location.pathname.replace(/\/$/, "");
 const allPages = [...assetPages, ...laboratoryPages, ...analysisPages];
 const siteId = path.match(/^\/assets\/sites\/([^/]+)$/)?.[1];
-const current = siteId ? { title: '现场详情', description: '查看现场基础资料及当前一级设备。', permission: 'assets.read' } : allPages.find((page) => page.path === path);
+const equipmentId = path.match(/^\/assets\/equipment\/([^/]+)$/)?.[1];
+const current = equipmentId ? { title: '设备详情', description: '查看设备属性、子设备和油样检测历史。', permission: 'assets.read' } : siteId ? { title: '现场详情', description: '查看现场基础资料及当前一级设备。', permission: 'assets.read' } : allPages.find((page) => page.path === path);
 const inLab = path === "/lab" || path.startsWith("/lab/");
 const workspace = inLab ? "DGA 实验室" : "资产管理与仪表板";
 
@@ -102,9 +104,9 @@ function App() {
                     "这个地址暂时无法访问，请从工作区导航选择页面。"}
                 </p>
               </div>
-              {!(siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
+              {!(equipmentId || siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
             </div>
-            {siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : <section className="empty-panel" aria-label="页面内容">
+            {equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>

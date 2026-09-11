@@ -27,6 +27,10 @@ def assets_router(directory: AssetDirectory, actor_dependency: Callable):
     ):
         return directory.search(actor, q, effective_at=effective_at)
 
+    @router.get('/equipment/{asset_id}')
+    def equipment_detail(asset_id: UUID, actor=Depends(actor_dependency)):
+        return directory.equipment_detail(actor, asset_id)
+
     @router.get('/{asset_id}/sampling-context')
     def sampling_context(
         asset_id: UUID,
