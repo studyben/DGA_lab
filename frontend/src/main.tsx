@@ -11,6 +11,7 @@ import { ReceptionPage } from './features/laboratory/ReceptionPage';
 import { WorkbenchPage } from './features/laboratory/WorkbenchPage';
 import { DashboardPage, SiteDetailPage } from './features/assets/DashboardPage';
 import { EquipmentDetailPage } from './features/assets/EquipmentDetailPage';
+import { RepairCenterPage } from './features/assets/LifecyclePanel';
 
 const path =
   window.location.pathname === "/"
@@ -106,7 +107,7 @@ function App() {
               </div>
               {!(equipmentId || siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
             </div>
-            {equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : <section className="empty-panel" aria-label="页面内容">
+            {equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>

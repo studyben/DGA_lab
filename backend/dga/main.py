@@ -15,6 +15,7 @@ from dga.shared.config import Settings
 from dga.assets.public import (
     MODULE as ASSETS,
     AssetDirectory,
+    AssetLifecycle,
     AssetQueryError,
     access_context as asset_access,
     http_router as assets_router,
@@ -92,7 +93,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     mutation_actor = requests.mutation_actor
 
     asset_directory = AssetDirectory(engine)
-    app.include_router(assets_router(asset_directory, current_actor))
+    app.include_router(assets_router(asset_directory, current_actor, AssetLifecycle(engine), mutation_actor))
     object_store = UnavailableFileStore()
     if all((settings.object_store_endpoint, settings.object_store_bucket,
             settings.object_store_access_key, settings.object_store_secret_key)):

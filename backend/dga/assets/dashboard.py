@@ -27,7 +27,7 @@ class EquipmentQuery(BaseModel):
     serial: str = Field(default='', max_length=160)
     model: str = Field(default='', max_length=120)
     machine_type: Literal['INVERTER_UNIT', 'INVERTER', 'ESS_SYSTEM', 'PCS_UNIT', 'PCS', 'BATTERY_CABINET', 'TRANSFORMER'] | None = None
-    lifecycle_status: Literal['COMMISSIONING', 'IN_SERVICE', 'OUT_OF_SERVICE', 'RETIRED', 'MERGED'] | None = None
+    lifecycle_status: Literal['COMMISSIONING', 'IN_SERVICE', 'OUT_OF_SERVICE', 'RETIRED', 'MERGED', 'UNDER_REPAIR', 'SPARE'] | None = None
     sort: Literal['display_name', 'system_asset_number', 'serial_number', 'model', 'material_number', 'machine_type', 'lifecycle_status', 'power_mw', 'energy_mwh'] = 'system_asset_number'
     direction: Literal['asc', 'desc'] = 'asc'
     page: int = Field(default=1, ge=1, le=100000)

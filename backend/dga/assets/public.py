@@ -36,6 +36,8 @@ class AssetType(StrEnum):
 
 
 class LifecycleStatus(StrEnum):
+    UNDER_REPAIR = 'UNDER_REPAIR'
+    SPARE = 'SPARE'
     COMMISSIONING = 'COMMISSIONING'
     IN_SERVICE = 'IN_SERVICE'
     OUT_OF_SERVICE = 'OUT_OF_SERVICE'
@@ -127,14 +129,20 @@ class AssetDirectory:
         require_permission(actor, 'assets.read')
         at = self._clock()
         with self._engine.connect().execution_options(isolation_level='REPEATABLE READ') as connection:
-            context = self._context(connection, asset_id, at)
+            from .lifecycle import location_at
+            try:
+                location = location_at(connection, asset_id, at)
+            except AssetQueryError as error:
+                if error.status == 404:
+                    raise
+                raise AssetQueryError('asset_context_unavailable', 409) from error
             columns = ('id,system_asset_number,serial_number,model,material_number,'
                        'machine_type,lifecycle_status,power_mw,energy_mwh,product_line,'
                        'equipment_name,tag_number,commissioning_date,battery_manufacturer,'
                        "COALESCE(NULLIF(tag_number,''),NULLIF(equipment_name,''),system_asset_number) AS display_name")
             path = [dict(connection.execute(text(f'SELECT {columns} FROM formal_assets WHERE id=:id'),
-                                            {'id': node.id}).mappings().one())
-                    for node in context.equipment_path]
+                                            {'id': node['id']}).mappings().one())
+                    for node in location['path']]
             children = connection.execute(text(f'''SELECT {columns} FROM formal_assets
                 WHERE id IN (SELECT asset_id FROM asset_installations
                     WHERE parent_asset_id=:id AND valid_from<=:at
@@ -142,10 +150,16 @@ class AssetDirectory:
                 ORDER BY system_asset_number,id'''), {'id': asset_id, 'at': at}).mappings().all()
             # Reject ambiguous effective installations instead of showing a misleading tree.
             for child in children:
-                self._context(connection, child['id'], at)
+                try:
+                    location_at(connection, child['id'], at)
+                except AssetQueryError as error:
+                    raise AssetQueryError('asset_context_unavailable', 409) from error
+            site = None
+            if location['site_id']:
+                site = dict(connection.execute(text('''SELECT s.id,s.site_name,c.customer_name,s.location_text
+                    FROM sites s JOIN customers c ON c.id=s.customer_id WHERE s.id=:id'''), {'id': location['site_id']}).mappings().one())
             return {'equipment': path[-1], 'path': path,
-                    'site': {'id': context.site_id, 'site_name': context.site_name,
-                             'customer_name': context.customer_name, 'location_text': context.site_location},
+                    'site': site, 'location': location,
                     'children': [dict(child) for child in children], 'health_status': 'UNASSESSED'}
 
     def search(
@@ -316,8 +330,11 @@ class AssetDirectory:
         raise AssetQueryError('asset_context_unavailable', 409)
 
 
-def http_router(directory: AssetDirectory, actor_dependency: Callable):
+def http_router(directory: AssetDirectory, actor_dependency: Callable, lifecycle, mutation_actor: Callable):
     """Compose the asset-owned HTTP adapter without exposing internal imports."""
     from .http import assets_router
 
-    return assets_router(directory, actor_dependency)
+    return assets_router(directory, actor_dependency, lifecycle, mutation_actor)
+
+
+from .lifecycle import AssetLifecycle
