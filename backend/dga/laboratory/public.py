@@ -66,12 +66,13 @@ class AssetSnapshotNode:
 @dataclass(frozen=True)
 class SampleAssetSnapshot:
     formal_asset_id: UUID
-    customer_id: UUID
+    customer_id: UUID | None
     customer_name: str
-    site_id: UUID
+    site_id: UUID | None
     site_name: str
     site_location: str | None
     equipment_path: tuple[AssetSnapshotNode, ...]
+    location_kind: str = 'SITE'
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,7 @@ def _snapshot(context: SamplingAssetContext) -> SampleAssetSnapshot:
         site_id=context.site_id,
         site_name=context.site_name,
         site_location=context.site_location,
+        location_kind=context.location_kind,
         equipment_path=tuple(
             AssetSnapshotNode(
                 id=asset.id,
@@ -126,11 +128,12 @@ def _decode_snapshot(value: dict | None) -> SampleAssetSnapshot | None:
         return None
     return SampleAssetSnapshot(
         formal_asset_id=UUID(value['formal_asset_id']),
-        customer_id=UUID(value['customer_id']),
+        customer_id=UUID(value['customer_id']) if value['customer_id'] else None,
         customer_name=value['customer_name'],
-        site_id=UUID(value['site_id']),
+        site_id=UUID(value['site_id']) if value['site_id'] else None,
         site_name=value['site_name'],
         site_location=value['site_location'],
+        location_kind=value.get('location_kind', 'SITE'),
         equipment_path=tuple(
             AssetSnapshotNode(
                 id=UUID(node['id']),

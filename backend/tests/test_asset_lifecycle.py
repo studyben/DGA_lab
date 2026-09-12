@@ -49,6 +49,29 @@ def test_uninstalled_retired_asset_restores_to_spare_at_repair_center(official_a
     assert restored['status'] == 'SPARE'
 
 
+def test_repair_center_sample_uses_formal_asset_without_fictitious_site(database_url):
+    engine, _, actor = reception_context(database_url)
+    lifecycle = AssetLifecycle(engine, clock=lambda: at(2026))
+    lifecycle.move(actor, TRANSFORMER_ID, destination='REPAIR_CENTER', effective_at=at(2025), reason='Repair', expected_revision=0)
+    directory = AssetDirectory(engine)
+    matches = directory.search(actor, 'TX-CURRENT', effective_at=at(2025, 2))
+    assert len(matches) == 1
+    assert matches[0].location_kind == 'REPAIR_CENTER'
+    assert matches[0].site_id is None
+    registry = SampleRegistry(engine, directory, AuditTrail())
+    sample = registry.receive(actor, ReceiveSample(sampled_at=at(2025, 2), received_at=at(2025, 2, 2),
+        site_name='维修中心', equipment_serial='TX-CURRENT-2002', notes='', container_count=1,
+        identity_status=SampleIdentityStatus.ASSOCIATED, formal_asset_id=TRANSFORMER_ID))
+    assert sample.asset_snapshot.site_id is None
+    assert sample.asset_snapshot.customer_id is None
+    assert sample.asset_snapshot.location_kind == 'REPAIR_CENTER'
+    lifecycle.move(actor, TRANSFORMER_ID, destination='PARENT', parent_asset_id=WHOLE_UNIT_ID,
+        effective_at=at(2025, 3), reason='Reinstall', expected_revision=1)
+    retrieved = registry.find_by_barcode(actor, sample.barcode_value)
+    assert retrieved.asset_snapshot == sample.asset_snapshot
+    engine.dispose()
+
+
 def test_lifecycle_http_requires_csrf_and_returns_queryable_results(database_url):
     engine, _, _ = reception_context(database_url)
     with TestClient(create_app(Settings(database_url=database_url, cookie_secure=False, auth_allowed_origins='http://testserver'))) as client:
@@ -113,6 +136,13 @@ def test_replacement_is_atomic_and_keeps_samples_on_physical_transformer(officia
                    reason='Prepare replacement', expected_revision=0)
     lifecycle.change_status(actor, DUPLICATE_TRANSFORMER_B_ID, status='SPARE', effective_at=at(2024, 8),
                             reason='Repair complete', expected_revision=1)
+    # New asset has a later state change. The old detach must roll back when the
+    # second half refuses this backdated replacement inside the transaction.
+    with pytest.raises(AssetQueryError, match='use_history_correction'):
+        lifecycle.replace_transformer(actor, CURRENT_TRANSFORMER_ID, replacement_id=DUPLICATE_TRANSFORMER_B_ID,
+            effective_at=at(2024, 7, 15), reason='Invalid replacement date', expected_revision=0, replacement_revision=2)
+    assert lifecycle.history(actor, CURRENT_TRANSFORMER_ID)['revision'] == 0
+    assert lifecycle.history(actor, CURRENT_TRANSFORMER_ID)['location']['path'][-2]['id'] == UNIT
     with pytest.raises(AssetQueryError, match='stale_asset_revision'):
         lifecycle.replace_transformer(actor, CURRENT_TRANSFORMER_ID, replacement_id=DUPLICATE_TRANSFORMER_B_ID,
             effective_at=at(2025), reason='Replace', expected_revision=0, replacement_revision=0)
@@ -163,6 +193,12 @@ def test_correction_requires_permission_reason_and_rejects_overlap_or_cycle(data
     with pytest.raises(AssetQueryError, match='conflicting_installation'):
         lifecycle.correct_installation(actor, TRANSFORMER_ID, **correction)
     assert lifecycle.history(actor, TRANSFORMER_ID)['revision'] == 1
+    with pytest.raises(AssetQueryError, match='history_gap'):
+        lifecycle.correct_installation(actor, TRANSFORMER_ID, **(correction | {'valid_to': at(2024, 12)}))
+    repair = history['installations'][1]
+    with pytest.raises(AssetQueryError, match='status_location_conflict'):
+        lifecycle.correct_installation(actor, TRANSFORMER_ID, **(correction | {
+            'installation_id': repair['id'], 'valid_from': at(2025), 'valid_to': None}))
     correction.update(valid_to=at(2025), valid_from=at(2023))
     with pytest.raises(AssetQueryError, match='reason_required'):
         lifecycle.correct_installation(actor, TRANSFORMER_ID, **(correction | {'reason': ' '}))

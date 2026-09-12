@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 
 
-type LifecycleStatus = 'COMMISSIONING' | 'IN_SERVICE' | 'OUT_OF_SERVICE' | 'RETIRED' | 'MERGED';
+type LifecycleStatus = 'COMMISSIONING' | 'IN_SERVICE' | 'OUT_OF_SERVICE' | 'RETIRED' | 'MERGED' | 'UNDER_REPAIR' | 'SPARE';
 
 type FormalAsset = {
   id: string;
@@ -15,9 +15,10 @@ type FormalAsset = {
 
 type AssetContext = {
   asset: FormalAsset;
-  customer_id: string;
+  customer_id: string | null;
   customer_name: string;
-  site_id: string;
+  site_id: string | null;
+  location_kind?: 'SITE' | 'REPAIR_CENTER';
   site_name: string;
   site_location: string | null;
   equipment_path: FormalAsset[];
@@ -36,6 +37,8 @@ const statusLabels: Record<LifecycleStatus, string> = {
   OUT_OF_SERVICE: '停运',
   RETIRED: '退役',
   MERGED: '已合并',
+  UNDER_REPAIR: '维修中',
+  SPARE: '备用',
 };
 
 const reasonLabels = {
@@ -151,8 +154,8 @@ export function OfficialAssetSelector({
         <legend>{match.asset.serial_number}</legend>
         <div className="match-banner">{reasonLabels[match.match_reason]}</div>
         <dl className="asset-facts">
-          <div><dt>客户</dt><dd>{match.customer_name}</dd></div>
-          <div><dt>现场</dt><dd>{match.site_name}</dd></div>
+          <div><dt>客户</dt><dd>{match.customer_name || '不适用'}</dd></div>
+          <div><dt>{match.location_kind === 'REPAIR_CENTER' ? '采样位置' : '现场'}</dt><dd>{match.site_name}</dd></div>
           <div><dt>位置</dt><dd>{match.site_location ?? '—'}</dd></div>
           <div><dt>系统资产号</dt><dd>{match.asset.system_asset_number}</dd></div>
           <div><dt>设备型号</dt><dd>{match.asset.model ?? '—'}</dd></div>

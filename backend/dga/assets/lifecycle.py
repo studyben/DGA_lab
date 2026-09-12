@@ -39,6 +39,20 @@ def active_relation(c, asset_id, at):
     return rows[0] if rows else None
 
 
+def status_at(c, asset_id, at):
+    row = asset_row(c, asset_id)
+    events = c.execute(text('''SELECT effective_at,before_value,after_value FROM asset_lifecycle_events
+        WHERE (asset_id=:id OR related_asset_id=:id) AND action<>'ASSET_HISTORY_CORRECT'
+        ORDER BY effective_at,occurred_at,id'''), {'id': asset_id}).mappings().all()
+    status = events[0]['before_value'][str(asset_id)]['status'] if events else row['lifecycle_status']
+    known = False
+    for event in events:
+        if event['effective_at'] <= at:
+            status = event['after_value'][str(asset_id)]['status']
+            known = True
+    return status, known
+
+
 def location_at(c, asset_id, at):
     path, visited = [], set()
     current = asset_id
@@ -186,6 +200,8 @@ class AssetLifecycle:
             loc = location_at(c, parent_asset_id, at)
             if loc['kind'] != 'SITE':
                 fail('parent_not_at_site')
+            if any(status_at(c, node['id'], at)[0] in ('RETIRED', 'MERGED') for node in loc['path']):
+                fail('disabled_parent')
             if asset_id in [n['id'] for n in loc['path']]:
                 fail('cyclic_installation')
         if previous:
@@ -270,9 +286,41 @@ class AssetLifecycle:
             for other in before[str(asset_id)]['installations']:
                 if other['id'] != installation_id and (valid_to is None or other['valid_from'] < valid_to) and (other['valid_to'] is None or valid_from < other['valid_to']):
                     fail('conflicting_installation')
+                if other['id'] != installation_id and (
+                    (other['valid_to'] == original['valid_from'] and valid_from != original['valid_from']) or
+                    (original['valid_to'] == other['valid_from'] and valid_to != original['valid_to'])
+                ):
+                    fail('history_gap')
+            if original['valid_to'] is None and valid_to is not None:
+                fail('history_gap')
             c.execute(text('''UPDATE asset_installations SET valid_from=:start,valid_to=:end,
                 parent_asset_id=:parent,site_id=:site,repair_center=:repair WHERE id=:id'''),
                 {'id': installation_id, 'start': valid_from, 'end': valid_to,
                  'parent': parent_asset_id, 'site': site_id, 'repair': repair_center})
             validate_graph(c)
+            # Corrections cannot manufacture an installation during a known spare,
+            # repair or disabled period. No guessed timestamps for legacy states.
+            boundaries = {valid_from, self._clock()}
+            boundaries.update(c.execute(text('''SELECT effective_at FROM asset_lifecycle_events
+                WHERE asset_id=:id OR related_asset_id=:id'''), {'id': asset_id}).scalars())
+            target_changed = any(original[key] != value for key, value in
+                                 [('parent_asset_id', parent_asset_id), ('site_id', site_id), ('repair_center', repair_center)])
+            for instant in boundaries:
+                if instant < valid_from or (valid_to is not None and instant >= valid_to):
+                    continue
+                status, known = status_at(c, asset_id, instant)
+                if not known and instant != max(boundaries):
+                    continue
+                if status in ('RETIRED', 'MERGED') and target_changed:
+                    fail('disabled_asset_cannot_install')
+                if (repair_center and status == 'IN_SERVICE') or (not repair_center and status in ('UNDER_REPAIR', 'SPARE')):
+                    fail('status_location_conflict')
+                if parent_asset_id is not None and target_changed:
+                    parent_location = location_at(c, parent_asset_id, instant)
+                    if parent_location['kind'] != 'SITE':
+                        fail('parent_not_at_site')
+                    for node in parent_location['path']:
+                        parent_status, parent_known = status_at(c, node['id'], instant)
+                        if (parent_known or instant == max(boundaries)) and parent_status in ('RETIRED', 'MERGED'):
+                            fail('disabled_parent')
             return self._record(c, actor, AssetAction.CORRECT, [asset_id], self._clock(), reason, before)
