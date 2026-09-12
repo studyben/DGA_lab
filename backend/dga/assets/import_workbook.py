@@ -3,7 +3,7 @@ from io import BytesIO
 from datetime import date, datetime
 from zipfile import ZipFile
 from defusedxml.ElementTree import fromstring
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
 from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
 from .import_validation import REQUIRED, OPTIONAL, issue
 
@@ -40,8 +40,8 @@ def inspect_archive(content):
                         if column_index_from_string(column) > 32:
                             reject('第32列以外存在内容；请移除模板外数据后上传。')
                         cells += 1
-                        if cells > 10000:
-                            reject('文件超过10000个单元格；请拆分批次。')
+                        if cells > 20000:
+                            reject('文件超过20000个单元格（包括参考表）；请拆分批次。')
                     if tag == 'row' and int(node.get('r', '0')) > 501:
                         reject('模板最多500条资产行；请移除远处的空白格式或拆分批次。')
                     if tag == 'f':
@@ -93,3 +93,47 @@ def parse(content):
     finally:
         if book:
             book.close()
+
+
+def template(sites, materials):
+    book = Workbook()
+    sheet = book.active
+    sheet.title = 'Assets'
+    sheet.append(REQUIRED + OPTIONAL)
+    for cell in sheet[1]:
+        cell.number_format = '@'
+    sheet.freeze_panes = 'A2'
+    instructions = book.create_sheet('Instructions')
+    for line in (
+        'v1：只新增资产，不覆盖、合并或更新已有记录；系统自动生成资产编号。',
+        '请在 Assets 表填写数据，最多500条。标识和日期时间请使用文本格式，保留序列号前导零。',
+        'record_key 在本批次内不同；parent_record_key 仅引用同一批次。无需按父子顺序排列。',
+        '必填：' + ', '.join(REQUIRED),
+        'effective_at 示例 2025-01-01T08:00:00Z 或 2025-01-01T08:00:00-06:00，不允许未来时间。',
+        'SITE：填写参考表 customer_id/site_id，根类型 INVERTER_UNIT 或 ESS_SYSTEM，状态 IN_SERVICE。',
+        'PARENT：填写父记录键，不填客户/现场，状态 IN_SERVICE。子设备时间不得早于父设备。',
+        'REPAIR_CENTER：客户/现场/父键留空，状态 SPARE、UNDER_REPAIR 或 RETIRED。',
+        'PV：INVERTER_UNIT、INVERTER、TRANSFORMER；ESS：ESS_SYSTEM、PCS_UNIT、PCS、BATTERY_CABINET、TRANSFORMER。',
+        'material_number 取已有目录，型号/资产类型由物料决定。目录缺失或冲突需管理员处理。',
+        'power_mw/energy_mwh 非负且最多6位小数，PV 的 energy_mwh 留空。commissioning_date 格式 YYYY-MM-DD。',
+        '参考表只列前500条，填写时也可使用其他已存在记录的明确ID；参考表不导入。',
+        '错误阻止整批发布；重复序列号是警告，需要确认是不同物理设备。修改文件请创建新批次。',
+    ):
+        instructions.append([line])
+    for name, headers, records in (
+        ('Sites', ('site_id', 'site_name', 'customer_id', 'customer_name', 'product_line'), sites),
+        ('Materials', ('material_number', 'model', 'asset_type'), materials),
+    ):
+        tab = book.create_sheet(name)
+        tab.append(headers)
+        for record in records:
+            tab.append([str(record[h]) if record[h] is not None else '' for h in headers])
+        # Explicit text cells keep source strings from becoming Excel formulas.
+        for row in tab:
+            for cell in row:
+                cell.data_type = 's'
+                cell.number_format = '@'
+        tab.freeze_panes = 'A2'
+    result = BytesIO()
+    book.save(result)
+    return result.getvalue()

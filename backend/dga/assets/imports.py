@@ -10,8 +10,8 @@ from sqlalchemy import text
 
 from dga.shared.auth.public import AuditTrail, require_permission
 from dga.shared.files import FileStore
-from .import_workbook import parse, WorkbookError, MAX_BYTES
-from .import_validation import validate, summary
+from .import_workbook import parse, template, WorkbookError, MAX_BYTES
+from .import_validation import validate, summary, issue
 from .lifecycle import fail
 
 logger = logging.getLogger(__name__)
@@ -68,15 +68,44 @@ class AssetImports:
                 fail('import_not_found', 404)
             return {k: v for k, v in row.items() if k not in ('source_rows', 'object_key')}
 
+    def template(self, actor):
+        require_permission(actor, 'assets.import')
+        with self._engine.connect().execution_options(isolation_level='REPEATABLE READ') as c:
+            materials = c.execute(text('SELECT * FROM asset_materials ORDER BY material_number LIMIT 500')).mappings().all()
+            sites = c.execute(text('''SELECT s.id AS site_id,s.site_name,c.id AS customer_id,c.customer_name,p.product_line
+                FROM sites s JOIN customers c ON c.id=s.customer_id
+                LEFT JOIN site_product_lines p ON p.site_id=s.id ORDER BY s.site_name,s.id,p.product_line LIMIT 500''')).mappings().all()
+            return template(sites, materials)
+
+    def list_batches(self, actor, *, query='', page=1):
+        require_permission(actor, 'assets.import')
+        if not isinstance(query, str) or len(query) > 200 or type(page) is not int or not 1 <= page <= 100000:
+            fail('invalid_import_search', 422)
+        with self._engine.connect().execution_options(isolation_level='REPEATABLE READ') as c:
+            where = "FROM asset_import_batches WHERE position(lower(:q) in lower(filename || ' ' || id::text))>0"
+            params = dict(q=query.strip(), offset=(page-1)*20)
+            count = c.execute(text('SELECT count(*) '+where), params).scalar_one()
+            batches = c.execute(text('SELECT id,filename,state,created_at,summary '+where+' ORDER BY created_at DESC,id DESC LIMIT 20 OFFSET :offset'), params).mappings().all()
+            return {'batches': [dict(b) for b in batches], 'total': count, 'page': page}
+
     def validate_next(self):
         """Trusted worker seam. Row claim and result commit together; crash releases claim."""
         with self._engine.begin() as c:
             batch = c.execute(text("SELECT * FROM asset_import_batches WHERE state='STAGED' ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1")).mappings().first()
             if batch is None:
                 return False
-            rows, issues, counts = validate(c, batch['source_rows'], self._clock())
-            c.execute(text("UPDATE asset_import_batches SET state='VALIDATED',rows=CAST(:rows AS jsonb),issues=CAST(:issues AS jsonb),summary=CAST(:summary AS jsonb),validation_revision=1 WHERE id=:id"),
-                      {'rows': json.dumps(rows), 'issues': json.dumps(issues), 'summary': json.dumps(counts), 'id': batch['id']})
+            state, failure = 'VALIDATED', None
+            try:
+                with c.begin_nested():
+                    rows, issues, counts = validate(c, batch['source_rows'], self._clock())
+            except Exception:
+                rows = []
+                issues = [issue(0, 'validation', '校验服务暂不可用；请联系管理员恢复服务后重新上传文件。')]
+                counts = summary(rows, issues)
+                state, failure = 'FAILED', 'validation_unavailable'
+                logger.error('Import validation failed for batch %s', batch['id'])
+            c.execute(text("UPDATE asset_import_batches SET state=:state,failure_code=:failure,rows=CAST(:rows AS jsonb),issues=CAST(:issues AS jsonb),summary=CAST(:summary AS jsonb),validation_revision=1 WHERE id=:id"),
+                      {'rows': json.dumps(rows), 'issues': json.dumps(issues), 'summary': json.dumps(counts), 'id': batch['id'], 'state': state, 'failure': failure})
             return True
 
     def publish(self, actor, batch_id, *, validation_revision, acknowledge_warnings=False):

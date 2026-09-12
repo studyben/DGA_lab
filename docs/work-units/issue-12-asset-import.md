@@ -4,8 +4,8 @@
 
 - Goal and isolated branch confirmed by user; base `2eb45a7` (merged PR #32).
 - Branch: `codex/issue-12-asset-import`; separate worktree, no existing acceptance data touched.
-- Current gate: accepted slice commit (S2).
-- Next entry point: S3 implementation after S2 checkpoint. Plan accepted in 89a78a9; S1 accepted in 315b0d0. S2 review/re-review passed, 33 public-seam PostgreSQL tests passed including post-review cleanup. Artifacts: docs/reviews/code-review-20260912-180638.md and code-review-20260912-181134.md. No push/publication.
+- Current gate: accepted slice commit (S3).
+- Next entry point: aggregate deepreview after S3 checkpoint. Plan 89a78a9; S1 315b0d0; S2 3a02d35. S3 review/fix/re-review passed: full backend107, browser18, TypeScript/build and diff check. Artifact docs/reviews/code-review-20260912-183229.md. User explicitly forbids push, PR and merge; preserve this stop boundary.
 - Issue: https://github.com/studyben/DGA_lab/issues/12 ; parent #1, completed blocker #11.
 
 ## Confirmed goal / non-goals
@@ -52,6 +52,8 @@ User explicitly confirmed: “只新增资产，可引用已有客户、现场�
 3. **S3 usable end-to-end import**: asset HTTP adapter/composition root, asset worker, compose test override, frontend AssetImportPage/pages/main/styles, browser tests, README and work-unit/review docs. Prerequisite accepted S2. Implement template/reference download, upload, batch list, polling, per-row preview/filter, warning checkbox, confirmation and result links, corrected-file retry as new batch. Add local worker, no edits to 18093 environment. Browser test upload→warning/errors→confirm→asset detail; backend HTTP RBAC/CSRF/body limits and worker verification. Typecheck/build and full backend/browser suites at completion. No login redesign or unrelated screens.
 
 ## Validation commands and docs decision
+
+S3 reviewed resource-bound refinement: whole-workbook cell allowance is **20000**, superseding the initial 10000 above, to accommodate 500 asset rows plus both generated reference sheets. Compressed/expanded byte limits, asset row limit, ZIP member cap and column bounds remain unchanged. Public regression proves 500 rows validate while retaining references.
 
 Use project `dga-issue12` test-db only: `docker compose -p dga-issue12 --profile test run --rm api-test pytest -q -p no:cacheprovider tests/test_asset_import.py`, then full api-test suite. Browser project `dga-issue12-browser` with isolated tmpfs and dedicated port 18095; never run fixtures on 18093. Frontend `npm run build` includes typecheck; run Playwright import spec then existing full suite. Review each slice using deepreview; final implement review includes parallel Standards/Spec code-review and aggregate deepreview. Preserve initial failed plan-review evidence, append re-review decision. Maintain README import template, limits, migration caveats, worker/source failure recovery. No root dirty CONTEXT/ADR edits; this work-unit records the user scope restriction. Accepted local commits only; explicit user instruction forbids push/PR/merge and later Issues.
 

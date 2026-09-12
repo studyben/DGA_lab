@@ -1,0 +1,35 @@
+# Isolated Issue #12 test overlay; never combine with acceptance overrides.
+services:
+  object-store:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: dga-local
+      MINIO_ROOT_PASSWORD: local-object-storage-only
+    tmpfs: [/data]
+  object-store-init:
+    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["until mc alias set local http://object-store:9000 dga-local local-object-storage-only; do sleep 1; done; mc mb --ignore-existing local/dga-lab"]
+    depends_on:
+      object-store:
+        condition: service_started
+  migrate:
+    command: ["sh", "-c", "alembic upgrade head && python -m tests.seed_browser && python -m tests.seed_import_browser"]
+  api:
+    environment:
+      OBJECT_STORE_ENDPOINT: http://object-store:9000
+      OBJECT_STORE_BUCKET: dga-lab
+      OBJECT_STORE_ACCESS_KEY: dga-local
+      OBJECT_STORE_SECRET_KEY: local-object-storage-only
+    depends_on:
+      object-store-init:
+        condition: service_completed_successfully
+  import-worker:
+    build: ./backend
+    command: ["python", "-m", "dga.assets.import_worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://dga_browser:isolated-browser-only@db:5432/dga_browser
+    depends_on:
+      migrate:
+        condition: service_completed_successfully

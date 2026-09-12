@@ -262,3 +262,97 @@ def test_late_database_failure_rolls_back_all_assets_and_allows_retry(database_u
             c.execute(text('ALTER TABLE formal_assets DROP CONSTRAINT import_test_failure'))
     assert imports.publish(actor, batch['id'], validation_revision=batch['validation_revision'])['state'] == 'PUBLISHED'
     engine.dispose()
+
+
+def test_http_upload_preview_publish_requires_csrf_and_provides_reference_template(database_url):
+    from fastapi.testclient import TestClient
+    from dga.main import create_app
+    from dga.shared.config import Settings
+    from tests.test_sample_reception import CHANGED_PASSWORD
+    engine, actor, imports, files = import_context(database_url)
+    app = create_app(Settings(database_url=database_url, cookie_secure=False, auth_allowed_origins='http://testserver'), file_store=files)
+    with TestClient(app) as client:
+        assert client.get('/api/assets/imports').status_code == 401
+        login = client.post('/api/auth/login', headers={'Origin': 'http://testserver'}, json={'username': 'reception-admin', 'password': CHANGED_PASSWORD}).json()
+        headers = {'Origin': 'http://testserver', 'X-CSRF-Token': login['csrf_token'], 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
+        template = client.get('/api/assets/imports/template')
+        assert template.status_code == 200
+        from openpyxl import load_workbook
+        book = load_workbook(BytesIO(template.content))
+        assert 'Materials' in book.sheetnames
+        assert 'IMPORT-TX' in [r[0] for r in book['Materials'].values]
+        content = workbook(new_rows())
+        assert client.post('/api/assets/imports?filename=a.xlsx', content=content, headers={'Origin': 'http://testserver'}).status_code == 403
+        submitted = client.post('/api/assets/imports?filename=a.xlsx', content=content, headers=headers)
+        assert submitted.status_code == 201
+        batch_id = submitted.json()['id']
+        imports.validate_next()
+        preview = client.get(f'/api/assets/imports/{batch_id}').json()
+        result = client.post(f'/api/assets/imports/{batch_id}/publish', headers={**headers, 'Content-Type': 'application/json'}, json={'validation_revision': preview['validation_revision'], 'acknowledge_warnings': False})
+        assert result.status_code == 200
+        assert result.headers.get('cache-control') == 'no-store'
+        assert result.json()['state'] == 'PUBLISHED'
+        listing = client.get('/api/assets/imports')
+        assert listing.headers.get('cache-control') == 'no-store'
+        assert listing.json()['batches'][0]['id'] == batch_id
+    engine.dispose()
+
+
+def test_import_does_not_rewrite_existing_oil_sample_snapshot(database_url):
+    from dga.assets.public import AssetDirectory
+    from dga.laboratory.public import SampleRegistry, ReceiveSample, SampleIdentityStatus
+    from dga.shared.auth.public import AuditTrail
+    engine, actor, imports, _ = import_context(database_url)
+    samples = SampleRegistry(engine, AssetDirectory(engine), AuditTrail())
+    sample = samples.receive(actor, ReceiveSample(sampled_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+        received_at=datetime(2025, 6, 2, tzinfo=timezone.utc), site_name='ignored', equipment_serial='ignored',
+        notes='snapshot preservation', container_count=1, identity_status=SampleIdentityStatus.ASSOCIATED,
+        formal_asset_id=TRANSFORMER_ID))
+    rows = new_rows()
+    rows[1]['serial_number'] = 'TX-CURRENT-2002'
+    batch = ready_batch(imports, actor, rows)
+    result = imports.publish(actor, batch['id'], validation_revision=batch['validation_revision'], acknowledge_warnings=True)
+    assert result['state'] == 'PUBLISHED'
+    assert samples.find_by_barcode(actor, sample.barcode_value).asset_snapshot == sample.asset_snapshot
+    engine.dispose()
+
+
+def test_500_asset_rows_can_keep_the_template_reference_sheets(database_url):
+    from openpyxl import load_workbook
+    engine, actor, imports, _ = import_context(database_url)
+    rows = [{**new_rows()[0], 'record_key': f'unit-{i}', 'serial_number': f'NEW-{i}',
+             'power_mw': 1, 'equipment_name': 'unit', 'tag_number': f'TAG-{i}',
+             'commissioning_date': '2025-01-01', 'battery_manufacturer': 'not applicable'} for i in range(500)]
+    book = load_workbook(BytesIO(workbook(rows)))
+    for name, width in [('Materials', 3), ('Sites', 5)]:
+        tab = book.create_sheet(name)
+        tab.append(['reference'] * width)
+        for i in range(500):
+            tab.append([f'value-{i}'] * width)
+    output = BytesIO()
+    book.save(output)
+    batch = imports.submit(actor, filename='full.xlsx', content=output.getvalue())
+    imports.validate_next()
+    preview = imports.get(actor, batch['id'])
+    assert preview['state'] == 'VALIDATED'
+    assert preview['summary']['valid_rows'] == 500
+    engine.dispose()
+
+
+def test_worker_records_unexpected_validation_failure_without_losing_source(database_url):
+    engine, actor, imports, files = import_context(database_url)
+    batch = imports.submit(actor, filename='worker.xlsx', content=workbook(new_rows()))
+    # Temporary schema unavailability is a database boundary fault, not an internal mock.
+    with engine.begin() as c:
+        c.execute(text('ALTER TABLE asset_materials RENAME TO import_test_unavailable'))
+    try:
+        assert imports.validate_next() is True
+        result = imports.get(actor, batch['id'])
+        assert result['state'] == 'FAILED'
+        assert result['failure_code'] == 'validation_unavailable'
+        assert result['summary']['error_count'] == 1
+        assert files.files
+    finally:
+        with engine.begin() as c:
+            c.execute(text('ALTER TABLE import_test_unavailable RENAME TO asset_materials'))
+    engine.dispose()

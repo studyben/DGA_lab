@@ -25,7 +25,7 @@ export const assetPages = [
   },
   {
     path: "/assets/import",
-    permission: 'assets.write',
+    permission: 'assets.import',
     title: "批量导入",
     description: "通过校验和预览发布正式资产资料。",
   },

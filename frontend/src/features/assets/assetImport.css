@@ -1,0 +1,20 @@
+.asset-import { display: grid; gap: 24px; }
+.asset-import .dashboard-table-panel { padding: 24px; min-width: 0; }
+.asset-import .dashboard-filters { margin: 20px 0; align-items: end; }
+.asset-import .dashboard-table-scroll { max-height: 420px; overflow: auto; }
+.asset-import th { position: sticky; top: 0; background: #f5f7fa; z-index: 1; }
+.asset-import td { max-width: 520px; overflow-wrap: anywhere; }
+.asset-import .import-note { color: #65778c; font-size: .88rem; overflow-wrap: anywhere; }
+.import-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 24px 0; }
+.import-counts > div { border: 1px solid #dce4ed; border-radius: 12px; padding: 16px; }
+.import-counts span { display: block; color: #65778c; }
+.import-counts strong { display: block; font-size: 1.8rem; margin-top: 8px; }
+.import-state { background: #edf1f6; padding: 6px 14px; border-radius: 20px; }
+.import-state.PUBLISHED { background: #e1f2e9; color: #245b42; }
+.import-state.FAILED, .import-error { color: #a32323; background: #fff0f0; }
+.import-error { padding: 20px; border-radius: 12px; }
+.import-error-text { color: #a32323; font-weight: 600; }
+.import-publication { display: grid; gap: 16px; margin-top: 24px; }
+.import-publication > button { justify-self: start; }
+.asset-import input[type="checkbox"] { width: auto; min-height: auto; }
+@media (max-width: 900px) { .import-counts { grid-template-columns: repeat(2, 1fr); } }

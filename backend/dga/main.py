@@ -16,6 +16,8 @@ from dga.assets.public import (
     MODULE as ASSETS,
     AssetDirectory,
     AssetLifecycle,
+    AssetImports,
+    import_http_router,
     AssetQueryError,
     access_context as asset_access,
     http_router as assets_router,
@@ -32,10 +34,10 @@ from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS, access_c
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
 from dga.shared.auth.http import AuthenticatedRequests, auth_router
-from dga.shared.files import ObjectStorageError, S3CompatibleFileStore, UnavailableFileStore
+from dga.shared.files import FileStore, ObjectStorageError, S3CompatibleFileStore, UnavailableFileStore
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, file_store: FileStore | None = None) -> FastAPI:
     settings = settings or Settings()
     migrations = Config(str(Path(__file__).resolve().parents[1] / 'alembic.ini'))
     expected_heads = set(ScriptDirectory.from_config(migrations).get_heads())
@@ -81,7 +83,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, error):
         # Pydantic error input/context can contain plaintext credentials.
-        return JSONResponse(status_code=422, content={'code': 'invalid_input'})
+        return JSONResponse(status_code=422, content={'code': 'invalid_input'}, headers={'Cache-Control': 'no-store'})
 
     @app.get('/api/modules')
     def modules(request: Request) -> list[ModuleDescriptor]:
@@ -104,6 +106,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settings.object_store_secret_key.get_secret_value(),
             region=settings.object_store_region,
         )
+    if file_store is not None:
+        object_store = file_store
+    app.include_router(import_http_router(AssetImports(engine, object_store), current_actor, mutation_actor))
 
     @app.exception_handler(ObjectStorageError)
     async def object_storage_error(request, error):
