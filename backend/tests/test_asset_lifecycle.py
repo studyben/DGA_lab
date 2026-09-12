@@ -20,6 +20,30 @@ def at(year, month=1, day=1):
     return datetime(year, month, day, tzinfo=timezone.utc)
 
 
+def test_same_day_status_changes_require_strict_time_order(database_url):
+    engine, _, actor = reception_context(database_url)
+    lifecycle = AssetLifecycle(engine, clock=lambda: at(2026))
+    morning = at(2025).replace(hour=8)
+    later = at(2025).replace(hour=9)
+    initial = lifecycle.history(actor, TRANSFORMER_ID)
+    lifecycle.move(actor, TRANSFORMER_ID, effective_at=morning,
+                           destination='REPAIR_CENTER', reason='Repair intake',
+                           expected_revision=initial['revision'])
+    revision = lifecycle.history(actor, TRANSFORMER_ID)['revision']
+    for invalid_time in (morning, morning.replace(hour=7)):
+        with pytest.raises(AssetQueryError, match='use_history_correction'):
+            lifecycle.change_status(actor, TRANSFORMER_ID, status='SPARE',
+                                    effective_at=invalid_time, reason='Repair complete', expected_revision=revision)
+    lifecycle.change_status(actor, TRANSFORMER_ID, status='SPARE',
+                            effective_at=later, reason='Repair complete', expected_revision=revision)
+    assert lifecycle.history(actor, TRANSFORMER_ID, effective_at=morning)['status'] == 'UNDER_REPAIR'
+    assert lifecycle.history(actor, TRANSFORMER_ID, effective_at=later)['status'] == 'SPARE'
+    current = lifecycle.history(actor, TRANSFORMER_ID)
+    assert len(current['events']) == 2
+    assert current['revision'] == revision + 1
+    engine.dispose()
+
+
 def test_detaching_and_reinstalling_preserves_half_open_location_history(database_url):
     engine, _, actor = reception_context(database_url)
     lifecycle = AssetLifecycle(engine, clock=lambda: at(2026))
