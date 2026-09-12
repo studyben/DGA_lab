@@ -28,3 +28,25 @@ Legacy status codes remain readable rather than guessing a migration mapping.
 New commands use IN_SERVICE, UNDER_REPAIR, SPARE and RETIRED. Legacy unknown
 historical state is not backdated as a made-up fact. Asset-owned change records
 retain before/after values and are linked to shared audit events in one transaction.
+
+## Integration and operational constraints
+
+- AssetDirectory sampling contexts now expose location_kind (SITE / REPAIR_CENTER).
+  Repair-center contexts have null customer_id and site_id; no artificial site or
+  customer is created. The existing site_name display field carries 维修中心 for
+  backward-compatible labels. Laboratory owns encoding/decoding its immutable JSON
+  snapshot, with SITE as the default for older snapshots lacking location_kind.
+- Existing installation rows expand to represent the single repair-center target.
+  Routine changes maintain adjacent half-open intervals; historical corrections
+  reject newly introduced gaps/overlaps and illegal state/parent periods. They do
+  not silently cascade timestamp changes into adjacent records or sample snapshots.
+- Routine commands serialize graph writes with one transaction advisory lock and
+  stale revision checks. This favors correctness for this small MVP over write
+  throughput. Historical graph validation currently scans effective boundaries;
+  scaling this validation is a future optimization, not a remote service seam.
+- Historical correction requires assets.history.correct (system_admin by default)
+  in addition to assets.write. Legacy state start times stay explicitly unknown.
+- Migration 0011 is intentionally forward-only to avoid silently deleting
+  immutable lifecycle evidence. Roll back deployment by reviewed backup recovery;
+  the health regression tests outdated migration readiness using a reversible step.
+- No production deployment or changes to the existing 18089 preview are included.

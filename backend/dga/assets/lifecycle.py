@@ -300,27 +300,29 @@ class AssetLifecycle:
             validate_graph(c)
             # Corrections cannot manufacture an installation during a known spare,
             # repair or disabled period. No guessed timestamps for legacy states.
-            boundaries = {valid_from, self._clock()}
-            boundaries.update(c.execute(text('''SELECT effective_at FROM asset_lifecycle_events
-                WHERE asset_id=:id OR related_asset_id=:id'''), {'id': asset_id}).scalars())
+            now = self._clock()
+            boundaries = {valid_from, now}
+            # Ancestors can change state/location within the corrected interval.
+            boundaries.update(c.execute(text('SELECT effective_at FROM asset_lifecycle_events')).scalars())
+            boundaries.update(c.execute(text('SELECT valid_from FROM asset_installations UNION SELECT valid_to FROM asset_installations WHERE valid_to IS NOT NULL')).scalars())
             target_changed = any(original[key] != value for key, value in
                                  [('parent_asset_id', parent_asset_id), ('site_id', site_id), ('repair_center', repair_center)])
             for instant in boundaries:
                 if instant < valid_from or (valid_to is not None and instant >= valid_to):
                     continue
                 status, known = status_at(c, asset_id, instant)
-                if not known and instant != max(boundaries):
-                    continue
-                if status in ('RETIRED', 'MERGED') and target_changed:
-                    fail('disabled_asset_cannot_install')
-                if (repair_center and status == 'IN_SERVICE') or (not repair_center and status in ('UNDER_REPAIR', 'SPARE')):
-                    fail('status_location_conflict')
-                if parent_asset_id is not None and target_changed:
+                newly_covered = target_changed or instant < original['valid_from'] or (original['valid_to'] is not None and instant >= original['valid_to'])
+                if known or instant == now:
+                    if status in ('RETIRED', 'MERGED') and newly_covered:
+                        fail('disabled_asset_cannot_install')
+                    if (repair_center and status == 'IN_SERVICE') or (not repair_center and status in ('UNDER_REPAIR', 'SPARE')):
+                        fail('status_location_conflict')
+                if parent_asset_id is not None and newly_covered:
                     parent_location = location_at(c, parent_asset_id, instant)
                     if parent_location['kind'] != 'SITE':
                         fail('parent_not_at_site')
                     for node in parent_location['path']:
                         parent_status, parent_known = status_at(c, node['id'], instant)
-                        if (parent_known or instant == max(boundaries)) and parent_status in ('RETIRED', 'MERGED'):
+                        if (parent_known or instant == now) and parent_status in ('RETIRED', 'MERGED'):
                             fail('disabled_parent')
             return self._record(c, actor, AssetAction.CORRECT, [asset_id], self._clock(), reason, before)

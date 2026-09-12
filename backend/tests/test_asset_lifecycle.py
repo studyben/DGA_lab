@@ -12,7 +12,7 @@ from dga.shared.auth.public import IdentityService, AuditTrail
 from sqlalchemy import text
 from dga.assets.public import AssetDirectory
 from dga.laboratory.public import SampleRegistry, ReceiveSample, SampleIdentityStatus
-from tests.test_asset_search import official_assets, CURRENT_TRANSFORMER_ID, OLD_TRANSFORMER_ID, DUPLICATE_TRANSFORMER_B_ID, WHOLE_UNIT_ID as UNIT
+from tests.test_asset_search import official_assets, CURRENT_TRANSFORMER_ID, OLD_TRANSFORMER_ID, DUPLICATE_TRANSFORMER_B_ID, SECOND_UNIT_ID, WHOLE_UNIT_ID as UNIT
 from tests.test_sample_reception import reception_context, WHOLE_UNIT_ID, TRANSFORMER_ID, SITE_ID
 
 
@@ -69,6 +69,33 @@ def test_repair_center_sample_uses_formal_asset_without_fictitious_site(database
         effective_at=at(2025, 3), reason='Reinstall', expected_revision=1)
     retrieved = registry.find_by_barcode(actor, sample.barcode_value)
     assert retrieved.asset_snapshot == sample.asset_snapshot
+    engine.dispose()
+
+
+def test_correction_checks_disabled_parent_even_when_legacy_child_status_time_is_unknown(official_assets):
+    lifecycle, actor, _ = lifecycle_context(official_assets)
+    lifecycle = AssetLifecycle(official_assets, clock=lambda: at(2027))
+    lifecycle.change_status(actor, SECOND_UNIT_ID, status='RETIRED', effective_at=at(2023), reason='Retire parent', expected_revision=0)
+    lifecycle.change_status(actor, SECOND_UNIT_ID, status='IN_SERVICE', effective_at=at(2026), reason='Restore parent', expected_revision=1)
+    lifecycle.move(actor, CURRENT_TRANSFORMER_ID, destination='REPAIR_CENTER', effective_at=at(2025), reason='Detach', expected_revision=0)
+    installation = lifecycle.history(actor, CURRENT_TRANSFORMER_ID)['installations'][0]
+    with pytest.raises(AssetQueryError, match='disabled_parent'):
+        lifecycle.correct_installation(actor, CURRENT_TRANSFORMER_ID, installation_id=installation['id'],
+            valid_from=at(2024), valid_to=at(2025), parent_asset_id=SECOND_UNIT_ID, site_id=None, repair_center=False,
+            reason='Wrong historical parent', expected_revision=1)
+
+
+def test_extending_same_parent_installation_cannot_start_in_disabled_period(database_url):
+    engine, _, actor = reception_context(database_url)
+    lifecycle = AssetLifecycle(engine, clock=lambda: at(2026))
+    lifecycle.change_status(actor, WHOLE_UNIT_ID, status='RETIRED', effective_at=at(2022), reason='Retire', expected_revision=0)
+    lifecycle.change_status(actor, WHOLE_UNIT_ID, status='IN_SERVICE', effective_at=at(2023), reason='Restore', expected_revision=1)
+    lifecycle.move(actor, TRANSFORMER_ID, destination='REPAIR_CENTER', effective_at=at(2025), reason='Detach', expected_revision=0)
+    installation = lifecycle.history(actor, TRANSFORMER_ID)['installations'][0]
+    with pytest.raises(AssetQueryError, match='disabled_parent'):
+        lifecycle.correct_installation(actor, TRANSFORMER_ID, installation_id=installation['id'],
+            valid_from=at(2022), valid_to=at(2025), parent_asset_id=WHOLE_UNIT_ID, site_id=None, repair_center=False,
+            reason='Extend into disabled time', expected_revision=1)
     engine.dispose()
 
 
