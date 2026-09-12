@@ -347,3 +347,4 @@ def http_router(directory: AssetDirectory, actor_dependency: Callable, lifecycle
 
 
 from .lifecycle import AssetLifecycle
+from .imports import AssetImports

@@ -4,8 +4,8 @@
 
 - Goal and isolated branch confirmed by user; base `2eb45a7` (merged PR #32).
 - Branch: `codex/issue-12-asset-import`; separate worktree, no existing acceptance data touched.
-- Current gate: plan (incremental import semantics resolved by user).
-- Next entry point: finish executable plan, plan review/re-review, then accepted plan commit. No implementation or publication yet.
+- Current gate: accepted slice commit (S1).
+- Next entry point: S2 implementation after S1 checkpoint. Plan accepted in 89a78a9; S1 review/fix/re-review passed, 29 public-seam PostgreSQL tests passed. Artifact: docs/reviews/code-review-20260912-180638.md. No push/publication.
 - Issue: https://github.com/studyben/DGA_lab/issues/12 ; parent #1, completed blocker #11.
 
 ## Confirmed goal / non-goals
