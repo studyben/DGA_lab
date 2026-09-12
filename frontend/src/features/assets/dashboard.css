@@ -42,3 +42,9 @@
 .equipment-path a { color: #a94f0b; }
 .equipment-path [aria-current="page"] { color: #202a39; font-weight: 600; }
 .site-facts h2 small { color: #667085; font-size: 15px; font-weight: 400; margin-left: 12px; }
+.lifecycle-form { display: block; }
+.lifecycle-form fieldset { border: 1px solid #dce3ed; border-radius: 12px; padding: 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.lifecycle-form label { display: flex; flex-direction: column; gap: 8px; }
+.lifecycle-form p, .lifecycle-form legend { grid-column: 1 / -1; }
+.lifecycle-form textarea { min-height: 80px; }
+.dashboard-table-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; }

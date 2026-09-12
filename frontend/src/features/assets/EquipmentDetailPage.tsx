@@ -3,9 +3,10 @@ import { useAuth } from '../../Auth';
 import { DataTable, useQuery, useRead } from './assetUi';
 import { machineNames, lifecycleNames as statuses } from './assetPresentation';
 import { EquipmentDetails, equipmentLayouts, fieldValue, unknownLayout } from './equipmentLayouts';
+import { LifecyclePanel } from './LifecyclePanel';
 
 type Detail = { equipment: EquipmentDetails; path: EquipmentDetails[]; children: EquipmentDetails[];
-  health_status: 'UNASSESSED'; site: { id: string; site_name: string; customer_name: string; location_text: string | null } };
+  health_status: 'UNASSESSED'; location: { kind: string; label: string }; site: { id: string; site_name: string; customer_name: string; location_text: string | null } | null };
 type History = { total: number; samples: { id: string; barcode_value: string; sampled_at: string;
   equipment_serial: string; test_types: string[]; test_count: number; testing_status: string }[] };
 const testNames: Record<string, string> = { DGA: 'DGA', MOISTURE: '微水', BREAKDOWN_VOLTAGE: '击穿电压' };
@@ -38,7 +39,7 @@ export function EquipmentDetailPage({ assetId }: { assetId: string }) {
   if (!data) return <p role="status">正在加载设备资料…</p>;
   const layout = equipmentLayouts[data.equipment.machine_type ?? ''] ?? unknownLayout;
   const line = data.path[0].product_line === 'ESS' ? 'ESS' : 'PV';
-  const siteHref = `/assets/sites/${data.site.id}?product_line=${line}`;
+  const siteHref = data.site ? `/assets/sites/${data.site.id}?product_line=${line}` : '/assets/repair-center';
   const returnTo = /^\/assets\/sites\/[a-f0-9-]+\?/.test(query.return_to ?? '') ? query.return_to : siteHref;
   const childHref = (row: EquipmentDetails) => `/assets/equipment/${row.id}?return_to=${encodeURIComponent(returnTo)}`;
   const sorted = data.children.filter(child => (!query.child_search || [child.display_name, child.serial_number, child.model].some(value => value?.toLowerCase().includes(query.child_search.toLowerCase()))) && (!query.child_type || child.machine_type === query.child_type));
@@ -46,14 +47,15 @@ export function EquipmentDetailPage({ assetId }: { assetId: string }) {
   sorted.sort((a, b) => String(a[sortKey] ?? '').localeCompare(String(b[sortKey] ?? ''), 'zh-CN') * (query.direction === 'desc' ? -1 : 1) || a.id.localeCompare(b.id));
   const page = Math.max(1, Number(query.page) || 1), size = [1,10,20,50,100].includes(Number(query.page_size)) ? Number(query.page_size) : 20;
   return <div className="asset-dashboard"><a href={returnTo}>返回现场详情</a>
-    <nav aria-label="设备路径" className="equipment-path"><a href={siteHref}>{data.site.site_name}</a>{data.path.map(node => <span key={node.id}> / <a href={childHref(node)} aria-current={node.id === assetId ? 'page' : undefined}>{node.display_name}</a></span>)}</nav>
+    <nav aria-label="设备路径" className="equipment-path"><a href={siteHref}>{data.site?.site_name ?? data.location.label}</a>{data.path.map(node => <span key={node.id}> / <a href={childHref(node)} aria-current={node.id === assetId ? 'page' : undefined}>{node.display_name}</a></span>)}</nav>
     <section className="site-facts" aria-label="设备属性"><h2>{data.equipment.display_name} <small>{layout.title}</small></h2>
-      <dl><div><dt>健康状态</dt><dd>未评估</dd></div><div><dt>设备状态</dt><dd>{statuses[data.equipment.lifecycle_status] ?? data.equipment.lifecycle_status}</dd></div>{layout.fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{fieldValue(data.equipment, field)}</dd></div>)}<div><dt>客户</dt><dd>{data.site.customer_name}</dd></div><div><dt>现场位置</dt><dd>{data.site.location_text ?? '未提供'}</dd></div></dl>
+      <dl><div><dt>健康状态</dt><dd>未评估</dd></div><div><dt>设备状态</dt><dd>{statuses[data.equipment.lifecycle_status] ?? data.equipment.lifecycle_status}</dd></div>{layout.fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{fieldValue(data.equipment, field)}</dd></div>)}<div><dt>客户</dt><dd>{data.site?.customer_name ?? '不适用'}</dd></div><div><dt>当前位置</dt><dd>{data.location.label}</dd></div><div><dt>现场位置</dt><dd>{data.site?.location_text ?? '不适用'}</dd></div></dl>
     </section>
     <form className="dashboard-filters" onSubmit={e => { e.preventDefault(); const form = new FormData(e.currentTarget); update({ child_search: String(form.get('search') ?? ''), child_type: String(form.get('type') ?? ''), page: '1' }); }}>
       <label>子设备名称或序列号筛选<input name="search" defaultValue={query.child_search ?? ''} maxLength={160} /></label><label>子设备类型筛选<select name="type" defaultValue={query.child_type ?? ''}><option value="">全部</option>{Object.entries(machineNames).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label><button>筛选子设备</button>
     </form>
     <DataTable name="子设备清单" rows={sorted.slice((page-1)*size, page*size)} total={sorted.length} columns={[{ key: 'display_name', label: '设备名称 / Tag number' }, { key: 'serial_number', label: '序列号' }, { key: 'model', label: '设备型号' }, { key: 'machine_type', label: '设备类型', render: row => machineNames[row.machine_type ?? ''] ?? '未分类设备' }]} query={{ ...query, page_size: String(size) }} update={update} href={childHref} />
     <TestHistory assetId={assetId} />
+    <LifecyclePanel assetId={assetId} />
   </div>;
 }

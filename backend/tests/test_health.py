@@ -27,10 +27,11 @@ def test_unavailable_database_is_bounded_and_does_not_expose_credentials(databas
     assert 'isolated-tests-only' not in response.text
 
 
-def test_unmigrated_database_is_unavailable_then_recovers_without_app_restart(database_url):
+def test_older_migration_is_unavailable_then_recovers_without_app_restart(database_url):
     config = Config('alembic.ini')
     with TestClient(create_app(Settings(database_url=database_url))) as client:
-        command.downgrade(config, 'base')
+        # Exercise an outdated schema without destroying immutable business history.
+        command.downgrade(config, '-1')
         try:
             assert client.get('/api/health').status_code == 503
         finally:

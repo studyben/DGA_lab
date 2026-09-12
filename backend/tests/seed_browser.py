@@ -99,6 +99,10 @@ def main():
             raise RuntimeError('Unexpected browser sample barcode')
         from tests.equipment_seed import seed_equipment
         seed_equipment(engine)
+        # Pre-existing uninstalled spare; lifecycle acceptance uses public commands thereafter.
+        with engine.begin() as c:
+            c.execute(text("""INSERT INTO formal_assets(id,system_asset_number,asset_type,serial_number,lifecycle_status,machine_type)
+                VALUES ('40000000-0000-0000-0000-000000000099','SYS-TX-099','TRANSFORMER','TX-SPARE-0099','SPARE','TRANSFORMER')"""))
         service.logout(admin.token)
     finally:
         engine.dispose()
