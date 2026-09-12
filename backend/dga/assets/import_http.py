@@ -41,7 +41,10 @@ def import_router(imports: AssetImports, actor_dependency, mutation_actor):
             if len(content) + len(part) > MAX_BYTES:
                 fail('import_file_size', 413)
             content.extend(part)
-        return await run_in_threadpool(imports.submit, actor, filename=filename, content=bytes(content))
+        try:
+            return await run_in_threadpool(imports.submit, actor, filename=filename, content=bytes(content))
+        except SQLAlchemyError:
+            fail('import_submit_unavailable', 503)
 
     @router.get('/{batch_id}')
     def preview(batch_id: UUID, actor=Depends(actor_dependency)):

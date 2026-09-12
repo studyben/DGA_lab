@@ -135,14 +135,25 @@ def test_hierarchy_identity_and_serial_diagnostics(database_url, variant):
     engine.dispose()
 
 
-@pytest.mark.parametrize('variant', ['not_zip', 'empty', 'formula', 'huge_xml', 'external_link', 'missing_header', 'too_many_rows', 'duplicate_header', 'far_column'])
+@pytest.mark.parametrize('variant', ['not_zip', 'empty', 'formula', 'huge_xml', 'external_link', 'missing_header', 'too_many_rows', 'duplicate_header', 'far_column', 'numeric_overflow'])
 def test_unsafe_or_invalid_workbook_is_retained_but_never_publishable(database_url, variant):
     engine, actor, imports, files = import_context(database_url)
     rows = new_rows()
     if variant == 'formula':
         rows[0]['serial_number'] = '=1+1'
+    if variant == 'numeric_overflow':
+        rows[0]['power_mw'] = 1
     content = workbook(rows)
-    if variant == 'not_zip':
+    if variant == 'numeric_overflow':
+        stream = BytesIO()
+        with ZipFile(BytesIO(content)) as source, ZipFile(stream, 'w', ZIP_DEFLATED) as target:
+            for entry in source.infolist():
+                data = source.read(entry)
+                if entry.filename == 'xl/worksheets/sheet1.xml':
+                    data = data.replace(b'<v>1</v>', b'<v>1e999</v>')
+                target.writestr(entry, data)
+        content = stream.getvalue()
+    elif variant == 'not_zip':
         content = b'not an Excel workbook'
     elif variant in ('huge_xml', 'external_link'):
         stream = BytesIO(content)
@@ -241,6 +252,9 @@ def test_publish_requires_current_warning_ack_and_concurrent_retries_share_resul
     assert first['rows'] == second['rows']
     assert first['state'] == second['state'] == 'PUBLISHED'
     assert AssetLifecycle(engine).catalog(actor)['total'] == 4
+    from dga.shared.auth.public import IdentityService
+    events = IdentityService(engine).audit_events(actor)
+    assert sum(e['action_code'] == 'ASSET_IMPORT_PUBLISH' and e['entity_id'] == batch['id'] for e in events) == 1
     engine.dispose()
 
 
@@ -355,4 +369,55 @@ def test_worker_records_unexpected_validation_failure_without_losing_source(data
     finally:
         with engine.begin() as c:
             c.execute(text('ALTER TABLE import_test_unavailable RENAME TO asset_materials'))
+    engine.dispose()
+
+
+def test_lost_commit_response_never_deletes_committed_batch_source(database_url, monkeypatch):
+    import psycopg
+    from sqlalchemy.exc import SQLAlchemyError
+    engine, actor, imports, files = import_context(database_url)
+    original_commit = psycopg.Connection.commit
+    fault_pending = True
+    def lost_response(connection):
+        nonlocal fault_pending
+        original_commit(connection)
+        if fault_pending:
+            fault_pending = False
+            raise psycopg.OperationalError('simulated lost COMMIT response')
+    monkeypatch.setattr(psycopg.Connection, 'commit', lost_response)
+    content = workbook(new_rows())
+    with pytest.raises(SQLAlchemyError):
+        imports.submit(actor, filename='lost-response.xlsx', content=content)
+    assert imports.list_batches(actor)['total'] == 1
+    assert content in files.files.values()
+    engine.dispose()
+
+
+def test_pending_and_error_batches_cannot_be_published(database_url):
+    engine, actor, imports, _ = import_context(database_url)
+    rows = new_rows()
+    rows[0]['material_number'] = 'UNREGISTERED'
+    batch = imports.submit(actor, filename='errors.xlsx', content=workbook(rows))
+    with pytest.raises(AssetQueryError, match='import_not_validated'):
+        imports.publish(actor, batch['id'], validation_revision=1, acknowledge_warnings=True)
+    imports.validate_next()
+    with pytest.raises(AssetQueryError, match='import_has_errors'):
+        imports.publish(actor, batch['id'], validation_revision=1, acknowledge_warnings=True)
+    assert AssetLifecycle(engine).catalog(actor)['total'] == 2
+    engine.dispose()
+
+
+def test_definite_precommit_failure_cleans_uncommitted_source(database_url):
+    from sqlalchemy.exc import SQLAlchemyError
+    engine, actor, imports, files = import_context(database_url)
+    with engine.begin() as c:
+        c.execute(text("ALTER TABLE asset_import_batches ADD CONSTRAINT import_test_submit_failure CHECK(filename <> 'reject.xlsx')"))
+    try:
+        with pytest.raises(SQLAlchemyError):
+            imports.submit(actor, filename='reject.xlsx', content=workbook(new_rows()))
+        assert imports.list_batches(actor)['total'] == 0
+        assert not files.files
+    finally:
+        with engine.begin() as c:
+            c.execute(text('ALTER TABLE asset_import_batches DROP CONSTRAINT import_test_submit_failure'))
     engine.dispose()

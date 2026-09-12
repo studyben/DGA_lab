@@ -19,6 +19,7 @@ const errors: Record<string, string> = {
   import_stale_validation: '预览已更新，请重新查看批次并确认。',
   import_warnings_unacknowledged: '请先核对全部警告并勾选确认。',
   object_storage_unavailable: '源文件存储暂不可用，未完成上传，请稍后重试。',
+  import_submit_unavailable: '上传结果尚未确认。请先按文件名查看批次历史，勿直接重复上传。',
   import_publish_unavailable: '发布服务暂不可用。请重新查看批次结果后再决定是否重试。',
   csrf_rejected: '会话已更新，请刷新页面后重试。',
   permission_denied: '当前账号没有资产导入权限。',

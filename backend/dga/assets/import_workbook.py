@@ -1,6 +1,7 @@
 """Private bounded XLSX adapter; business validation belongs to assets."""
 from io import BytesIO
 from datetime import date, datetime
+from math import isfinite
 from zipfile import ZipFile
 from defusedxml.ElementTree import fromstring
 from openpyxl import load_workbook, Workbook
@@ -76,6 +77,8 @@ def parse(content):
             values = {}
             for key, cell in zip(headers, cells):
                 value = cell.value
+                if isinstance(value, float) and not isfinite(value):
+                    reject('单元格数值溢出；请填写有限数值后重新上传。', n, key)
                 if isinstance(value, str) and (len(value) > 1000 or '\x00' in value):
                     reject('单元格过长或包含无效字符；最多1000字符。', n, key)
                 if isinstance(value, (datetime, date)):

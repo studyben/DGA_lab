@@ -43,6 +43,7 @@ class AssetImports:
         batch_id = uuid4()
         key = f'asset-imports/{batch_id}/source.xlsx'
         self._files.put(object_key=key, content=content, content_type=XLSX_TYPE)
+        commit_may_have_started = False
         try:
             with self._engine.begin() as c:
                 c.execute(text('''INSERT INTO asset_import_batches
@@ -52,11 +53,17 @@ class AssetImports:
                          key=key, size=len(content), rows=json.dumps(rows), actor=actor.user_id, at=self._clock(),
                          state=state, issues=json.dumps(issues), summary=json.dumps(summary(rows, issues))))
                 self._audit.append(c, actor, ImportAction.SUBMIT, entity_id=batch_id)
+                # Exiting engine.begin sends COMMIT. Its response can be lost even
+                # when the database durably committed: never delete that source.
+                commit_may_have_started = True
         except Exception:
-            try:
-                self._files.delete(object_key=key)
-            except Exception:
-                logger.error('Import source cleanup required: %s', key)
+            if commit_may_have_started:
+                logger.error('Import commit outcome uncertain; retain and reconcile source: %s', key)
+            else:
+                try:
+                    self._files.delete(object_key=key)
+                except Exception:
+                    logger.error('Import source cleanup required: %s', key)
             raise
         return self.get(actor, batch_id)
 

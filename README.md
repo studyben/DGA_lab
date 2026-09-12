@@ -151,6 +151,8 @@ docker compose run --rm migrate alembic upgrade head
 
 源文件使用既有 S3 兼容 FileStore，配置沿用 `OBJECT_STORE_*`。对象存储失败不生成可发布批次；上传成功后数据库写入失败会尝试删除该次孤立对象，删除失败日志记录对象键供管理员核对。S3与PostgreSQL不是分布式事务；生产源文件保留、备份与孤立对象清理由部署 #20 运维策略负责，不自动删除已发布源文件。
 
+例外：如果已开始 COMMIT 而提交响应丢失，结果可能已经落库，此时**保留源文件而不删除**，日志记录对象键供核对。用户先查批次历史确认是否已有批次，再决定是否重新上传。只有明确发生在 COMMIT 之前的失败才尝试即时清理孤立源文件。
+
 隔离验收可使用 `compose.browser.yaml` 加 `compose.import-browser.yaml`，项目名 `dga-issue12-browser`、`DGA_BROWSER_PORT=18095`；它使用临时测试数据和独立MinIO，**不可与现有验收 override 混用**。`tests.seed_import_browser` 只用于隔离假数据，不用于用户验收库。浏览器输入fixture由 `python -m tests.make_import_fixture <frontend/tests/fixtures/asset-import.xlsx>` 生成。后端行为测试使用 `dga-issue12` 的 `test-db`，不使用18093数据。
 
 ## 交付顺序

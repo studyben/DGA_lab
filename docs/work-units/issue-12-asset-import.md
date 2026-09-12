@@ -4,8 +4,8 @@
 
 - Goal and isolated branch confirmed by user; base `2eb45a7` (merged PR #32).
 - Branch: `codex/issue-12-asset-import`; separate worktree, no existing acceptance data touched.
-- Current gate: accepted slice commit (S3).
-- Next entry point: aggregate deepreview after S3 checkpoint. Plan 89a78a9; S1 315b0d0; S2 3a02d35. S3 review/fix/re-review passed: full backend107, browser18, TypeScript/build and diff check. Artifact docs/reviews/code-review-20260912-183229.md. User explicitly forbids push, PR and merge; preserve this stop boundary.
+- Current gate: aggregate deepreview passed; local ready-to-open-draft-PR boundary (publication explicitly paused by user).
+- Accepted checkpoints: plan 89a78a9; S1 315b0d0; S2 3a02d35; S3 dc31c5e. Final aggregate review/fix/re-review passed: full backend 111, browser 18, TypeScript/build and diff check. Artifacts docs/reviews/code-review-20260912-183229.md and docs/reviews/code-review-20260912-183427.md. Do not push, open a PR, merge, close the issue or start later Issues. This is local completion, not full Gateflow PR/final closeout completion.
 - Issue: https://github.com/studyben/DGA_lab/issues/12 ; parent #1, completed blocker #11.
 
 ## Confirmed goal / non-goals
@@ -80,3 +80,10 @@ Public import and asset application interfaces + real isolated PostgreSQL; file 
 ## Completion reporting
 
 Report delivered behavior, tests and counts, review findings/status, migration/source retention implications, remaining risks, local commit/PR state, preview URL if started. Merge requires issue-specific authorization; prior PR #32 authorization does not carry forward.
+
+## Final local verification and recovery refinement
+
+- Aggregate adversarial review added regressions for nonfinite XLSX numbers and lost database COMMIT responses; both were observed failing before fixes and passed afterward. A definite pre-commit failure still cleans an uncommitted source. Once COMMIT may have started, retain the source and direct the user to batch history to reconcile; never delete a potentially committed batch's source. This supersedes the unconditional DB-failure cleanup wording in the initial plan. Possible orphan reconciliation belongs to deployment operations, not destructive cleanup in this command.
+- Full real-PostgreSQL backend suite: 111 passed (two existing deprecation warnings); full browser suite: 18 passed; TypeScript/Vite build and git diff --check passed. Concurrent publication verifies exactly one publication audit in addition to stable asset IDs. STAGED/error batches cannot publish.
+- Isolated disposable preview: http://127.0.0.1:18095/assets/import, project dga-issue12-browser. Only its tmpfs data was seeded. Existing acceptance environment at port 18093 and original workspace edits were preserved.
+- No remaining accepted correctness findings. Operational residuals: source retention/orphan reconciliation and production worker monitoring remain deployment work; ambiguous legacy material mappings require administrator correction, not import guessing. CI/PR checks were not run because remote publication is explicitly prohibited.
