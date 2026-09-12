@@ -97,6 +97,8 @@ def main():
         )
         if sample.barcode_value != 'DGA-20260802-000001':
             raise RuntimeError('Unexpected browser sample barcode')
+        from tests.equipment_seed import seed_equipment
+        seed_equipment(engine)
         service.logout(admin.token)
     finally:
         engine.dispose()

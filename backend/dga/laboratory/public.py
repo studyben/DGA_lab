@@ -8,6 +8,8 @@ from typing import Callable
 from uuid import UUID, uuid4
 
 from sqlalchemy import Engine, text
+from pydantic import ValidationError
+from .asset_history import AssetHistoryQuery
 
 from dga.assets.public import AssetDirectory, AssetType, SamplingAssetContext
 from dga.shared.auth.public import (
@@ -159,6 +161,16 @@ class SampleRegistry:
         self._assets = asset_directory
         self._audit = audit_trail
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+
+    def asset_test_history(self, actor: ActorContext, asset_id: UUID, **filters) -> dict:
+        """Asset readers may see summaries, not the laboratory workbench or raw files."""
+        require_permission(actor, 'assets.read')
+        from .asset_history import asset_test_history
+        try:
+            query = AssetHistoryQuery(**filters)
+        except ValidationError as error:
+            raise LaboratoryError('invalid_asset_history_query') from error
+        return asset_test_history(self._engine, asset_id, query)
 
     def receive(self, actor: ActorContext, command: ReceiveSample) -> OilSample:
         require_permission(actor, 'laboratory.write')

@@ -38,3 +38,7 @@
 .site-facts dl { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 24px; }
 .site-facts dt { color: #667085; font-size: 12px; margin-bottom: 8px; }
 .site-facts dd { margin: 0; overflow-wrap: anywhere; }
+.equipment-path { margin: 16px 0; line-height: 2; overflow-wrap: anywhere; }
+.equipment-path a { color: #a94f0b; }
+.equipment-path [aria-current="page"] { color: #202a39; font-weight: 600; }
+.site-facts h2 small { color: #667085; font-size: 15px; font-weight: 400; margin-left: 12px; }
