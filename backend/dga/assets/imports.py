@@ -78,3 +78,59 @@ class AssetImports:
             c.execute(text("UPDATE asset_import_batches SET state='VALIDATED',rows=CAST(:rows AS jsonb),issues=CAST(:issues AS jsonb),summary=CAST(:summary AS jsonb),validation_revision=1 WHERE id=:id"),
                       {'rows': json.dumps(rows), 'issues': json.dumps(issues), 'summary': json.dumps(counts), 'id': batch['id']})
             return True
+
+    def publish(self, actor, batch_id, *, validation_revision, acknowledge_warnings=False):
+        """Create the entire new-asset batch atomically, never update existing assets."""
+        require_permission(actor, 'assets.import')
+        with self._engine.begin() as c:
+            c.execute(text('SELECT pg_advisory_xact_lock(110011)'))
+            batch = c.execute(text('SELECT * FROM asset_import_batches WHERE id=:id FOR UPDATE'), {'id': batch_id}).mappings().first()
+            if batch is None:
+                fail('import_not_found', 404)
+            if batch['state'] != 'PUBLISHED':
+                if batch['state'] != 'VALIDATED':
+                    fail('import_not_validated')
+                if validation_revision != batch['validation_revision']:
+                    fail('import_stale_validation')
+                # Catalog and site provisioning may not use the graph advisory lock.
+                # Hold reference tables stable through the complete creation transaction.
+                c.execute(text('LOCK TABLE asset_materials,sites,site_product_lines IN SHARE MODE'))
+                rows, issues, counts = validate(c, batch['source_rows'], self._clock())
+                if rows != batch['rows'] or issues != batch['issues']:
+                    c.execute(text('''UPDATE asset_import_batches SET rows=CAST(:rows AS jsonb),
+                        issues=CAST(:issues AS jsonb),summary=CAST(:summary AS jsonb),
+                        validation_revision=validation_revision+1 WHERE id=:id'''),
+                        dict(rows=json.dumps(rows), issues=json.dumps(issues), summary=json.dumps(counts), id=batch_id))
+                else:
+                    self._create_assets(c, actor, batch, acknowledge_warnings)
+        return self.get(actor, batch_id)
+
+    def _create_assets(self, c, actor, batch, acknowledge_warnings):
+        batch_id = batch['id']
+        if batch['summary']['error_count']:
+            fail('import_has_errors')
+        if batch['summary']['warning_count'] and acknowledge_warnings is not True:
+            fail('import_warnings_unacknowledged')
+        rows = batch['rows']
+        ids = {r['values']['record_key']: uuid4() for r in rows}
+        assets, installations = [], []
+        for row in rows:
+            v = row['values']
+            asset_id = ids[v['record_key']]
+            number = 'AST-' + asset_id.hex.upper()
+            assets.append({**v, 'id': asset_id, 'number': number})
+            installations.append(dict(id=uuid4(), asset=asset_id, parent=ids.get(v['parent_record_key']),
+                                      site=v['site_id'], repair=v['location_kind'] == 'REPAIR_CENTER', at=v['effective_at']))
+            row.update(asset_id=str(asset_id), system_asset_number=number)
+        c.execute(text('''INSERT INTO formal_assets
+            (id,system_asset_number,asset_type,serial_number,model,material_number,lifecycle_status,
+             product_line,machine_type,power_mw,energy_mwh,equipment_name,tag_number,commissioning_date,battery_manufacturer)
+            VALUES (:id,:number,:asset_type,:serial_number,:model,:material_number,:status,
+             :product_line,:machine_type,:power_mw,:energy_mwh,:equipment_name,:tag_number,:commissioning_date,:battery_manufacturer)'''), assets)
+        c.execute(text('''INSERT INTO asset_installations
+            (id,asset_id,parent_asset_id,site_id,repair_center,valid_from)
+            VALUES (:id,:asset,:parent,:site,:repair,:at)'''), installations)
+        c.execute(text("""UPDATE asset_import_batches SET state='PUBLISHED',rows=CAST(:rows AS jsonb),
+            published_by=:actor,published_at=:at WHERE id=:id"""),
+            dict(rows=json.dumps(rows), actor=actor.user_id, at=self._clock(), id=batch_id))
+        self._audit.append(c, actor, ImportAction.PUBLISH, entity_id=batch_id)

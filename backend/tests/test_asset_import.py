@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from io import BytesIO
 from zipfile import ZipFile, ZIP_DEFLATED
+from concurrent.futures import ThreadPoolExecutor
 
 from openpyxl import Workbook
 from sqlalchemy import text
@@ -11,7 +12,7 @@ from dga.shared.files import UnavailableFileStore, ObjectStorageError
 from dga.assets.public import AssetQueryError
 
 from dga.assets.public import AssetImports, AssetLifecycle
-from tests.test_sample_reception import reception_context, CUSTOMER_ID, SITE_ID
+from tests.test_sample_reception import reception_context, CUSTOMER_ID, SITE_ID, TRANSFORMER_ID
 
 
 class MemoryFiles:
@@ -181,4 +182,83 @@ def test_upload_rejects_unauthorized_oversized_and_unavailable_storage(database_
         AssetImports(engine, UnavailableFileStore()).submit(actor, filename='a.xlsx', content=workbook(new_rows()))
     assert not files.files
     assert imports.validate_next() is False
+    engine.dispose()
+
+
+def ready_batch(imports, actor, rows=None):
+    batch = imports.submit(actor, filename='publish.xlsx', content=workbook(rows or new_rows()))
+    imports.validate_next()
+    return imports.get(actor, batch['id'])
+
+
+def test_publish_creates_queryable_hierarchy_without_changing_existing_assets(database_url):
+    engine, actor, imports, _ = import_context(database_url)
+    lifecycle = AssetLifecycle(engine)
+    original = lifecycle.history(actor, TRANSFORMER_ID)
+    batch = ready_batch(imports, actor)
+    result = imports.publish(actor, batch['id'], validation_revision=batch['validation_revision'], acknowledge_warnings=False)
+    assert result['state'] == 'PUBLISHED'
+    root_id, child_id = [r['asset_id'] for r in result['rows']]
+    assert root_id != child_id
+    from uuid import UUID
+    history = lifecycle.history(actor, UUID(child_id))
+    assert history['location']['site_id'] == SITE_ID
+    assert str(history['installations'][0]['parent_asset_id']) == root_id
+    assert history['status'] == 'IN_SERVICE'
+    assert lifecycle.history(actor, TRANSFORMER_ID) == original
+    assert imports.get(actor, batch['id'])['published_by'] == actor.user_id
+    engine.dispose()
+
+
+def test_publish_revalidates_live_material_facts_before_creating_assets(database_url):
+    engine, actor, imports, _ = import_context(database_url)
+    batch = ready_batch(imports, actor)
+    with engine.begin() as c:
+        c.execute(text("UPDATE asset_materials SET model='Corrected model' WHERE material_number='IMPORT-TX'"))
+    updated = imports.publish(actor, batch['id'], validation_revision=batch['validation_revision'])
+    assert updated['state'] == 'VALIDATED'
+    assert updated['validation_revision'] == batch['validation_revision'] + 1
+    assert updated['rows'][1]['values']['model'] == 'Corrected model'
+    assert AssetLifecycle(engine).catalog(actor)['total'] == 2
+    result = imports.publish(actor, batch['id'], validation_revision=updated['validation_revision'])
+    assert result['state'] == 'PUBLISHED'
+    engine.dispose()
+
+
+def test_publish_requires_current_warning_ack_and_concurrent_retries_share_result(database_url):
+    engine, actor, imports, _ = import_context(database_url)
+    rows = new_rows()
+    rows[1]['serial_number'] = 'TX-CURRENT-2002'
+    batch = ready_batch(imports, actor, rows)
+    with pytest.raises(AssetQueryError, match='import_warnings_unacknowledged'):
+        imports.publish(actor, batch['id'], validation_revision=batch['validation_revision'])
+    with pytest.raises(AssetQueryError, match='import_stale_validation'):
+        imports.publish(actor, batch['id'], validation_revision=0, acknowledge_warnings=True)
+    def publish(_):
+        return imports.publish(actor, batch['id'], validation_revision=batch['validation_revision'], acknowledge_warnings=True)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first, second = list(pool.map(publish, range(2)))
+    assert first['rows'] == second['rows']
+    assert first['state'] == second['state'] == 'PUBLISHED'
+    assert AssetLifecycle(engine).catalog(actor)['total'] == 4
+    engine.dispose()
+
+
+def test_late_database_failure_rolls_back_all_assets_and_allows_retry(database_url):
+    from sqlalchemy.exc import SQLAlchemyError
+    engine, actor, imports, _ = import_context(database_url)
+    batch = ready_batch(imports, actor)
+    # System boundary fault: PostgreSQL rejects the second asset insert after the first succeeds.
+    with engine.begin() as c:
+        c.execute(text("ALTER TABLE formal_assets ADD CONSTRAINT import_test_failure CHECK(serial_number <> '00002')"))
+    try:
+        with pytest.raises(SQLAlchemyError):
+            imports.publish(actor, batch['id'], validation_revision=batch['validation_revision'])
+        assert AssetLifecycle(engine).catalog(actor)['total'] == 2
+        assert imports.get(actor, batch['id'])['state'] == 'VALIDATED'
+        assert all('asset_id' not in r for r in imports.get(actor, batch['id'])['rows'])
+    finally:
+        with engine.begin() as c:
+            c.execute(text('ALTER TABLE formal_assets DROP CONSTRAINT import_test_failure'))
+    assert imports.publish(actor, batch['id'], validation_revision=batch['validation_revision'])['state'] == 'PUBLISHED'
     engine.dispose()
