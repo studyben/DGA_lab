@@ -52,3 +52,6 @@ S3 UI identity queue+container controls and acceptance: identity page shares fil
 ### Validation and risk
 
 Separate projects dga-issue13 and dga-issue13-browser (port18097,tmpfs); no fixtures/migrations on18093. Tests mock only external clock/store; fixture SQL for arrangement, public reads for outcomes. Include DST spring/fall, measured_at vs created_at, removed tests, pagination ties, stale identity snapshots and finalization race. No formal ASTM/thresholds/PDF branding. Domain docs are read from authoritative original workspace; do not overwrite dirty versions. README documents counts, states and dependency baseline. Remaining production deployment concerns stay #20. No push/PR/remote merge or later Issue.
+
+### S1 implementation / review pass
+Implemented public dashboard/ledger queries, laboratory HTTP adapter and operational home/ledger UI, barcode continuation and restricted return link. TDD observed missing-interface/route failures then green; boundary review reproduced and fixed maximum-date overflow. Evidence: docs/reviews/code-review-20260912-224212.md,5 backend tests,1 browser flow, frontend build/typecheck. Docs decision: semantics here, final README in S3. Current gate/next entry: S2 implementation; identity/container commands and aggregate validation remain approved work, not completed.

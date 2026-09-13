@@ -367,3 +367,6 @@ from .reports import (  # noqa: E402
     ReportStatus,
     StaleReportClaim,
 )
+
+from .operations import LaboratoryOperations  # noqa: E402
+from .operations_http import operations_router  # noqa: E402

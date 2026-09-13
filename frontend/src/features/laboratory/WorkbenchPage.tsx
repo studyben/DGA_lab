@@ -88,6 +88,8 @@ async function attachmentPayload(file: File | null) {
 
 export function WorkbenchPage() {
   const { session, can } = useAuth();
+  const returnTo = new URLSearchParams(location.search).get('return_to') ?? '';
+  const ledgerReturn = /^\/lab\/(samples|identity)(\?|$)/.test(returnTo) ? returnTo : '/lab/samples';
   const [barcode, setBarcode] = useState(() => (new URLSearchParams(location.search).get('barcode') ?? '').slice(0, 160));
   const [data, setData] = useState<Workbench | null>(null);
   const [error, setError] = useState('');
@@ -290,6 +292,7 @@ export function WorkbenchPage() {
   }
 
   return <div className="workbench-layout">
+    <a href={ledgerReturn}>返回油样台账</a>
     <section className="lookup-panel" aria-labelledby="workbench-scan-title">
       <div className="section-heading"><div><span className="step">01 / 扫码</span><h2 id="workbench-scan-title">进入油样检测</h2></div></div>
       <form className="asset-search-form" onSubmit={event => { event.preventDefault(); void load(); }}>

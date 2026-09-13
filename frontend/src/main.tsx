@@ -14,6 +14,7 @@ import { EquipmentDetailPage } from './features/assets/EquipmentDetailPage';
 import { RepairCenterPage } from './features/assets/LifecyclePanel';
 import { AssetImportPage } from './features/assets/AssetImportPage';
 import { ReportPage } from './features/laboratory/ReportPage';
+import { LaboratoryHomePage, SampleLedgerPage } from './features/laboratory/OperationsPages';
 
 const path =
   window.location.pathname === "/"
@@ -109,7 +110,7 @@ function App() {
               </div>
               {!(equipmentId || siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
             </div>
-            {equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
+            {equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <SampleLedgerPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>

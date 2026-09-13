@@ -27,6 +27,8 @@ from dga.laboratory.public import (
     LaboratoryError,
     LaboratoryWorkbench,
     LaboratoryReports,
+    LaboratoryOperations,
+    operations_router,
     SampleRegistry,
     access_context as laboratory_access,
     http_router as laboratory_router,
@@ -120,6 +122,9 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
             headers={'Cache-Control': 'no-store'},
         )
     sample_registry = SampleRegistry(engine, asset_directory, AuditTrail())
+    app.include_router(operations_router(
+        LaboratoryOperations(engine, sample_registry, asset_directory, AuditTrail()), current_actor, mutation_actor,
+    ))
     audit_trail = AuditTrail()
     reports = LaboratoryReports(engine, audit_trail, configured_object_store)
     app.include_router(
