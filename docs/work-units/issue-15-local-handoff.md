@@ -1,5 +1,12 @@
 # Issue #15 local handoff
 
+## Publication update
+
+- User completed basic manual acceptance with no issues and authorized continuing push/draft PR/PR review; merge remains unauthorized.
+- Draft PR #36: https://github.com/studyben/DGA_lab/pull/36 (base main, Closes #15).
+- PR review passed without new findings: docs/reviews/pr-36-review-20260913-142907.md. Next gate is accepted PR review commit → final push → latest-head CI validation.
+- Initial local-only status below is retained as historical handoff evidence, superseded by this publication update. Issue closeout comment awaits explicit authorization; do not claim final closeout pass.
+
 - Goal confirmed; plan reviewed/committed 1cf43c8; S1 accepted 2cced8c; S2 accepted 907b14b.
 - Aggregate review: docs/reviews/code-review-20260913-122147.md; all accepted findings fixed/re-reviewed.
 - Verification: backend 212 passed; browser 32 passed; production frontend build, architecture checks, migration head and diff whitespace checks passed. No schema migration added.
