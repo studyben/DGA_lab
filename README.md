@@ -129,6 +129,32 @@ docker compose run --rm migrate alembic upgrade head
 
 依赖由 `backend/requirements.in` 和 `frontend/package.json` 声明，分别使用带哈希的 requirements.txt 与 package-lock.json 锁定。更新 Python 依赖时在 Python 3.12 环境执行 `pip-compile --generate-hashes --output-file backend/requirements.txt backend/requirements.in`，之后验证 Linux 镜像；不要手改哈希。
 
+## Issue #12：新增资产批量导入
+
+管理员在 `/assets/import` 下载固定 XLSX 模板和已有客户/现场/物料参考资料，上传后查看后台校验结果。仅新增资产及初始安装关系，不更新、合并或覆盖既有资产，也不通过文件创建客户、现场或物料。新资产ID和系统资产编号自动生成。序列号重复不是唯一性错误；页面列出冲突资产编号/型号并要求确认这些是不同物理设备。
+
+模板 `Assets` 的必填列为 `record_key, serial_number, material_number, product_line, machine_type, status, location_kind, effective_at`。可选列见模板 Instructions。`parent_record_key` 只指向本批次中的父记录，不按序列号关联。已有父设备下的新部件，可先导入维修中心，再使用已有受控资产移动功能安装。直接归属现场仅允许光伏整机/储能系统；维修中心不填写客户/现场。导入只接收当前开放关系，不接收关系结束日期或多段历史。
+
+- 输入上限：2 MiB XLSX、展开10 MiB、100个ZIP成员、500条资产行、全文件20000个单元格（包括参考表）、每单元格1000字符。参考表各列前500条，可删除参考表但需保留 Assets。拒绝公式、宏、外链、加密、空文件、重复列名、未知字段、远处隐藏数据，不做任意格式识别。
+- 标识使用文本保留前导零。`effective_at` 填带时区的 ISO 日期时间，如 `2025-01-01T08:00:00Z`；不允许未来时间。`commissioning_date` 使用 `YYYY-MM-DD`。MW/MWh 最多6位小数，PV 的 MWh 留空。
+- 只有 `assets.import` 权限可以访问导入入口/API，迁移默认仅授予 system_admin；一般 `assets.write` 不等于导入权限。所有HTTP写操作校验Origin/CSRF。
+- `STAGED` 等待后台校验；`VALIDATED` 可包含错误/警告；`FAILED` 保留失败诊断和源文件；`PUBLISHED` 保留发布结果。错误阻止整批发布，警告需明确勾选确认。发布时重新校验当前主数据；预览变化会要求再次确认。并发/重试发布返回同一组资产，不重复创建。
+- 修正后上传新批次，旧批次和源文件保留。发布超时不能认定失败：先刷新该批次确认状态。数据库行写入、安装关系、批次结果和成功审计处于同一事务，任一失败全部回滚，不跳过坏行。
+
+### 物料与迁移注意事项
+
+`0013_asset_import` 增加物料目录和导入批次。只从已有资产中迁移非空、完全一致的物料/型号/资产类型映射；歧义或缺失映射不会猜测修复，原资产不变。空数据库需要管理员先准备客户、现场产品线和物料目录，否则导入会明确报缺失引用。此工单不提供新的主数据维护页面。存在保留批次时，降级迁移会拒绝静默丢弃导入审计。
+
+### 后台进程与失败恢复
+
+普通 `compose.yaml` 包含 `import-worker`，执行 `python -m dga.assets.import_worker`；`--once` 处理最多一个批次，供操作检查使用。进程用数据库行锁领取待校验批次：崩溃释放锁，下一次继续处理；异常校验记录失败码，不无限重试同一个坏批次。长时间处于 STAGED 时先检查 worker 日志与数据库可用性。恢复后对于 FAILED 文件重新上传，不手改批次状态。
+
+源文件使用既有 S3 兼容 FileStore，配置沿用 `OBJECT_STORE_*`。对象存储失败不生成可发布批次；上传成功后数据库写入失败会尝试删除该次孤立对象，删除失败日志记录对象键供管理员核对。S3与PostgreSQL不是分布式事务；生产源文件保留、备份与孤立对象清理由部署 #20 运维策略负责，不自动删除已发布源文件。
+
+例外：如果已开始 COMMIT 而提交响应丢失，结果可能已经落库，此时**保留源文件而不删除**，日志记录对象键供核对。用户先查批次历史确认是否已有批次，再决定是否重新上传。只有明确发生在 COMMIT 之前的失败才尝试即时清理孤立源文件。
+
+隔离验收可使用 `compose.browser.yaml` 加 `compose.import-browser.yaml`，项目名 `dga-issue12-browser`、`DGA_BROWSER_PORT=18095`；它使用临时测试数据和独立MinIO，**不可与现有验收 override 混用**。`tests.seed_import_browser` 只用于隔离假数据，不用于用户验收库。浏览器输入fixture由 `python -m tests.make_import_fixture <frontend/tests/fixtures/asset-import.xlsx>` 生成。后端行为测试使用 `dga-issue12` 的 `test-db`，不使用18093数据。
+
 ## 交付顺序
 
 #2 工程基础 → #3 登录/权限/审计身份 → #4 资产搜索/采样上下文 → #5 收样条码 → #6 检测录入 → #7 整体定稿 → #8 条码报告。随后按依赖补全 #9–#19，#20 完成部署和恢复验收。服务工单、ASTM 编号、正式阈值和 PDF 品牌细节不在本票范围。
