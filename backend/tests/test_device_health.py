@@ -159,6 +159,9 @@ def test_health_http_auth_and_mutation_csrf(workbench_context,database_url):
         result=client.post('/api/condition-analysis/rules',json=payload,headers={'X-CSRF-Token':session.csrf_token,'Origin':'http://localhost:8080'})
         assert result.status_code==201
         assert result.headers['cache-control']=='no-store'
+        precise=payload|{'threshold':'999999999999.123456'}
+        saved=client.post('/api/condition-analysis/rules',json=precise,headers={'X-CSRF-Token':session.csrf_token,'Origin':'http://localhost:8080'})
+        assert saved.json()['threshold']=='999999999999.123456'
 
 
 def test_priority_and_current_effective_period_not_sampling_period(workbench_context):

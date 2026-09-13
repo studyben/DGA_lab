@@ -1,0 +1,22 @@
+.health-panel,.health-card { min-width:0; padding:20px; border:1px solid #dce4ee; border-radius:12px; background:white; margin:16px 0; }
+.health-panel h3,.health-card h2 { margin:0; }
+.health-help { font-size:13px; color:#68788d; line-height:1.65; }
+.health-status { font-size:22px; font-weight:700; margin:14px 0; }
+.health-abnormal { color:#bb2536; }
+.health-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+.health-source { border-top:1px solid #e3e9f0; padding:16px 0; overflow-wrap:anywhere; }
+.health-panel button,.health-card button { font:inherit; padding:10px 16px; border:1px solid #ccd7e5; border-radius:7px; background:#fff; color:#a74800; cursor:pointer; }
+.health-panel button:disabled,.health-card button:disabled { opacity:.5; cursor:default; }
+.health-card a,.health-panel a { color:#a74800; text-decoration:underline; }
+.health-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-top:20px; }
+fieldset.health-form { border:0; padding:0; min-width:0; }
+.health-form label { display:grid; gap:7px; min-width:0; font-size:14px; }
+.health-card input,.health-card select,.health-card textarea { width:100%; min-width:0; box-sizing:border-box; font:inherit; padding:11px; border:1px solid #ccd7e5; border-radius:7px; background:white; }
+.health-form .health-wide { grid-column:1/-1; }
+.health-table-scroll { overflow-x:auto; }
+.health-card table { width:100%; border-collapse:collapse; font-size:14px; }
+.health-card td,.health-card th { text-align:left; padding:12px; border-bottom:1px solid #e5ebf3; vertical-align:top; }
+.health-card td { overflow-wrap:anywhere; }
+.health-card td button { margin:3px; white-space:nowrap; }
+.health-card [role=alert],.health-panel [role=alert] { color:#b32636; }
+@media(max-width:900px) { .health-form { grid-template-columns:minmax(0,1fr); } }

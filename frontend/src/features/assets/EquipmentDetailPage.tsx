@@ -4,6 +4,7 @@ import { DataTable, useQuery, useRead } from './assetUi';
 import { machineNames, lifecycleNames as statuses } from './assetPresentation';
 import { EquipmentDetails, equipmentLayouts, fieldValue, unknownLayout } from './equipmentLayouts';
 import { LifecyclePanel } from './LifecyclePanel';
+import { HealthPanel } from '../condition-analysis/HealthPanel';
 
 type Detail = { equipment: EquipmentDetails; path: EquipmentDetails[]; children: EquipmentDetails[];
   health_status: 'UNASSESSED'; location: { kind: string; label: string }; site: { id: string; site_name: string; customer_name: string; location_text: string | null } | null };
@@ -50,7 +51,8 @@ export function EquipmentDetailPage({ assetId }: { assetId: string }) {
   return <div className="asset-dashboard"><a href={returnTo}>返回现场详情</a>
     <nav aria-label="设备路径" className="equipment-path"><a href={siteHref}>{data.site?.site_name ?? data.location.label}</a>{data.path.map(node => <span key={node.id}> / <a href={childHref(node)} aria-current={node.id === assetId ? 'page' : undefined}>{node.display_name}</a></span>)}</nav>
     <section className="site-facts" aria-label="设备属性"><h2>{data.equipment.display_name} <small>{layout.title}</small></h2>
-      <dl><div><dt>健康状态</dt><dd>未评估</dd></div><div><dt>设备状态</dt><dd>{statuses[data.equipment.lifecycle_status] ?? data.equipment.lifecycle_status}</dd></div>{layout.fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{fieldValue(data.equipment, field)}</dd></div>)}<div><dt>客户</dt><dd>{data.site?.customer_name ?? '不适用'}</dd></div><div><dt>当前位置</dt><dd>{data.location.label}</dd></div><div><dt>现场位置</dt><dd>{data.site?.location_text ?? '不适用'}</dd></div></dl>
+      {can('analysis.read')&&<HealthPanel assetId={assetId}/>}
+      <dl><div><dt>设备状态</dt><dd>{statuses[data.equipment.lifecycle_status] ?? data.equipment.lifecycle_status}</dd></div>{layout.fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{fieldValue(data.equipment, field)}</dd></div>)}<div><dt>客户</dt><dd>{data.site?.customer_name ?? '不适用'}</dd></div><div><dt>当前位置</dt><dd>{data.location.label}</dd></div><div><dt>现场位置</dt><dd>{data.site?.location_text ?? '不适用'}</dd></div></dl>
     </section>
     <form className="dashboard-filters" onSubmit={e => { e.preventDefault(); const form = new FormData(e.currentTarget); update({ child_search: String(form.get('search') ?? ''), child_type: String(form.get('type') ?? ''), page: '1' }); }}>
       <label>子设备名称或序列号筛选<input name="search" defaultValue={query.child_search ?? ''} maxLength={160} /></label><label>子设备类型筛选<select name="type" defaultValue={query.child_type ?? ''}><option value="">全部</option>{Object.entries(machineNames).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label><button>筛选子设备</button>
