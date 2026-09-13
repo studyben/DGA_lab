@@ -329,17 +329,21 @@ class SampleRegistry:
             raise LaboratoryError('pending_identity_has_asset')
 
 
-def http_router(registry: SampleRegistry, workbench, actor_dependency: Callable, mutation_actor_dependency: Callable):
+def http_router(registry: SampleRegistry, workbench, reports, actor_dependency: Callable, mutation_actor_dependency: Callable):
     """Compose the laboratory-owned HTTP adapter."""
     from .http import laboratory_router
 
-    return laboratory_router(registry, workbench, actor_dependency, mutation_actor_dependency)
+    return laboratory_router(registry, workbench, reports, actor_dependency, mutation_actor_dependency)
 
 
 # Result-entry contracts are re-exported here so callers cross one laboratory seam.
 from .workbench import (  # noqa: E402
     BreakdownVoltageResultInput,
     DgaResultInput,
+    FinalizationAssessment,
+    FinalizationEvent,
+    FinalizationEventType,
+    FinalizationWarningSource,
     LaboratoryWorkbench,
     MethodConfiguration,
     MethodField,
@@ -355,3 +359,14 @@ from .workbench import (  # noqa: E402
     UpdateSampleBasics,
     WorkbenchSample,
 )
+
+from .reports import (  # noqa: E402
+    LaboratoryReports,
+    ReportFile,
+    ReportState,
+    ReportStatus,
+    StaleReportClaim,
+)
+
+from .operations import LaboratoryOperations  # noqa: E402
+from .operations_http import operations_router  # noqa: E402

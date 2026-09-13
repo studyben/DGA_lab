@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 
 import { useAuth } from '../../Auth';
+import { SampleOperationsPanel } from './SampleOperationsPanel';
 
 type TestType = 'DGA' | 'MOISTURE' | 'BREAKDOWN_VOLTAGE';
 type Qualifier = 'EQ' | 'ND' | 'LT' | 'GT';
@@ -31,6 +32,7 @@ type TestRecord = {
   notes: string | null;
   result: Record<string, Measurement>;
   attachments: { id: string; filename: string; content_type: string; byte_size: number }[];
+  selected_for_report: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -47,8 +49,16 @@ type Workbench = {
     containers: { container_number: string; ordinal: number }[];
   };
   testing_status: 'OPEN' | 'FINALIZED';
+  testing_finalized_by: string | null;
+  testing_finalized_at: string | null;
   methods: Method[];
   tests: TestRecord[];
+  finalization_assessment: {
+    ready: boolean;
+    blocking_codes: string[];
+    missing_test_types: TestType[];
+    warning_codes: string[];
+  };
 };
 
 const TYPE_LABEL: Record<TestType, string> = {
@@ -78,7 +88,9 @@ async function attachmentPayload(file: File | null) {
 }
 
 export function WorkbenchPage() {
-  const { session } = useAuth();
+  const { session, can } = useAuth();
+  const returnTo = new URLSearchParams(location.search).get('return_to') ?? '';
+  const ledgerReturn = /^\/lab\/(samples|identity)(\?|$)/.test(returnTo) ? returnTo : '/lab/samples';
   const [barcode, setBarcode] = useState(() => (new URLSearchParams(location.search).get('barcode') ?? '').slice(0, 160));
   const [data, setData] = useState<Workbench | null>(null);
   const [error, setError] = useState('');
@@ -99,6 +111,11 @@ export function WorkbenchPage() {
       ?? null,
     [data, editing, methodId, testType],
   );
+  const testTypeCounts = useMemo(() => {
+    const counts = { DGA: 0, MOISTURE: 0, BREAKDOWN_VOLTAGE: 0 };
+    data?.tests.forEach(record => { counts[record.test_type] += 1; });
+    return counts;
+  }, [data]);
 
   async function load(value = barcode) {
     setError(''); setBusy(true);
@@ -199,6 +216,60 @@ export function WorkbenchPage() {
     } catch (failure) { setError(failure instanceof Error ? failure.message : '无法删除检测记录。'); setBusy(false); }
   }
 
+  async function selectReportResult(record: TestRecord) {
+    if (!data) return;
+    setError(''); setBusy(true);
+    try {
+      const response = await fetch(
+        `/api/laboratory/samples/${encodeURIComponent(data.sample.barcode_value)}/report-result`,
+        { method: 'PUT', credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(10000),
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': session?.csrf_token ?? '' },
+          body: JSON.stringify({ test_id: record.id }) },
+      );
+      if (!response.ok) throw new Error('无法选择报告结果。');
+      setData(await response.json() as Workbench);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : '无法选择报告结果。'); }
+    finally { setBusy(false); }
+  }
+
+  async function finalizeTesting() {
+    if (!data) return;
+    const warnings = data.finalization_assessment.warning_codes;
+    if (warnings.length > 0 && !window.confirm(
+      `存在 ${warnings.length} 项检测警告。确认已核对并继续整体定稿吗？`,
+    )) return;
+    setError(''); setBusy(true);
+    try {
+      const response = await fetch(
+        `/api/laboratory/samples/${encodeURIComponent(data.sample.barcode_value)}/finalization`,
+        { method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(10000),
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': session?.csrf_token ?? '' },
+          body: JSON.stringify({ acknowledged_warning_codes: warnings }) },
+      );
+      if (!response.ok) throw new Error('无法完成整体检测定稿，请检查待办项。');
+      setData(await response.json() as Workbench); setShowForm(false); setEditing(null);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : '无法完成整体检测定稿。'); }
+    finally { setBusy(false); }
+  }
+
+  async function withdrawFinalization() {
+    if (!data) return;
+    const reason = window.prompt('请输入撤回定稿原因');
+    if (!reason?.trim()) return;
+    setError(''); setBusy(true);
+    try {
+      const response = await fetch(
+        `/api/laboratory/samples/${encodeURIComponent(data.sample.barcode_value)}/finalization-withdrawals`,
+        { method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(10000),
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': session?.csrf_token ?? '' },
+          body: JSON.stringify({ reason }) },
+      );
+      if (!response.ok) throw new Error('无法撤回定稿。');
+      setData(await response.json() as Workbench);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : '无法撤回定稿。'); }
+    finally { setBusy(false); }
+  }
+
   async function saveBasics(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!data) return;
@@ -222,6 +293,7 @@ export function WorkbenchPage() {
   }
 
   return <div className="workbench-layout">
+    <a href={ledgerReturn}>返回油样台账</a>
     <section className="lookup-panel" aria-labelledby="workbench-scan-title">
       <div className="section-heading"><div><span className="step">01 / 扫码</span><h2 id="workbench-scan-title">进入油样检测</h2></div></div>
       <form className="asset-search-form" onSubmit={event => { event.preventDefault(); void load(); }}>
@@ -232,6 +304,7 @@ export function WorkbenchPage() {
     </section>
 
     {data && <>
+      <SampleOperationsPanel key={data.sample.barcode_value} barcode={data.sample.barcode_value} />
       <section className="workbench-summary">
         <div><span className="step">02 / 油样</span><h2>{data.sample.sample_number}</h2></div>
         <span className={`status-pill ${data.testing_status === 'OPEN' ? 'open' : ''}`}>{data.testing_status === 'OPEN' ? '检测中' : '已定稿'}</span>
@@ -255,17 +328,37 @@ export function WorkbenchPage() {
 
       <section className="test-records" aria-labelledby="test-records-title">
         <div className="section-heading"><div><span className="step">04 / 检测</span><h2 id="test-records-title">检测记录</h2></div>
-          {data.testing_status === 'OPEN' && <div className="test-actions">{(Object.keys(TYPE_LABEL) as TestType[]).map(type => <button key={type} type="button" disabled={!data.methods.some(method => method.test_type === type && method.is_active)} onClick={() => beginCreate(type)}>新增{TYPE_LABEL[type]}</button>)}</div>}
+          {data.testing_status === 'OPEN' && can('laboratory.write') && <div className="test-actions">{(Object.keys(TYPE_LABEL) as TestType[]).map(type => <button key={type} type="button" disabled={!data.methods.some(method => method.test_type === type && method.is_active)} onClick={() => beginCreate(type)}>新增{TYPE_LABEL[type]}</button>)}</div>}
         </div>
         {data.tests.length === 0 ? <p className="no-results">尚无检测记录。</p> : <div className="test-list">{data.tests.map((record, index) => <article className="test-card" aria-label={`${TYPE_LABEL[record.test_type]} 检测 #${index + 1}`} key={record.id}>
           <div><span className="test-type">{TYPE_LABEL[record.test_type]}</span><strong>{TYPE_LABEL[record.test_type]} 检测 #{index + 1}</strong><p>{new Date(record.measured_at).toLocaleString('zh-CN')} · {record.instrument_name || '未填写仪器'}</p></div>
           <div className="measurement-preview">{Object.entries(resultMeasurements(record)).slice(0, 3).map(([code, item]) => <span key={code}>{code.toUpperCase()} {item.qualifier === 'EQ' ? '' : `${item.qualifier} `}{item.value ?? ''}</span>)}</div>
-          {data.testing_status === 'OPEN' && <div className="record-actions"><button type="button" onClick={() => beginEdit(record)}>修改</button><button type="button" className="danger-action" onClick={() => void remove(record)}>删除</button></div>}
+          <div className="record-actions">
+            {record.selected_for_report && <span className="report-result-badge">报告结果</span>}
+            {data.testing_status === 'OPEN' && can('laboratory.write') && testTypeCounts[record.test_type] > 1 && !record.selected_for_report && <button type="button" onClick={() => void selectReportResult(record)}>设为报告结果</button>}
+            {data.testing_status === 'OPEN' && can('laboratory.write') && <><button type="button" onClick={() => beginEdit(record)}>修改</button><button type="button" className="danger-action" onClick={() => void remove(record)}>删除</button></>}
+          </div>
         </article>)}</div>}
       </section>
 
-      {showForm && method && data.testing_status === 'OPEN' && <section className="test-editor" aria-labelledby="test-editor-title">
-        <div className="section-heading"><div><span className="step">05 / 录入</span><h2 id="test-editor-title">{editing ? `修改${TYPE_LABEL[testType]}` : `新增${TYPE_LABEL[testType]}`}</h2></div><button type="button" className="quiet-action" onClick={() => setShowForm(false)}>取消</button></div>
+      <section className="finalization-panel" aria-labelledby="finalization-title">
+        <div><span className="step">05 / 整体定稿</span><h2 id="finalization-title">整体检测定稿</h2></div>
+        {data.testing_status === 'OPEN' ? <>
+          {data.finalization_assessment.blocking_codes.includes('sample_identity_not_confirmed') && <p className="finalization-blocker">油样身份尚未关联正式资产。</p>}
+          {data.finalization_assessment.blocking_codes.includes('no_active_tests') && <p className="finalization-blocker">至少需要一条检测记录。</p>}
+          {data.finalization_assessment.missing_test_types.map(type => <p className="finalization-blocker" key={type}>{TYPE_LABEL[type]} 有多份检测，请选择报告结果</p>)}
+          {data.finalization_assessment.warning_codes.length > 0 && <div className="finalization-warnings" role="status"><strong>检测警告（定稿前请核对）</strong><ul>{data.finalization_assessment.warning_codes.map(code => <li key={code}>{code}</li>)}</ul></div>}
+          {data.finalization_assessment.ready && <p className="finalization-ready">基础信息、检测数据和报告结果已具备定稿条件。</p>}
+          {can('laboratory.finalize') && <button className="primary-action" type="button" disabled={busy || !data.finalization_assessment.ready} onClick={() => void finalizeTesting()}>整体检测定稿</button>}
+        </> : <>
+          <p className="finalization-ready">检测已整体定稿，基础信息、检测记录和报告结果为只读。</p>
+          {data.testing_finalized_at && <p className="finalization-meta">定稿时间：{new Date(data.testing_finalized_at).toLocaleString('zh-CN')}</p>}
+          {can('laboratory.finalize') && <button className="danger-action" type="button" disabled={busy} onClick={() => void withdrawFinalization()}>撤回定稿</button>}
+        </>}
+      </section>
+
+      {showForm && method && data.testing_status === 'OPEN' && can('laboratory.write') && <section className="test-editor" aria-labelledby="test-editor-title">
+        <div className="section-heading"><div><span className="step">06 / 录入</span><h2 id="test-editor-title">{editing ? `修改${TYPE_LABEL[testType]}` : `新增${TYPE_LABEL[testType]}`}</h2></div><button type="button" className="quiet-action" onClick={() => setShowForm(false)}>取消</button></div>
         <p className="method-note">{method.display_name} · {method.standard_reference ?? 'ASTM 方法编号待配置'}</p>
         <form className="test-form" onSubmit={saveTest}>
           <label>检测方法<select value={method.id} disabled={Boolean(editing)} onChange={event => setMethodId(event.target.value)}>{data.methods.filter(item => item.test_type === testType && (item.is_active || item.id === editing?.method.id)).map(item => <option value={item.id} key={item.id}>{item.display_name} · {item.version_label}</option>)}</select></label>

@@ -31,7 +31,7 @@ def test_older_migration_is_unavailable_then_recovers_without_app_restart(databa
     config = Config('alembic.ini')
     with TestClient(create_app(Settings(database_url=database_url))) as client:
         # Exercise an outdated schema without destroying immutable business history.
-        command.downgrade(config, '-1')
+        command.downgrade(config, '0013_asset_import')
         try:
             assert client.get('/api/health').status_code == 503
         finally:

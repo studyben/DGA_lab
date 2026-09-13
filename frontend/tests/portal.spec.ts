@@ -29,7 +29,7 @@ test("SUNGROW 品牌在两个工作区加载且可返回首页", async ({ page }
 
 test('正式门户连接真实后端并显示就绪状态', async ({ page }) => {
   await page.goto('/lab');
-  await expect(page.getByRole('status')).toContainText('服务连接正常');
+  await expect(page.getByRole('status', { name: '服务连接状态' })).toContainText('服务连接正常');
 });
 
 test("顶部切换工作区，侧栏跟随工作区且支持刷新与返回", async ({ page }) => {
@@ -74,10 +74,10 @@ test("服务不可用有明确提示，重试可恢复", async ({ page }) => {
     }),
   );
   await page.goto("/lab");
-  await expect(page.getByRole("status")).toContainText("服务暂不可用");
+  await expect(page.getByRole("status", { name: '服务连接状态' })).toContainText("服务暂不可用");
   unavailable = false;
   await page.getByRole("button", { name: "重试连接" }).click();
-  await expect(page.getByRole("status")).toContainText("服务连接正常");
+  await expect(page.getByRole("status", { name: '服务连接状态' })).toContainText("服务连接正常");
 });
 
 test("无效地址可返回已知工作区，键盘可跳过导航", async ({ page }) => {

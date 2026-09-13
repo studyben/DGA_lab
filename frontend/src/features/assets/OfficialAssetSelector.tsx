@@ -69,6 +69,8 @@ export function OfficialAssetSelector({
   const currentSampledAt = useRef(sampledAt);
   currentSampledAt.current = sampledAt;
 
+  useEffect(() => () => { requestVersion.current += 1; }, []);
+
   useEffect(() => {
     requestVersion.current += 1;
     setMatches([]);

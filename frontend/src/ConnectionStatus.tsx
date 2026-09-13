@@ -38,7 +38,7 @@ export function ConnectionStatus() {
 
   return (
     <div className="connection">
-      <span role="status">
+      <span role="status" aria-label="服务连接状态">
         {state === "checking"
           ? "正在连接服务…"
           : state === "ready"
