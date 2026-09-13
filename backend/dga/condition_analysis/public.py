@@ -12,6 +12,8 @@ from .statistics import calculate, metric
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import ActorContext, require_permission
 from .rules import HealthRules, HealthRuleInput, HealthError
+from .health import DeviceHealth
+from .health_http import health_router
 
 MODULE = ModuleDescriptor(code='condition_analysis', label='状态分析')
 

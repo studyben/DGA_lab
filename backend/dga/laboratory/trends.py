@@ -95,11 +95,17 @@ class FinalizedMeasurement:
     equipment_serial: str
     instrument_name: str | None
     warnings: tuple[str, ...]
+    asset_id: UUID | None = None
 
 
 class FinalizedResultReader(Protocol):
     def finalized_measurements(self, actor: ActorContext, asset_id: UUID,
                                start: datetime | None, end: datetime | None) -> tuple[FinalizedMeasurement, ...]: ...
+
+
+class HealthResultReader(Protocol):
+    def finalized_measurements_for_assets(self, actor: ActorContext, asset_ids: tuple[UUID, ...],
+        start: datetime | None = None, end: datetime | None = None) -> tuple[FinalizedMeasurement, ...]: ...
 
 
 class LaboratoryTrendSource:
@@ -108,16 +114,22 @@ class LaboratoryTrendSource:
 
     def finalized_measurements(self, actor: ActorContext, asset_id: UUID,
                                start: datetime | None = None, end: datetime | None = None) -> tuple[FinalizedMeasurement, ...]:
+        return self.finalized_measurements_for_assets(actor,(asset_id,),start,end)
+
+    def finalized_measurements_for_assets(self, actor: ActorContext, asset_ids: tuple[UUID, ...],
+                               start: datetime | None = None, end: datetime | None = None) -> tuple[FinalizedMeasurement, ...]:
         require_permission(actor, 'analysis.read')
+        if not asset_ids:
+            return ()
         with self._engine.connect() as connection:
-            rows = connection.execute(text('''SELECT s.id,r.report_snapshot FROM oil_samples s
+            rows = connection.execute(text('''SELECT s.id,s.formal_asset_id,r.report_snapshot FROM oil_samples s
                 JOIN laboratory_reports r ON r.oil_sample_id=s.id
                     AND r.finalization_token=s.testing_finalization_token
-                WHERE s.formal_asset_id=:asset AND s.identity_status='ASSOCIATED'
+                WHERE s.formal_asset_id=ANY(CAST(:assets AS uuid[])) AND s.identity_status='ASSOCIATED'
                     AND s.testing_status='FINALIZED'
                     AND (CAST(:start AS timestamptz) IS NULL OR s.sampled_at>=:start)
                     AND (CAST(:end AS timestamptz) IS NULL OR s.sampled_at<:end)
-                ORDER BY s.sampled_at,s.id'''), {'asset': asset_id, 'start': start, 'end': end}).mappings().all()
+                ORDER BY s.sampled_at,s.id'''), {'assets': list(asset_ids), 'start': start, 'end': end}).mappings().all()
         points = []
         try:
             for row in rows:
@@ -133,7 +145,7 @@ class LaboratoryTrendSource:
                             result.measured_at.astimezone(timezone.utc), result.test_type, code, method.method_version_id,
                             method.display_name, method.version_label, field.unit_code, method.configuration is not None,
                             reading.qualifier, reading.value, sample.site_name, sample.equipment_serial,
-                            result.instrument_name, tuple(snapshot.acknowledged_warning_codes)))
+                            result.instrument_name, tuple(snapshot.acknowledged_warning_codes),row['formal_asset_id']))
         except (KeyError, ValueError, TypeError, ArithmeticError) as error:
             raise LaboratoryError('trend_snapshot_unavailable', 503) from error
         return tuple(points)
