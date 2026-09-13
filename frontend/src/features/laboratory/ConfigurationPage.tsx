@@ -101,7 +101,13 @@ function MethodEditor({catalog,submit}:{catalog:Catalog;submit:Submit}) {
   const [draft,setDraft]=useState<MethodDraft>(()=>blankMethod('DGA'));
   function field(index:number, change:Partial<FieldConfig>) { setDraft(d=>({...d,fields:d.fields.map((f,i)=>i===index?{...f,...change}:f)})); }
   async function save(e:FormEvent) {e.preventDefault(); await submit('configuration/methods',draft);}
-  return <><h2>新增方法版本</h2><p>修改配置请复制为新版本。留空代表待配置，不表示零。</p>
+  return <><h2>新增方法版本</h2>
+    <section aria-label="方法版本使用说明">
+      <p>方法版本是一套保存好的检测配置。录入检测时选择它，系统会按这套配置显示结果名称和单位，校验小数位数、录入范围及允许的结果限定符，并提供检出限、定量限和 QA/QC 检查要求。它不负责操控仪器，也不是报告版本。</p>
+      <p>日常检测可重复使用已有方法版本，不必每次新建。只有检测规则调整时，才需要复制为新版本；旧检测保留原来使用的配置，已定稿报告不会随新版本改变。</p>
+      <p>版本标识用于区分同一种检测的不同配置，例如“微水-v1”，同一检测类型下不能重复，与 ASTM 方法编号无关。不再使用的方法版本请在上方列表中“停用”：新检测不能选用，历史记录仍保留；目前不提供删除功能。</p>
+    </section>
+    <p>修改配置请复制为新版本。可选配置留空代表待配置，不表示零；方法名称和方法版本标识为必填项。</p>
     <label>复制已有方法<select defaultValue="" onChange={e=>{const m=catalog.methods.find(m=>m.id===e.target.value);if(m)setDraft(m.configuration?{...m.configuration,version_label:''}:{...blankMethod(m.test_type),display_name:m.display_name});}}><option value="">选择作为起点的方法</option>{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.display_name} · {m.version_label}</option>)}</select></label>
     <form className="config-form" onSubmit={save}>
       <label>检测类型<select aria-label="检测类型" value={draft.test_type} onChange={e=>setDraft(blankMethod(e.target.value as TestType))}>{Object.entries(TYPE_LABEL).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
