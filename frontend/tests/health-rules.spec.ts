@@ -44,6 +44,11 @@ test('规则草稿批准后评估设备，停用后未评估并保留来源', as
   await expect(panel).toContainText(barcode);
   await expect(panel).toContainText('TEST-UNIT');
   await expect(panel.getByRole('link',{name:'条码报告'})).toHaveAttribute('href',`/lab/reports?barcode=${barcode}`);
+  await page.goto('/assets/equipment/30000000-0000-0000-0000-000000000001');
+  await expect(panel).toContainText('子设备汇总：警示');
+  await panel.getByText('查看评估来源',{exact:true}).click();
+  await expect(panel).toContainText('TX-CURRENT-2002');
+  await expect(panel).toContainText(barcode);
   for(const width of [1920,1280]){
     await page.setViewportSize({width,height:1080});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();

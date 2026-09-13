@@ -9,7 +9,7 @@ from sqlalchemy import text
 from dga.shared.auth.public import require_permission
 from dga.assets.public import HealthAssetReader
 from dga.laboratory.public import HealthResultReader
-from .rules import HealthRules, HealthError, lock_rules, encode
+from .rules import HealthRules, HealthError, encode
 
 SEVERITY = {'UNASSESSED': 0, 'NORMAL': 1, 'ATTENTION': 2, 'WARNING': 3, 'CRITICAL': 4}
 COMPARE = {'GT': gt, 'GE': ge, 'LT': lt, 'LE': le}
@@ -52,7 +52,11 @@ class DeviceHealth:
         tree=self._assets.health_assets(actor,asset_id,now)
         ids=tuple(a.id for a in tree if a.asset_type=='TRANSFORMER')
         points=tuple(p for p in self._laboratory.finalized_measurements_for_assets(actor,ids) if p.sampled_at<=now)
-        return tree,points
+        with self._engine.connect() as c:
+            policies=tuple(dict(r) for r in c.execute(text("""SELECT * FROM health_rule_versions
+                WHERE state='ACTIVE' AND effective_from<=:now AND (effective_to IS NULL OR :now<effective_to)
+                ORDER BY id"""),{'now':now}).mappings())
+        return tree,points,policies
 
     def _stable_source(self,actor,asset_id,now):
         for _ in range(3):
@@ -67,12 +71,10 @@ class DeviceHealth:
         now = self._clock()
         if now.tzinfo is None or now.utcoffset() is None:
             raise HealthError('timezone_required')
+        # Owner reads finish before borrowing the persistence connection. Rules are
+        # part of double-read validation, avoiding nested checkout / lock starvation.
+        tree,points,policies=self._stable_source(actor,asset_id,now)
         with self._engine.begin() as c:
-            lock_rules(c)
-            policies = [dict(r) for r in c.execute(text("""SELECT * FROM health_rule_versions
-                WHERE state='ACTIVE' AND effective_from<=:now AND (effective_to IS NULL OR :now<effective_to)
-                ORDER BY id"""), {'now':now}).mappings()]
-            tree,points=self._stable_source(actor,asset_id,now)
             ids = tuple(a.id for a in tree if a.asset_type=='TRANSFORMER')
             latest = {}
             for point in points:

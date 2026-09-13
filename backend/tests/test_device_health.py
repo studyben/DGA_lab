@@ -92,6 +92,22 @@ def test_continuously_changing_results_fail_explicitly(workbench_context):
     assert source.calls==6
 
 
+def test_public_health_and_activation_work_with_single_connection_pool(workbench_context,database_url):
+    from sqlalchemy import create_engine
+    from dga.condition_analysis.public import HealthRules
+    from dga.laboratory.public import LaboratoryConfiguration
+    engine, _, actor,sample=workbench_context
+    method=configured_method(engine,actor)
+    limited=create_engine(database_url,pool_size=1,max_overflow=0,pool_timeout=.2)
+    try:
+        service=HealthRules(limited,LaboratoryConfiguration(limited),AssetDirectory(limited),clock=lambda:NOW)
+        rule=service.create(actor,command(method))
+        service.activate(actor,rule['id'],0,'test')
+        assert DeviceHealth(limited,AssetDirectory(limited),LaboratoryTrendSource(limited),service,clock=lambda:NOW).query(actor,sample.formal_asset_id)['status']=='UNASSESSED'
+    finally:
+        limited.dispose()
+
+
 @pytest.mark.parametrize('qualifier,value', [('ND',None),('LT','1'),('GT','100')])
 def test_latest_qualified_result_never_falls_back(workbench_context, qualifier, value):
     engine, _, actor, sample = workbench_context
@@ -139,6 +155,28 @@ def test_changing_sources_are_retried_without_stale_evidence(workbench_context):
             return points
     result=DeviceHealth(engine,AssetDirectory(engine),ConcurrentSource(),rules(engine),clock=lambda:NOW).query(actor,sample.formal_asset_id)
     assert result['status']=='WARNING'
+
+
+def test_rule_retirement_during_source_read_is_retried(workbench_context):
+    engine, _, actor, sample=workbench_context
+    method=configured_method(engine,actor)
+    service=rules(engine)
+    draft=service.create(actor,command(method))
+    service.activate(actor,draft['id'],0,'test')
+    add_point(engine,actor,sample.formal_asset_id,method['id'],0,'20')
+    class RetiringSource:
+        calls=0
+        def finalized_measurements_for_assets(self,*args,**kwargs):
+            points=LaboratoryTrendSource(engine).finalized_measurements_for_assets(*args,**kwargs)
+            self.calls+=1
+            if self.calls==2:
+                service.retire(actor,draft['id'],1,'test concurrent retirement')
+            return points
+    source=RetiringSource()
+    result=DeviceHealth(engine,AssetDirectory(engine),source,service,clock=lambda:NOW).query(actor,sample.formal_asset_id)
+    assert result['status']=='UNASSESSED'
+    assert result['sources'][0]['reason']=='no_applicable_rule'
+    assert source.calls==4
 
 
 def test_health_http_auth_and_mutation_csrf(workbench_context,database_url):

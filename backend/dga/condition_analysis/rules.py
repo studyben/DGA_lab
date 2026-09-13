@@ -148,6 +148,9 @@ class HealthRules:
         validate_revision(expected_revision)
         if not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 1000:
             raise HealthError('rule_reason_required')
+        if target == 'ACTIVE':
+            candidate = self.get(actor, identifier)
+            self._validate(actor, HealthRuleInput(**{k: candidate[k] for k in HealthRuleInput.model_fields}))
         with self._engine.begin() as c:
             lock_rules(c)
             before = self._get(c, identifier)
@@ -156,7 +159,6 @@ class HealthRules:
             if before['state'] != ('DRAFT' if target == 'ACTIVE' else 'ACTIVE'):
                 raise HealthError('invalid_rule_transition', 409)
             if target == 'ACTIVE':
-                self._validate(actor, HealthRuleInput(**{k: before[k] for k in HealthRuleInput.model_fields}))
                 conflict = c.execute(text('''SELECT id FROM health_rule_versions
                     WHERE state='ACTIVE' AND priority=:priority AND test_type=:test_type
                     AND analyte=:analyte AND method_version_id=:method_version_id AND unit=:unit
