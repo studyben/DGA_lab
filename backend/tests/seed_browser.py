@@ -32,6 +32,9 @@ def main():
         service.provision_user(admin.actor, 'field-user', '现场工程师', initial, ['field_engineer'])
         field = service.login('field-user', initial)
         service.change_password(field.token, initial, changed)
+        service.provision_user(admin.actor, 'operations-reader', '实验室只读测试', initial, ['management_readonly'])
+        reader = service.login('operations-reader', initial)
+        service.change_password(reader.token, initial, changed)
         with engine.begin() as connection:
             connection.execute(text("""
                 INSERT INTO customers(id,customer_name) VALUES

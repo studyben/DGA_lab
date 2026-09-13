@@ -15,3 +15,7 @@
 .lab-operations .lab-column-choice { display: inline-flex; align-items: center; margin: 12px; }
 .lab-operations [role=alert] { color: #a52a25; }.lab-operations li { margin: 12px 0; }
 @media(max-width:1100px) { .lab-filters,.lab-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+.lab-operations .lab-container,.lab-operations .lab-identity-selection { border:1px solid #d8e0eb; border-radius:12px; padding:20px; margin:16px 0; min-width:0; }
+.lab-operations .lab-reason { flex:1; min-width:250px; }
+.lab-operations textarea { width:100%; padding:12px; border:1px solid #ccd7e4; border-radius:8px; font:inherit; resize:vertical; }
+.lab-operations pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:320px; overflow:auto; background:#f5f7fa; padding:12px; }

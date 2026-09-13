@@ -260,6 +260,15 @@ class AssetDirectory:
                         break
             return tuple(matches)
 
+    def lock_sampling_context(self, actor: ActorContext, connection: Connection) -> None:
+        """Stabilize the asset graph until the caller's transaction completes.
+
+        Call before locking a sample; the asset module owns the graph lock protocol.
+        This does not commit, close, or mutate caller business records.
+        """
+        require_permission(actor, 'assets.read')
+        connection.execute(text('SELECT pg_advisory_xact_lock(110011)'))
+
     def resolve_sampling_context(
         self,
         actor: ActorContext,

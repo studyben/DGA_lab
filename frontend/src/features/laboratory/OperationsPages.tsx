@@ -53,7 +53,7 @@ const textFilters = [['barcode', '条码筛选'], ['sample_number', '样品号']
 const columns = [['sample_number','油样编号'], ['site_name','现场'], ['equipment_serial','设备序列号'], ['state','状态'], ['created_at','创建时间'], ['received_at','收样时间'], ['sampled_at','采样时间'], ['test_types','检测类型']] as const;
 const testLabels: Record<string,string> = { DGA: 'DGA', MOISTURE: '微水', BREAKDOWN_VOLTAGE: '击穿电压' };
 
-export function SampleLedgerPage({ pending = false }: { pending?: boolean }) {
+export function SampleLedgerPage({ pending = false, onChoose, onInspect }: { pending?: boolean; onChoose?: (barcode: string) => void; onInspect?: (barcode: string) => void }) {
   const { can } = useAuth();
   const initial = () => Object.fromEntries(new URLSearchParams(location.search));
   const [query, setQuery] = useState<Record<string,string>>(initial);
@@ -81,7 +81,7 @@ export function SampleLedgerPage({ pending = false }: { pending?: boolean }) {
     <details><summary>显示列</summary>{columns.map(([key,label])=><label className="lab-column-choice" key={key}><input type="checkbox" checked={!hidden.includes(key)} onChange={()=>setHidden(hidden.includes(key)?hidden.filter(k=>k!==key):[...hidden,key])}/>{label}</label>)}</details>
     {read.error && <p role="alert">{read.error}<button onClick={read.retry}>重试</button></p>}
     {!read.data && !read.error && <p role="status">正在读取油样…</p>}
-    {read.data && <><p>共 {read.data.total} 条</p><div className="lab-table-scroll"><table aria-label="油样台账"><thead><tr><th>条码</th>{columns.filter(([key])=>!hidden.includes(key)).map(([key,label])=><th key={key}>{label}</th>)}</tr></thead><tbody>{read.data.samples.map(s=><tr key={s.id}><td>{can('laboratory.write')?<a href={link(s)}>{s.barcode_value}</a>:s.barcode_value}</td>{columns.filter(([key])=>!hidden.includes(key)).map(([key])=><td key={key}>{key==='state'?sampleStates[s.state]:key==='test_types'?s.test_types.map(t=>testLabels[t]).join('、'):key.endsWith('_at')?chicagoTime(String(s[key])):s[key]}</td>)}</tr>)}</tbody></table></div>
+    {read.data && <><p>共 {read.data.total} 条</p><div className="lab-table-scroll"><table aria-label="油样台账"><thead><tr><th>条码</th>{columns.filter(([key])=>!hidden.includes(key)).map(([key,label])=><th key={key}>{label}</th>)}{onInspect && <th>运营信息</th>}</tr></thead><tbody>{read.data.samples.map(s=><tr key={s.id}><td>{can('laboratory.write')?(onChoose ? <button onClick={()=>onChoose(s.barcode_value)} aria-label={'核实 '+s.barcode_value}>{s.barcode_value}</button> : <a href={link(s)}>{s.barcode_value}</a>):s.barcode_value}</td>{columns.filter(([key])=>!hidden.includes(key)).map(([key])=><td key={key}>{key==='state'?sampleStates[s.state]:key==='test_types'?s.test_types.map(t=>testLabels[t]).join('、'):key.endsWith('_at')?chicagoTime(String(s[key])):s[key]}</td>)}{onInspect && <td><button onClick={()=>onInspect(s.barcode_value)} aria-label={'查看运营信息 '+s.barcode_value}>查看运营信息</button></td>}</tr>)}</tbody></table></div>
       {!read.data.total && <p role="status">没有符合条件的油样，可重置筛选。</p>}
       <div className="lab-toolbar"><label>每页条数<select value={query.page_size??'20'} onChange={e=>apply({...query,page_size:e.target.value,page:'1'})}>{[10,20,50,100].map(n=><option key={n}>{n}</option>)}</select></label><span>第 {read.data.page} 页</span><button disabled={read.data.page<=1} onClick={()=>apply({...query,page:String(read.data!.page-1)})}>上一页</button><button disabled={read.data.page*read.data.page_size>=read.data.total} onClick={()=>apply({...query,page:String(read.data!.page+1)})}>下一页</button></div></>}
   </section></div>;

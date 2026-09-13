@@ -194,3 +194,29 @@ def test_confirmation_works_with_one_connection_without_nested_checkout(context,
         assert result['sample'].identity_status==SampleIdentityStatus.ASSOCIATED
     finally:
         engine.dispose()
+
+
+def test_sample_operation_http_csrf_strict_input_and_audited_success(context,database_url):
+    from fastapi.testclient import TestClient
+    from dga.main import create_app
+    from dga.shared.config import Settings
+    from tests.test_sample_reception import CHANGED_PASSWORD
+    _,_,_,sample,_=context
+    path='/api/laboratory/operations/'+sample.barcode_value
+    with TestClient(create_app(Settings(database_url=database_url,cookie_secure=False,auth_allowed_origins='http://testserver'))) as client:
+        assert client.get(path).status_code==401
+        session=client.post('/api/auth/login',headers={'Origin':'http://testserver'},json={'username':'reception-admin','password':CHANGED_PASSWORD}).json()
+        headers={'Origin':'http://testserver','X-CSRF-Token':session['csrf_token']}
+        response=client.get(path)
+        assert response.status_code==200 and response.headers['cache-control']=='no-store'
+        body={'formal_asset_id':str(TRANSFORMER_ID),'expected_revision':0,'reason':'confirmed'}
+        assert client.post(path+'/identity',json=body).status_code==403
+        for bad in ({**body,'expected_revision':True},{**body,'extra':'ignored'},{**body,'reason':'   '}):
+            assert client.post(path+'/identity',headers=headers,json=bad).status_code==422
+        confirmed=client.post(path+'/identity',headers=headers,json=body)
+        assert confirmed.status_code==200
+        assert confirmed.json()['sample']['identity_status']=='ASSOCIATED'
+        container=path+'/containers/'+str(sample.containers[0].id)
+        change={'target':'IN_USE','expected_revision':0,'reason':'started'}
+        assert client.post(container,headers=headers,json=change).status_code==200
+        assert client.post(container,headers=headers,json=change).status_code==409

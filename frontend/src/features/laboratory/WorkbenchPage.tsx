@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 
 import { useAuth } from '../../Auth';
+import { SampleOperationsPanel } from './SampleOperationsPanel';
 
 type TestType = 'DGA' | 'MOISTURE' | 'BREAKDOWN_VOLTAGE';
 type Qualifier = 'EQ' | 'ND' | 'LT' | 'GT';
@@ -303,6 +304,7 @@ export function WorkbenchPage() {
     </section>
 
     {data && <>
+      <SampleOperationsPanel key={data.sample.barcode_value} barcode={data.sample.barcode_value} />
       <section className="workbench-summary">
         <div><span className="step">02 / 油样</span><h2>{data.sample.sample_number}</h2></div>
         <span className={`status-pill ${data.testing_status === 'OPEN' ? 'open' : ''}`}>{data.testing_status === 'OPEN' ? '检测中' : '已定稿'}</span>

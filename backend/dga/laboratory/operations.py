@@ -148,7 +148,7 @@ class LaboratoryOperations:
         from .public import _snapshot
         with self._engine.begin() as c:
             # Match asset lifecycle lock ordering, then serialize against finalize/basic edits.
-            c.execute(text('SELECT pg_advisory_xact_lock(110011)'))
+            self._assets.lock_sampling_context(actor,c)
             row = self._sample(c,barcode,lock=True)
             if row['operations_revision'] != command.expected_revision:
                 raise LaboratoryError('stale_sample',409)
