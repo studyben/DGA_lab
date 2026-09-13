@@ -10,6 +10,8 @@ from dga.laboratory.public import LaboratoryError
 from dga.laboratory.public import InstrumentInput, CalibrationInput
 from dga.shared.auth.public import IdentityError
 from pydantic import ValidationError
+from dga.laboratory.public import PackageInput
+from dga.laboratory.public import QaExecution
 from tests.test_laboratory_workbench import workbench_context, make_workbench, RecordingObjectStore, _moisture
 
 
@@ -82,3 +84,75 @@ def test_configuration_rejects_untrusted_or_incoherent_input(workbench_context):
     config.create_method(actor, method_input())
     with pytest.raises(LaboratoryError, match='configuration_duplicate'):
         config.create_method(actor, method_input())
+
+
+def test_qa_warning_acknowledgement_and_report_evidence(workbench_context):
+    from dga.laboratory.public import LaboratoryReports
+    from dga.shared.auth.public import AuditTrail
+    engine, _, actor, sample = workbench_context
+    config = LaboratoryConfiguration(engine)
+    method = config.create_method(actor, method_input(qa_checks=[dict(code='BLANK', label='空白检查')]))
+    store = RecordingObjectStore()
+    bench = make_workbench(engine, store)
+    record = bench.add_test(actor, sample.barcode_value, _moisture(method['id'], value='8.50'))
+    warnings = bench.load(actor, sample.barcode_value).finalization_assessment.warning_codes
+    assert len(warnings) == 1
+    with pytest.raises(LaboratoryError, match='warnings_not_acknowledged'):
+        bench.finalize(actor, sample.barcode_value)
+    bench.finalize(actor, sample.barcode_value, warnings)
+    claim = LaboratoryReports(engine, AuditTrail(), store).claim_next_report('test', lease_seconds=30)
+    assert claim.snapshot['quality_evidence'][0]['test_id'] == str(record.id)
+    assert claim.snapshot['quality_evidence'][0]['qa_results'][0]['status'] == 'NOT_RUN'
+    assert claim.snapshot['selected_results'][0]['method']['fields'][0]['display_decimal_places'] == 2
+    assert claim.snapshot['acknowledged_warning_codes'] == list(warnings)
+
+
+def test_package_required_types_are_checked_at_finalization(workbench_context):
+    engine, _, actor, sample = workbench_context
+    config = LaboratoryConfiguration(engine)
+    method = config.create_method(actor, method_input())
+    package = config.create_package(actor, PackageInput(code='ANNUAL-1', name='Annual', items=[
+        dict(test_type='MOISTURE', method_version_id=method['id'], required=True)]))
+    config.apply_package(actor, sample.barcode_value, package['id'])
+    with pytest.raises(LaboratoryError, match='package_plan_conflict'):
+        config.apply_package(actor, sample.barcode_value, package['id'])
+    bench = make_workbench(engine, RecordingObjectStore())
+    assert bench.load(actor, sample.barcode_value).finalization_assessment.required_missing_test_types == ('MOISTURE',)
+    with pytest.raises(LaboratoryError, match='required_tests_missing'):
+        bench.finalize(actor, sample.barcode_value)
+    bench.add_test(actor, sample.barcode_value, _moisture(method['id'], value='8.50'))
+    assert bench.finalize(actor, sample.barcode_value).testing_status == 'FINALIZED'
+    with pytest.raises(LaboratoryError, match='sample_finalized'):
+        config.apply_package(actor, sample.barcode_value, package['id'])
+
+
+def test_changed_qa_evidence_requires_fresh_acknowledgement(workbench_context):
+    engine, _, actor, sample = workbench_context
+    config = LaboratoryConfiguration(engine)
+    method = config.create_method(actor, method_input(qa_checks=[dict(code='BLANK', label='空白检查')]))
+    bench = make_workbench(engine, RecordingObjectStore())
+    submission = replace(_moisture(method['id'], value='8.50'), qa_results=(QaExecution(code='BLANK', status='FAIL', note='retry'),))
+    record = bench.add_test(actor, sample.barcode_value, submission)
+    before = bench.load(actor, sample.barcode_value).finalization_assessment.warning_codes
+    bench.update_test(actor, sample.barcode_value, record.id, submission)
+    with pytest.raises(LaboratoryError, match='warnings_not_acknowledged'):
+        bench.finalize(actor, sample.barcode_value, before)
+    bench.update_test(actor, sample.barcode_value, record.id, replace(submission, qa_results=(QaExecution(code='BLANK', status='PASS'),)))
+    assert bench.load(actor, sample.barcode_value).finalization_assessment.warning_codes == ()
+
+
+@pytest.mark.parametrize('expires,outcome,status', [
+    (date(2026,8,3),'VALID','VALID'), (date(2026,8,2),'VALID','EXPIRED'),
+    (None,'VALID','UNKNOWN'), (date(2027,1,1),'FAILED','FAILED'),
+])
+def test_calibration_boundaries(workbench_context, expires, outcome, status):
+    engine, _, actor, sample = workbench_context
+    config = LaboratoryConfiguration(engine)
+    method = config.create_method(actor, method_input())
+    instrument = config.create_instrument(actor, InstrumentInput(code='I1', name='Test instrument'))
+    config.add_calibration(actor, instrument['id'], CalibrationInput(calibrated_on=date(2026,1,1), expires_on=expires, outcome=outcome))
+    config.add_calibration(actor, instrument['id'], CalibrationInput(calibrated_on=date(2026,9,1), expires_on=date(2027,9,1), outcome='VALID'))
+    bench = make_workbench(engine, RecordingObjectStore())
+    record = bench.add_test(actor, sample.barcode_value, replace(_moisture(method['id'], value='8.50'), instrument_id=instrument['id']))
+    assert record.quality_snapshot['calibration']['status'] == status
+    assert len(bench.load(actor, sample.barcode_value).finalization_assessment.warning_codes) == (0 if status=='VALID' else 1)

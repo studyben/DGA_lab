@@ -1,6 +1,7 @@
 """Small Chinese MVP report renderer driven only by snapshot v1."""
 
 from datetime import datetime
+from decimal import Decimal
 from io import BytesIO
 
 from reportlab.lib import colors
@@ -106,17 +107,29 @@ def render_report_pdf(snapshot: dict, generated_at: datetime) -> bytes:
         method = result['method']
         line('检测类型', _test_type(result['test_type']))
         line('检测方法', method.get('display_name'))
+        if method.get('version_label'):
+            line('方法版本', method['version_label'])
         if method.get('method_code'):
             line('标准参考', method['method_code'])
         line('检测时间', result.get('measured_at'))
         if result.get('instrument_name'):
             line('仪器', result['instrument_name'])
+        quality = result.get('quality_snapshot')
+        if quality:
+            calibration = quality['calibration']
+            line('检测时校准状态', {'VALID': '有效', 'EXPIRED': '已过期', 'FAILED': '失败',
+                'UNKNOWN': '未知', 'NOT_LINKED': '未关联仪器，未评估'}.get(calibration['status'], calibration['status']))
+            if calibration.get('expires_on'):
+                line('校准有效截止日', calibration['expires_on'])
+            if calibration.get('certificate'):
+                line('校准证书', calibration['certificate'])
         fields = {item['code'].lower(): item for item in method.get('fields', [])}
         for code, measurement in result.get('result', {}).items():
-            field = fields.get(code.lower(), {})
+            field_code = result['test_type'].lower() if code == 'result' else code.lower()
+            field = fields.get(field_code, {})
             label = field.get('display_name') or code.upper()
             unit = field.get('unit_code')
-            line(label, _measurement(measurement, unit))
+            line(label, _measurement(measurement, unit, field.get('display_decimal_places')))
 
     section('报告信息')
     finalization = snapshot['finalization']
@@ -125,7 +138,9 @@ def render_report_pdf(snapshot: dict, generated_at: datetime) -> bytes:
     line('报告生成时间', generated_at.isoformat())
     warnings = snapshot.get('acknowledged_warning_codes') or []
     if warnings:
-        line('已确认警示', '、'.join(warnings))
+        messages = {w['code']: w['message'] for q in snapshot.get('quality_evidence', []) for w in q.get('warnings', [])}
+        for warning in warnings:
+            line('已确认警示', messages.get(warning, warning))
 
     document.setFillColor(colors.HexColor('#77848D'))
     document.setFont(_FONT, 7)
@@ -164,9 +179,11 @@ def _test_type(value: str) -> str:
     }.get(value, value)
 
 
-def _measurement(value: dict, unit: str | None) -> str:
+def _measurement(value: dict, unit: str | None, decimal_places: int | None = None) -> str:
     qualifier = value.get('qualifier')
     number = value.get('value')
+    if number is not None and decimal_places is not None:
+        number = f'{Decimal(str(number)):.{decimal_places}f}'
     if qualifier == 'ND':
         rendered = '未检出'
     else:

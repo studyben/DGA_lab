@@ -30,6 +30,8 @@ class _Action(StrEnum):
     INSTRUMENT_STATUS = 'LAB_INSTRUMENT_STATUS_CHANGED'
     CALIBRATION_ADDED = 'LAB_CALIBRATION_ADDED'
     TYPE_UPDATED = 'LAB_TYPE_UPDATED'
+    PACKAGE_CREATED = 'LAB_PACKAGE_CREATED'
+    PACKAGE_APPLIED = 'LAB_PACKAGE_APPLIED'
 
 
 class ConfigInput(BaseModel):
@@ -62,6 +64,12 @@ class QaCheck(ConfigInput):
     code: str = Field(pattern=r'^[A-Z][A-Z0-9_]{0,29}$')
     label: str = Field(min_length=1, max_length=100)
     instructions: str = Field(default='', max_length=500)
+
+
+class QaExecution(ConfigInput):
+    code: str = Field(pattern=r'^[A-Z][A-Z0-9_]{0,29}$')
+    status: Literal['PASS', 'FAIL', 'NOT_RUN']
+    note: str = Field(default='', max_length=500)
 
 
 class MethodVersionInput(ConfigInput):
@@ -105,6 +113,24 @@ class CalibrationInput(ConfigInput):
 class TypeSettingsInput(ConfigInput):
     display_name: str = Field(min_length=1, max_length=100)
     is_active: bool = Field(strict=True)
+
+
+class PackageItem(ConfigInput):
+    test_type: TypeCode
+    method_version_id: UUID
+    required: bool = Field(default=True, strict=True)
+
+
+class PackageInput(ConfigInput):
+    code: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=120)
+    items: tuple[PackageItem, ...] = Field(min_length=1, max_length=3)
+
+    @model_validator(mode='after')
+    def coherent(self):
+        if len({i.test_type for i in self.items}) != len(self.items):
+            raise ValueError('duplicate_package_type')
+        return self
 
 
 def instrument_evidence(connection, instrument_id, measured_at, *, existing_id=None):
@@ -151,6 +177,7 @@ class LaboratoryConfiguration:
                 'methods': [dict(r) for r in c.execute(text('SELECT * FROM test_method_versions ORDER BY test_type,version_label')).mappings()],
                 'instruments': [dict(r) for r in c.execute(text('SELECT * FROM laboratory_instruments ORDER BY code')).mappings()],
                 'calibrations': [dict(r) for r in c.execute(text('SELECT * FROM laboratory_calibrations ORDER BY calibrated_on DESC,id')).mappings()],
+                'packages': [dict(r) for r in c.execute(text('SELECT * FROM laboratory_packages ORDER BY code')).mappings()],
             }
 
     def create_method(self, actor, command: MethodVersionInput):
@@ -242,3 +269,57 @@ class LaboratoryConfiguration:
         except IntegrityError as exc:
             raise LaboratoryError('configuration_duplicate', 409) from exc
         return next(i for i in self.catalog(actor)['calibrations'] if i['id'] == identifier)
+
+    @staticmethod
+    def _validate_package_methods(c, items):
+        for item in items:
+            if not c.execute(text('''SELECT m.id FROM test_method_versions m
+                JOIN laboratory_type_settings t ON t.code=m.test_type
+                WHERE m.id=:id AND m.test_type=:type AND m.is_active AND t.is_active'''),
+                dict(id=item.method_version_id, type=item.test_type)).first():
+                raise LaboratoryError('package_method_unavailable')
+
+    def create_package(self, actor, command: PackageInput):
+        require_permission(actor, 'laboratory.configure')
+        command = PackageInput.model_validate(command)
+        identifier = uuid4()
+        try:
+            with self._engine.begin() as c:
+                lock_configuration(c)
+                self._validate_package_methods(c, command.items)
+                c.execute(text('''INSERT INTO laboratory_packages(id,code,name,items,created_by)
+                    VALUES (:id,:code,:name,CAST(:items AS jsonb),:actor)'''),
+                    dict(id=identifier, code=command.code, name=command.name,
+                         items=json.dumps([i.model_dump(mode='json') for i in command.items]), actor=actor.user_id))
+                self._audit.append(c, actor, _Action.PACKAGE_CREATED, entity_id=identifier)
+        except IntegrityError as exc:
+            raise LaboratoryError('configuration_duplicate', 409) from exc
+        return next(p for p in self.catalog(actor)['packages'] if p['id'] == identifier)
+
+    def apply_package(self, actor, barcode, package_id, expected_package_id=None):
+        require_permission(actor, 'laboratory.write')
+        with self._engine.begin() as c:
+            lock_configuration(c)
+            sample = c.execute(text('SELECT id,testing_status,package_snapshot FROM oil_samples WHERE barcode_value=:barcode FOR UPDATE'),
+                               {'barcode': barcode.strip().upper()}).mappings().first()
+            if not sample:
+                raise LaboratoryError('sample_not_found', 404)
+            if sample['testing_status'] != 'OPEN':
+                raise LaboratoryError('sample_finalized', 409)
+            previous_id = (sample['package_snapshot'] or {}).get('id')
+            if previous_id != (str(expected_package_id) if expected_package_id else None):
+                raise LaboratoryError('package_plan_conflict', 409)
+            package = c.execute(text('SELECT * FROM laboratory_packages WHERE id=:id'), {'id': package_id}).mappings().first()
+            if not package:
+                raise LaboratoryError('package_not_found', 404)
+            self._validate_package_methods(c, [PackageItem.model_validate(i) for i in package['items']])
+            snapshot = dict(id=str(package['id']), code=package['code'], name=package['name'], items=package['items'])
+            c.execute(text('UPDATE oil_samples SET package_snapshot=CAST(:snapshot AS jsonb) WHERE id=:id'),
+                      dict(id=sample['id'], snapshot=json.dumps(snapshot)))
+            c.execute(text('''INSERT INTO laboratory_operation_events
+                (id,oil_sample_id,action_code,reason,actor_id,occurred_at,before_value,after_value)
+                VALUES (:id,:sample,'PACKAGE_APPLIED','应用检测包',:actor,:now,CAST(:before AS jsonb),CAST(:after AS jsonb))'''),
+                dict(id=uuid4(), sample=sample['id'], actor=actor.user_id, now=datetime.now(timezone.utc),
+                     before=json.dumps(sample['package_snapshot'] or {}), after=json.dumps(snapshot)))
+            self._audit.append(c, actor, _Action.PACKAGE_APPLIED, entity_id=sample['id'])
+        return snapshot

@@ -17,6 +17,7 @@ from dga.shared.auth.public import ActorContext, AuditTrail, require_permission
 from dga.shared.files import FileStore, ObjectStorageError
 
 from .errors import LaboratoryError
+from .configuration import MethodVersionInput
 
 
 class ReportState(StrEnum):
@@ -441,6 +442,9 @@ class LaboratoryReports:
             {'sample': sample_id},
         ).mappings().all()
         results = [self._selected_result(connection, row) for row in selected]
+        quality = [r['quality_snapshot'] for r in connection.execute(text('''SELECT quality_snapshot
+            FROM laboratory_tests WHERE oil_sample_id=:sample AND record_status='ACTIVE'
+            AND quality_snapshot IS NOT NULL ORDER BY created_at,id'''), {'sample': sample_id}).mappings()]
         return {
             'schema_version': 1,
             'sample': {
@@ -454,6 +458,7 @@ class LaboratoryReports:
                 'asset_snapshot': self._json_value(sample['asset_snapshot']),
             },
             'selected_results': results,
+            'quality_evidence': quality,
             'acknowledged_warning_codes': sorted(set(warning_codes)),
             'finalization': {
                 'token': str(finalization_token),
@@ -478,6 +483,10 @@ class LaboratoryReports:
                 {'method': row['method_version_id']},
             ).mappings()
         ]
+        configuration = connection.execute(text('SELECT configuration FROM test_method_versions WHERE id=:id'),
+                                           {'id': row['method_version_id']}).scalar_one()
+        if configuration is not None:
+            fields = [f.model_dump(mode='json') for f in MethodVersionInput.model_validate(configuration).fields]
         if row['test_type'] == 'DGA':
             values = connection.execute(
                 text('SELECT * FROM dga_test_results WHERE test_id=:test'),
@@ -515,9 +524,11 @@ class LaboratoryReports:
                 'display_name': row['method_display_name'],
                 'version_label': row['version_label'],
                 'fields': fields,
+                'configuration': configuration,
             },
             'measured_at': self._json_value(row['measured_at']),
             'instrument_name': row['instrument_name'],
+            'quality_snapshot': row['quality_snapshot'],
             'notes': row['notes'],
             'result': result,
         }
