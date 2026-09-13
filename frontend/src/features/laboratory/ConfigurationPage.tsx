@@ -90,6 +90,11 @@ export function ConfigurationPage() {
         <div className="config-table-wrap"><table aria-label="校准记录"><thead><tr><th>仪器</th><th>校准日期</th><th>有效截止日</th><th>记录结论</th><th>证书</th></tr></thead><tbody>{catalog.calibrations.filter(c=>matches(c.certificate,catalog.instruments.find(i=>i.id===c.instrument_id)?.code ?? '')).map(c=><tr key={c.id}><td>{catalog.instruments.find(i=>i.id===c.instrument_id)?.code}</td><td>{c.calibrated_on}</td><td>{c.expires_on ?? '未知'}</td><td>{STATUS_LABEL[c.outcome]}</td><td>{c.certificate ?? '—'}</td></tr>)}</tbody></table></div>
       </>}
       {tab==='packages' && <>
+        <section className="lab-help-text" aria-label="检测包使用说明">
+          <p>检测包是一套可重复使用的检测项目组合，例如为油样安排 DGA 和微水检测。它指定包含哪些检测类型、各自的默认方法，以及哪些项目必须完成。</p>
+          <p>在检测工作台应用检测包后，新建检测会优先使用包内的默认方法；必做项目缺少检测记录时不能整体定稿。应用检测包不会自动生成检测数据，也不会删除已有检测；不使用检测包时仍可逐项新增检测。</p>
+          <p>请先在“方法版本”中添加并启用所需方法，再在下方保存检测包。检测包保存后不覆盖，调整组合请使用新编号；已应用到油样的项目配置会保留。</p>
+        </section>
         <div className="config-table-wrap"><table aria-label="检测包列表"><thead><tr><th>编号</th><th>名称</th><th>项目</th></tr></thead><tbody>{catalog.packages.filter(p=>matches(p.code,p.name)).map(p=><tr key={p.id}><td>{p.code}</td><td>{p.name}</td><td>{p.items.map(i=>`${TYPE_LABEL[i.test_type]}${i.required?'（必做）':'（可选）'}`).join('、')}</td></tr>)}</tbody></table></div>
         <fieldset disabled={busy || uncertain || !can('laboratory.configure')}><PackageEditor catalog={catalog} submit={submit} /></fieldset>
       </>}
@@ -102,7 +107,7 @@ function MethodEditor({catalog,submit}:{catalog:Catalog;submit:Submit}) {
   function field(index:number, change:Partial<FieldConfig>) { setDraft(d=>({...d,fields:d.fields.map((f,i)=>i===index?{...f,...change}:f)})); }
   async function save(e:FormEvent) {e.preventDefault(); await submit('configuration/methods',draft);}
   return <><h2>新增方法版本</h2>
-    <section aria-label="方法版本使用说明">
+    <section className="lab-help-text" aria-label="方法版本使用说明">
       <p>方法版本是一套保存好的检测配置。录入检测时选择它，系统会按这套配置显示结果名称和单位，校验小数位数、录入范围及允许的结果限定符，并提供检出限、定量限和 QA/QC 检查要求。它不负责操控仪器，也不是报告版本。</p>
       <p>日常检测可重复使用已有方法版本，不必每次新建。只有检测规则调整时，才需要复制为新版本；旧检测保留原来使用的配置，已定稿报告不会随新版本改变。</p>
       <p>版本标识用于区分同一种检测的不同配置，例如“微水-v1”，同一检测类型下不能重复，与 ASTM 方法编号无关。不再使用的方法版本请在上方列表中“停用”：新检测不能选用，历史记录仍保留；目前不提供删除功能。</p>

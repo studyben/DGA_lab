@@ -360,8 +360,9 @@ export function WorkbenchPage() {
       <section className="test-records" aria-labelledby="test-records-title">
         <div className="lab-config">
           <p>检测包：{data.package_snapshot?.name ?? '未应用检测包'}</p>
+          <p id="workbench-package-help" className="lab-help-text">检测包用于一次安排多个检测项目及默认方法，不会自动生成检测数据。需要新增检测包？请到侧栏“实验室配置” → “检测包”保存；没有配置权限时请联系实验室管理员。配置完成后，先保存当前输入，再重新加载油样以更新选项。</p>
           {data.package_snapshot && <p>{data.package_snapshot.items.map(i=>`${TYPE_LABEL[i.test_type]}${i.required?'（必做）':'（可选）'}`).join('、')}</p>}
-          {data.testing_status==='OPEN' && catalog && can('laboratory.write') && <div className="config-row"><label>应用检测包<select aria-label="应用检测包" value={packageId} onChange={e=>setPackageId(e.target.value)}><option value="">请选择检测包</option>{catalog.packages.map(p=><option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}</select></label>
+          {data.testing_status==='OPEN' && catalog && can('laboratory.write') && <div className="config-row"><label>应用检测包<select aria-label="应用检测包" aria-describedby="workbench-package-help" value={packageId} onChange={e=>setPackageId(e.target.value)}><option value="">{catalog.packages.length ? '请选择检测包' : '暂无检测包，请先到实验室配置添加'}</option>{catalog.packages.map(p=><option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}</select></label>
             <button type="button" disabled={busy||!packageId||packageNeedsReload} onClick={async()=>{
               if(!window.confirm('应用此检测包将替换当前待做项目要求，不删除已有检测，是否继续？'))return;
               setBusy(true);setError('');
@@ -375,6 +376,7 @@ export function WorkbenchPage() {
         <div className="section-heading"><div><span className="step">04 / 检测</span><h2 id="test-records-title">检测记录</h2></div>
           {data.testing_status === 'OPEN' && can('laboratory.write') && <div className="test-actions">{(Object.keys(TYPE_LABEL) as TestType[]).map(type => <button key={type} type="button" disabled={!data.methods.some(method => method.test_type === type && method.is_active)} onClick={() => beginCreate(type)}>新增{TYPE_LABEL[type]}</button>)}</div>}
         </div>
+        <p className="lab-help-text">新增检测按钮不可用或找不到所需方法时，请到侧栏“实验室配置” → “方法版本”添加并启用对应方法，同时确认“检测类型”已启用；没有配置权限时请联系实验室管理员。</p>
         {data.tests.length === 0 ? <p className="no-results">尚无检测记录。</p> : <div className="test-list">{data.tests.map((record, index) => <article className="test-card" aria-label={`${TYPE_LABEL[record.test_type]} 检测 #${index + 1}`} key={record.id}>
           <div><span className="test-type">{TYPE_LABEL[record.test_type]}</span><strong>{TYPE_LABEL[record.test_type]} 检测 #{index + 1}</strong><p>{new Date(record.measured_at).toLocaleString('zh-CN')} · {record.instrument_name || '未填写仪器'}</p></div>
           <div className="measurement-preview">{Object.entries(resultMeasurements(record)).slice(0, 3).map(([code, item]) => <span key={code}>{code.toUpperCase()} {item.qualifier === 'EQ' ? '' : `${item.qualifier} `}{item.value ?? ''}</span>)}</div>
@@ -408,8 +410,9 @@ export function WorkbenchPage() {
       {showForm && method && data.testing_status === 'OPEN' && can('laboratory.write') && <section className="test-editor" aria-labelledby="test-editor-title">
         <div className="section-heading"><div><span className="step">06 / 录入</span><h2 id="test-editor-title">{editing ? `修改${TYPE_LABEL[testType]}` : `新增${TYPE_LABEL[testType]}`}</h2></div><button type="button" className="quiet-action" onClick={() => setShowForm(false)}>取消</button></div>
         <p className="method-note">{method.display_name} · {method.standard_reference ?? 'ASTM 方法编号待配置'}</p>
+        <p id="workbench-method-help" className="lab-help-text">检测方法来自“实验室配置” → “方法版本”。需要新增或调整方法时，请联系实验室管理员在该页发布新版本；先保存当前输入，再重新加载油样以更新选项。已有检测的修改表单不能更换方法版本。</p>
         <form className="test-form" onSubmit={saveTest}>
-          <label>检测方法<select value={method.id} disabled={Boolean(editing)} onChange={event => { setMethodId(event.target.value); setMeasurements({}); setQaResults({}); }}>{data.methods.filter(item => item.test_type === testType && (item.is_active || item.id === editing?.method.id)).map(item => <option value={item.id} key={item.id}>{item.display_name} · {item.version_label}</option>)}</select></label>
+          <label>检测方法<select aria-describedby="workbench-method-help" value={method.id} disabled={Boolean(editing)} onChange={event => { setMethodId(event.target.value); setMeasurements({}); setQaResults({}); }}>{data.methods.filter(item => item.test_type === testType && (item.is_active || item.id === editing?.method.id)).map(item => <option value={item.id} key={item.id}>{item.display_name} · {item.version_label}</option>)}</select></label>
           <label>检测时间<input type="datetime-local" value={measuredAt} onChange={event => setMeasuredAt(event.target.value)} required /></label>
           <label>仪器<input value={instrument} onChange={event => setInstrument(event.target.value)} maxLength={160} /></label>
           <label>关联仪器<select value={instrumentId} onChange={e=>setInstrumentId(e.target.value)}><option value="">未关联（保留手填名称，校准未评估）</option>{catalog?.instruments.filter(i=>i.status==='ACTIVE'||i.id===editing?.instrument_id).map(i=><option key={i.id} value={i.id}>{i.code} · {i.name}</option>)}</select></label>
