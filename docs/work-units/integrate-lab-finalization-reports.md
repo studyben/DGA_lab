@@ -2,7 +2,7 @@
 
 ## Goal confirmation and gate
 
-User explicitly authorized this prerequisite integration in an independent branch, preserving #9–#12 and existing workspace/acceptance data, then continuing #13. Local integration/commits are allowed; no remote push, PR merge, issue changes or deployment. Base main `62f26a4`; source `origin/codex/issue-6-test-entry` at `b16c0e4` containing PR #27/#28. Current gate: plan review.
+User explicitly authorized this prerequisite integration in an independent branch, preserving #9–#12 and existing workspace/acceptance data, then continuing #13. Local integration/commits are allowed; no remote push, PR merge, issue changes or deployment. Base main `62f26a4`; source `origin/codex/issue-6-test-entry` at `b16c0e4` containing PR #27/#28. Plan accepted8ed06ec. Slice review/fix/re-review passed; next gate aggregate deepreview after local integration commit.
 
 Main lacks the finalization/report migrations and public commands; source retains them but predates asset lifecycle/import work. This is integration of existing intent, not reimplementation. Successful outcome: both capabilities coexist behind the existing laboratory public seam, all original suites and added integration regression pass, and migration upgrade preserves populated current-main records.
 
@@ -31,3 +31,7 @@ Review: planreview then accepted plan commit; merge/resolve; run typecheck and f
 ## Reporting
 
 Record source/base hashes, per-conflict decisions, tests/results, fixed findings and remaining risks. Do not claim GitHub issues closed or main integrated until separately authorized remote publication. Integration is a local prerequisite for #13.
+
+## Slice evidence
+
+Review docs/reviews/code-review-20260912-222426.md records all seven conflict decisions and one accepted report-worker data-loss finding. Actual COMMIT-acknowledgement failure reproduced, fixed and independently re-reviewed.149 backend tests passed with2 existing deprecation warnings;19 browser tests passed; TypeScript/Vite production build and diff check passed. Fresh migration and populated0013 upgrade covered without touching real data. Uncertain report object cleanup is deliberately retained/logged for #20 reconciliation, not deleted. One isolated browser stack18096 holds disposable data. Original18093 unchanged.

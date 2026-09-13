@@ -26,6 +26,7 @@ from dga.laboratory.public import (
     MODULE as LABORATORY,
     LaboratoryError,
     LaboratoryWorkbench,
+    LaboratoryReports,
     SampleRegistry,
     access_context as laboratory_access,
     http_router as laboratory_router,
@@ -74,9 +75,12 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
 
     @app.exception_handler(LaboratoryError)
     async def laboratory_error(request, error):
+        content = {'code': error.code}
+        if error.details is not None:
+            content['details'] = error.details
         return JSONResponse(
             status_code=error.status,
-            content={'code': error.code},
+            content=content,
             headers={'Cache-Control': 'no-store'},
         )
 
@@ -96,19 +100,17 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
 
     asset_directory = AssetDirectory(engine)
     app.include_router(assets_router(asset_directory, current_actor, AssetLifecycle(engine), mutation_actor))
-    object_store = UnavailableFileStore()
-    if all((settings.object_store_endpoint, settings.object_store_bucket,
+    configured_object_store = file_store if file_store is not None else UnavailableFileStore()
+    if file_store is None and all((settings.object_store_endpoint, settings.object_store_bucket,
             settings.object_store_access_key, settings.object_store_secret_key)):
-        object_store = S3CompatibleFileStore(
+        configured_object_store = S3CompatibleFileStore(
             settings.object_store_endpoint,
             settings.object_store_bucket,
             settings.object_store_access_key.get_secret_value(),
             settings.object_store_secret_key.get_secret_value(),
             region=settings.object_store_region,
         )
-    if file_store is not None:
-        object_store = file_store
-    app.include_router(import_http_router(AssetImports(engine, object_store), current_actor, mutation_actor))
+    app.include_router(import_http_router(AssetImports(engine, configured_object_store), current_actor, mutation_actor))
 
     @app.exception_handler(ObjectStorageError)
     async def object_storage_error(request, error):
@@ -118,10 +120,15 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
             headers={'Cache-Control': 'no-store'},
         )
     sample_registry = SampleRegistry(engine, asset_directory, AuditTrail())
+    audit_trail = AuditTrail()
+    reports = LaboratoryReports(engine, audit_trail, configured_object_store)
     app.include_router(
         laboratory_router(
             sample_registry,
-            LaboratoryWorkbench(engine, sample_registry, AuditTrail(), object_store),
+            LaboratoryWorkbench(
+                engine, sample_registry, audit_trail, configured_object_store, reports
+            ),
+            reports,
             current_actor,
             mutation_actor,
         )

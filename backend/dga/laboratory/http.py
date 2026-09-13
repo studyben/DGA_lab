@@ -15,6 +15,7 @@ from .public import (
     DgaResultInput,
     LaboratoryError,
     LaboratoryWorkbench,
+    LaboratoryReports,
     MoistureResultInput,
     QualifiedMeasurement,
     RawAttachment,
@@ -88,6 +89,18 @@ class RemovalInput(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
 
+class ReportResultInput(BaseModel):
+    test_id: UUID
+
+
+class FinalizationInput(BaseModel):
+    acknowledged_warning_codes: list[str] = Field(default_factory=list, max_length=100)
+
+
+class WithdrawalInput(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
 def _submission(payload: TestInput):
     def measurement(item):
         return QualifiedMeasurement(item.qualifier, item.value)
@@ -122,6 +135,7 @@ def _attachment(payload: AttachmentInput | None):
 def laboratory_router(
     registry: SampleRegistry,
     workbench: LaboratoryWorkbench,
+    reports: LaboratoryReports,
     actor_dependency: Callable,
     mutation_actor_dependency: Callable,
 ):
@@ -151,6 +165,31 @@ def laboratory_router(
     def load_workbench(barcode_value: str, actor=Depends(actor_dependency)):
         return workbench.load(actor, barcode_value)
 
+    @router.get('/reports/by-barcode/{barcode_value}')
+    def report_status(barcode_value: str, actor=Depends(actor_dependency)):
+        return reports.get_report_by_barcode(actor, barcode_value)
+
+    @router.post('/reports/by-barcode/{barcode_value}/retry')
+    def retry_report(barcode_value: str, actor=Depends(mutation_actor_dependency)):
+        return reports.retry_report(actor, barcode_value)
+
+    @router.get('/reports/by-barcode/{barcode_value}/file')
+    def report_file(
+        barcode_value: str,
+        disposition: Literal['inline', 'attachment'] = 'inline',
+        actor=Depends(actor_dependency),
+    ):
+        current = reports.read_report_file(actor, barcode_value)
+        return Response(
+            content=current.content,
+            media_type='application/pdf',
+            headers={
+                'Content-Disposition': f'{disposition}; filename="{current.filename}"',
+                'Cache-Control': 'private, no-store',
+                'X-Content-Type-Options': 'nosniff',
+            },
+        )
+
     @router.patch('/samples/{barcode_value}')
     def update_sample(barcode_value: str, payload: SampleBasicsInput, actor=Depends(mutation_actor_dependency)):
         return workbench.update_sample(actor, barcode_value, UpdateSampleBasics(**payload.model_dump()))
@@ -167,5 +206,33 @@ def laboratory_router(
     def remove_test(barcode_value: str, test_id: UUID, payload: RemovalInput, actor=Depends(mutation_actor_dependency)):
         workbench.remove_test(actor, barcode_value, test_id, payload.reason)
         return Response(status_code=204)
+
+    @router.put('/samples/{barcode_value}/report-result')
+    def select_report_result(
+        barcode_value: str,
+        payload: ReportResultInput,
+        actor=Depends(mutation_actor_dependency),
+    ):
+        return workbench.select_report_result(actor, barcode_value, payload.test_id)
+
+    @router.post('/samples/{barcode_value}/finalization')
+    def finalize(
+        barcode_value: str,
+        payload: FinalizationInput,
+        actor=Depends(mutation_actor_dependency),
+    ):
+        return workbench.finalize(
+            actor,
+            barcode_value,
+            tuple(payload.acknowledged_warning_codes),
+        )
+
+    @router.post('/samples/{barcode_value}/finalization-withdrawals')
+    def withdraw_finalization(
+        barcode_value: str,
+        payload: WithdrawalInput,
+        actor=Depends(mutation_actor_dependency),
+    ):
+        return workbench.withdraw_finalization(actor, barcode_value, payload.reason)
 
     return router

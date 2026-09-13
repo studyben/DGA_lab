@@ -2,7 +2,7 @@
 
 中文现场资产与油样管理门户。当前交付 [Issue #2](https://github.com/studyben/DGA_lab/issues/2) 的工程基础，完整 MVP 规格见 [Issue #1](https://github.com/studyben/DGA_lab/issues/1)。
 
-这是绿地项目的初始生产工程：#2 门户导航与测试基础，#3 本地账号、权限、会话和审计，#4 正式资产搜索，#5 油样收样与共享条码，以及 #6 条码检测工作台、类型化检测结果和原始附件已经实现。整体检测定稿和报告仍由后续工单交付；其他未实施业务页明确显示待开放，不展示原型假数据。
+这是绿地项目的初始生产工程：#2 门户导航与测试基础，#3 本地账号、权限、会话和审计，#4 正式资产搜索，#5 油样收样与共享条码，#6 条码检测工作台、类型化检测结果和原始附件，#7 整体检测定稿，以及 #8 条码中文报告已经实现。其他未实施业务页明确显示待开放，不展示原型假数据。
 
 ## 启动
 
@@ -12,7 +12,7 @@
 docker compose up --build -d --wait
 ```
 
-打开 http://127.0.0.1:8080 。首次启动需要下载镜像/依赖；无需本机安装 Python、Node 或 PostgreSQL。端口占用时设置环境变量 `DGA_PORT=18080` 后执行同一命令。浏览器深链可直接访问 `/assets`、`/lab`、`/lab/workbench`；顶部提供两个工作区，状态分析归属资产侧栏。
+打开 http://127.0.0.1:8080 。首次启动需要下载镜像/依赖；无需本机安装 Python、Node 或 PostgreSQL。端口占用时设置环境变量 `DGA_PORT=18080` 后执行同一命令。浏览器深链可直接访问 `/assets`、`/lab`、`/lab/workbench`、`/lab/reports`；顶部提供两个工作区，状态分析归属资产侧栏。
 
 ```sh
 docker compose ps
@@ -51,7 +51,7 @@ USER_UUID 使用创建账号时输出的 ID。所有管理命令都校验当前�
 | field_engineer | 资产读取、状态分析读取 |
 | management_readonly | 资产、实验室、状态分析读取 |
 
-角色可叠加，权限取并集。写入/定稿等能力目前只建立授权契约，不表示对应业务已实现。前端按能力隐藏工作区或禁用子页，直接访问未授权路径有明确提示；后端模块公开入口仍独立校验，不信任前端角色声明。
+角色可叠加，权限取并集。尚未交付的能力仍可能只有授权契约，不表示对应业务已经实现。前端按能力隐藏工作区或禁用子页，直接访问未授权路径有明确提示；后端模块公开入口仍独立校验，不信任前端角色声明。
 
 ## 运行与配置
 
@@ -73,12 +73,15 @@ nginx 提供 React/TypeScript 静态构建，并将 `/api/` 转发给 FastAPI；
 - `POST /api/laboratory/samples`：以正式资产关联或明确的“身份待确认”方式登记油样；正式关联会保存采样时客户、现场、设备路径和序列号快照，一个油样可登记 1–20 个共享条码的样品容器。
 - `GET /api/laboratory/samples/by-barcode/{barcode}`：扫描或输入油样条码取回同一组收样基本信息和容器；`POST /api/laboratory/samples/{barcode}/label-prints` 在调用浏览器打印前记录审计。两个 POST 均要求同源 Origin 和当前会话 CSRF。
 - `GET /api/laboratory/workbench/{barcode}`：取回油样基础信息、容器、检测中状态、启用的方法配置和全部有效检测。`PATCH /api/laboratory/samples/{barcode}` 修正基础信息；`POST/PUT/DELETE /api/laboratory/samples/{barcode}/tests...` 新增、修改或逻辑删除 DGA、微水和击穿电压记录。重复检测是同一条码下的独立记录，不另建“复测”实体；ND 不保存数值，LT/GT 保存边界数值。正式 ASTM 方法编号、单位、精度和检出限当前明确待配置。
+- `PUT /api/laboratory/samples/{barcode}/report-result`：同类型存在多份有效检测时选择该条码报告采用的结果；只有一份时整体定稿自动选择。`POST /api/laboratory/samples/{barcode}/finalization` 执行整体检测定稿，身份待确认、没有有效检测、缺少多结果选择或未确认 QA 警示时返回结构化阻塞原因；定稿后基础信息、检测和报告结果选择均只读。
+- `POST /api/laboratory/samples/{barcode}/finalization-withdrawals`：具有 `laboratory.finalize` 权限的人员填写原因后撤回定稿并恢复编辑；条码标签仍可重打，当前报告同步失效。
+- `GET /api/laboratory/reports/by-barcode/{barcode}`：查询当前条码报告的不可用、排队、生成中、就绪或失败状态；`POST .../retry` 由具有定稿权限的人员安全重试失败任务；`GET .../file?disposition=inline|attachment` 代理返回校验过 SHA-256 的当前 PDF。未定稿不出报告，撤回后旧文件不可访问，重新定稿只替换当前报告，不显示版本历史。独立 `report-worker` 从 PostgreSQL 领取带租约的任务，将中文简版报告写入 S3 兼容对象存储。
 
 密码使用 Argon2id（19MiB、2 次、并行度 1）；只存哈希。会话为随机不透明凭据，数据库只存会话凭据 SHA-256。退出撤销当前会话，改密撤销全部旧会话并创建新会话；停用/锁定撤销旧会话，重新启用不会复活它们。每次请求读取当前状态/角色。连续 5 次错误密码后账号临时限制 15 分钟；接口不透露账号是否存在。前端每 30 秒及重新聚焦时检查会话，后端每次请求校验，因此撤销后的数据接口立即受限。
 
-审计只追加（登录成功/失败、退出、密码变更、账号/角色/状态操作，以及收样、资产关联、条码打印），通过受权共享公开查询读取。未匹配账号的失败登录 actor 为空，另保存声称的用户名；不伪造用户 ID，不记录密码/会话/CSRF。结构化非法请求在认证前返回通用错误，不回显输入。审计查询为最小 operator/application 接口，无审计管理 UI。生产还需 #20 的 TLS、反向代理级限流、监控和最小数据库权限；应用内账号节流不替代外围防滥用。
+审计只追加（登录成功/失败、退出、密码变更、账号/角色/状态操作，以及收样、资产关联、条码打印、检测变更、报告结果选择、定稿尝试与撤回），通过受权共享公开查询读取。未匹配账号的失败登录 actor 为空，另保存声称的用户名；不伪造用户 ID，不记录密码/会话/CSRF。结构化非法请求在认证前返回通用错误，不回显输入。审计查询为最小 operator/application 接口，无审计管理 UI。生产还需 #20 的 TLS、反向代理级限流、监控和最小数据库权限；应用内账号节流不替代外围防滥用。
 
-未来 Lightsail 的外部托管数据库、对象存储、worker 和备份配置由 #20 与对应业务工单提供，本地 Compose 不作为生产配置。
+未来 Lightsail 的外部托管数据库、对象存储和备份配置由 #20 提供；本地 Compose 已包含报告 worker，但不作为生产配置。
 
 ## 测试
 
@@ -90,7 +93,7 @@ docker compose -f compose.browser.yaml --profile test run --build --no-deps --rm
 
 API 测试会启动独立 `test-db` PostgreSQL，先执行与应用一致的 Alembic migration，然后从 HTTP/公开应用接口观察行为。测试 URL 限制为 test-db/dga_test/dga_test，避免误迁移应用数据。测试存储为 tmpfs，停止后不保留。当前 migration downgrade 验证按串行执行；请勿对同一 test-db 并发运行多份套件。不同开发任务可使用不同 Compose project name 隔离。
 
-浏览器套件使用独立 dga-browser Compose 项目、临时 PostgreSQL 和匹配版本的 Playwright Linux 镜像，在 18080 提供测试门户。fixture 脚本严格拒绝非 dga_browser 数据库；测试账号仅存在于此隔离环境，不在正常应用中生成。验证登录/权限、Logo、导航与服务重试，并覆盖正式资产搜索、收样条码，以及扫码后连续新增两份 DGA、修改和删除。附件的失败原子性在共享文件端口使用测试实现验证，浏览器套件不替代对象存储验收。失败重试仅在 HTTP 外部边界注入 503，其余走真实 API；不依赖 React 组件树、CSS 类名或内部表。
+浏览器套件使用独立 dga-browser Compose 项目、临时 PostgreSQL、临时 MinIO、真实报告 worker 和匹配版本的 Playwright Linux 镜像，在 18080 提供测试门户。fixture 脚本严格拒绝非 dga_browser 数据库；测试账号仅存在于此隔离环境，不在正常应用中生成。验证登录/权限、Logo、导航与服务重试，并覆盖正式资产搜索、收样条码、检测录入与整体定稿，以及未定稿不可出报告、异步生成、在线预览、下载、撤回失效和重新定稿重建当前报告。附件的失败原子性在共享文件端口使用测试实现验证；失败重试和待确认 QA 警示仅在 HTTP 外部边界注入，其余走真实 API，不依赖 React 组件树、CSS 类名或内部表。
 
 首次改密测试会改变测试账号密码。重复执行前，仅重置隔离 fixture（不能用于正常应用）：
 
@@ -118,7 +121,7 @@ docker compose -f compose.browser.yaml --profile test down
 
 ## 数据库演进
 
-首个 Alembic migration 是空业务 schema 基线；0002 增加身份与审计；0003 增加正式资产和安装关系；0004 增加油样、身份快照、共享条码和容器；0005 增加检测中状态、只读方法版本、通用检测头、三类一对一结果表及对象元数据。序列号刻意不唯一，系统资产号唯一。0005 只提供待配置的方法占位，不预置未经确认的 ASTM 参数；完整配置管理属于 #14。downgrade 仅允许隔离测试库使用，已有真实数据的环境不得执行。
+首个 Alembic migration 是空业务 schema 基线；0002 增加身份与审计；0003 增加正式资产和安装关系；0004 增加油样、身份快照、共享条码和容器；0005 增加检测中状态、只读方法版本、通用检测头、三类一对一结果表及对象元数据；0006 增加报告结果选择、整体定稿元数据和生命周期事件；0007 增加当前条码报告、不可变定稿快照及异步任务租约。序列号刻意不唯一，系统资产号唯一。0005 只提供待配置的方法占位，不预置未经确认的 ASTM 参数；完整配置管理属于 #14。0006 降级会把已定稿样品恢复为检测中并移除该版本的选择与定稿事实，以保证随后可再次升级；downgrade 仅允许隔离测试库使用，已有真实数据的环境不得执行。
 
 ```sh
 docker compose run --rm migrate alembic current

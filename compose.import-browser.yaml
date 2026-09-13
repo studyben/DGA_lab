@@ -33,3 +33,7 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+  report-worker:
+    environment:
+      OBJECT_STORE_ACCESS_KEY: dga-local
+      OBJECT_STORE_SECRET_KEY: local-object-storage-only

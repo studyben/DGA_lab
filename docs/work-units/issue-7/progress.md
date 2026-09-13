@@ -1,0 +1,32 @@
+# Issue #7 gate state
+
+- Preflight: dirty root `main` preserved; isolated worktree created at `.worktrees/issue-7-finalization`.
+- Branch: `codex/issue-7-finalization`, stacked on `origin/codex/issue-6-test-entry` at `d4528f1`.
+- Goal confirmation: user confirmed; see `goal-confirmation.md`.
+- Plan review `docs/reviews/plan-review-20260910-130045.md`: FAIL with four findings; all four incorporated.
+- Plan re-review `docs/reviews/plan-review-20260910-130209.md`: PASS.
+- Current gate: accepted-plan commit pending; no business implementation has started.
+- Accepted-plan commit: `4644fe5`.
+- S1 TDD: report-result selection implemented; 13 focused PostgreSQL tests pass; `0006` downgrade/upgrade passes.
+- S1 deep review `docs/reviews/code-review-20260910-130820.md`: one medium test-proof finding accepted; fix/re-review pending.
+- S1 re-review `docs/reviews/code-review-20260910-131046.md`: PASS; 15 focused PostgreSQL tests pass and migration downgrade/upgrade passes.
+- Current gate: accepted S1 commit pending.
+- Accepted S1 commit: `0bd3138`.
+- S2 TDD: lifecycle, withdrawal, warning acknowledgement, structured HTTP errors and concurrency implemented; 53 backend/PostgreSQL tests pass.
+- S2 deep review `docs/reviews/code-review-20260910-132007.md`: one high persisted-state invariant finding accepted; fix/re-review pending.
+- S2 re-review `docs/reviews/code-review-20260910-132228.md`: PASS; clean-database migration and 54 backend tests pass.
+- Current gate: accepted S2 commit pending.
+- Accepted S2 commit: `eec0e27`.
+- S3 TDD: report selection, readiness blockers, finalization read-only state, withdrawal and re-finalization UI implemented; frontend build and 12 Playwright tests pass.
+- S3 deep review `docs/reviews/code-review-20260910-132752.md`: one high silent-warning-acknowledgement finding accepted; fix/re-review pending.
+- S3 re-review `docs/reviews/code-review-20260910-133017.md`: PASS; TypeScript/build and all 12 Playwright tests pass.
+- Current gate: accepted S3 commit pending.
+- Accepted S3 commit: `787b169`.
+- Aggregate deep review `docs/reviews/code-review-20260910-133153.md`: two high findings accepted (implicit selection audit; finalized-data migration round trip); fix/re-review pending.
+- Aggregate findings fixed: implicit selection clears and sole-result auto-selection are audited; `0006` finalized-data downgrade/re-upgrade is covered.
+- Aggregate re-review `docs/reviews/code-review-20260910-133633.md`: PASS; 56 backend/PostgreSQL tests and 12 Playwright tests pass.
+- Accepted aggregate-review commit: `69a1fb1`.
+- Final closeout: all local gates passed.
+- Draft PR base must be `codex/issue-6-test-entry` while PR #26 remains unmerged.
+- After explicit authorization, branch pushed and stacked draft PR #27 created: https://github.com/studyben/DGA_lab/pull/27
+- No merge, Issue close, or Issue closeout comment has occurred.

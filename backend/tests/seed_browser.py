@@ -82,7 +82,8 @@ def main():
                   ('50000000-0000-0000-0000-000000000011','30000000-0000-0000-0000-000000000011',NULL,'20000000-0000-0000-0000-000000000001','2020-01-01',NULL),
                   ('50000000-0000-0000-0000-000000000012','30000000-0000-0000-0000-000000000012','30000000-0000-0000-0000-000000000011',NULL,'2020-01-01',NULL);
             """))
-        sample = SampleRegistry(engine, AssetDirectory(engine), AuditTrail()).receive(
+        registry = SampleRegistry(engine, AssetDirectory(engine), AuditTrail())
+        sample = registry.receive(
             admin.actor,
             ReceiveSample(
                 sampled_at=datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc),
@@ -103,6 +104,21 @@ def main():
         with engine.begin() as c:
             c.execute(text("""INSERT INTO formal_assets(id,system_asset_number,asset_type,serial_number,lifecycle_status,machine_type)
                 VALUES ('40000000-0000-0000-0000-000000000099','SYS-TX-099','TRANSFORMER','TX-SPARE-0099','SPARE','TRANSFORMER')"""))
+        report_sample = registry.receive(
+            admin.actor,
+            ReceiveSample(
+                sampled_at=datetime(2026, 8, 1, 14, 0, tzinfo=timezone.utc),
+                received_at=datetime(2026, 8, 2, 10, 0, tzinfo=timezone.utc),
+                site_name='ignored',
+                equipment_serial='ignored',
+                notes='条码报告浏览器验收样品',
+                container_count=1,
+                identity_status=SampleIdentityStatus.ASSOCIATED,
+                formal_asset_id='40000000-0000-0000-0000-000000000002',
+            ),
+        )
+        if report_sample.barcode_value != 'DGA-20260802-000002':
+            raise RuntimeError('Unexpected browser report sample barcode')
         service.logout(admin.token)
     finally:
         engine.dispose()
