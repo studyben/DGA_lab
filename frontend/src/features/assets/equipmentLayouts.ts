@@ -1,4 +1,5 @@
 export type EquipmentDetails = {
+  asset_type?: string;
   id: string; display_name: string; equipment_name: string | null; tag_number: string | null;
   system_asset_number: string; serial_number: string; model: string | null; material_number: string | null;
   machine_type: string | null; lifecycle_status: string; product_line: string | null;

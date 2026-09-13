@@ -38,6 +38,8 @@ P2: Eligibility uses ASSOCIATED + FINALIZED + matching non-null current report t
 
 ## Validation and completion
 
+S2 review correction: add laboratory/ReportPage.tsx to allowed files solely to consume barcode deep-link query and load the existing report read endpoint. Review found the existing page ignored query parameters; no report generation/state/permission changes. Browser source-link regression must fail before this edit and pass after.
+
 Commands: docker compose -p dga-issue15-test --profile test run --rm --build api-test pytest -q -p no:cacheprovider [target]; full suite same without target. alembic heads expected 0018_lab_packages (no new migration). Browser isolated Compose with frontend build and Playwright. Run git diff --check, architecture tests, full backend regression, frontend TypeScript/Vite build and critical browser suite. Never run fixture TRUNCATE against acceptance data.
 
 Report: changes, gate state, commands/counts, review findings and disposition, artifact paths, preserved data, next entry ready-to-open-draft-PR (stop before push per user).
