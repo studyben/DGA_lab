@@ -30,7 +30,7 @@ function stateMessage(report: ReportStatus) {
 
 export function ReportPage() {
   const { session, can } = useAuth();
-  const [barcode, setBarcode] = useState('');
+  const [barcode, setBarcode] = useState(() => (new URLSearchParams(location.search).get('barcode') ?? '').trim().toUpperCase());
   const [report, setReport] = useState<ReportStatus | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,6 +48,8 @@ export function ReportPage() {
 
   useEffect(() => {
     mounted.current = true;
+    const sourceBarcode = (new URLSearchParams(location.search).get('barcode') ?? '').trim().toUpperCase();
+    if (sourceBarcode && sourceBarcode.length <= 40) void load(sourceBarcode);
     return () => { mounted.current = false; stopPending(); };
   }, []);
 

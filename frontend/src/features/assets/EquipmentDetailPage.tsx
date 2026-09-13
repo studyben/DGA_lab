@@ -33,6 +33,7 @@ function TestHistory({ assetId }: { assetId: string }) {
 }
 
 export function EquipmentDetailPage({ assetId }: { assetId: string }) {
+  const { can } = useAuth();
   const { query, update } = useQuery();
   const { data, error, retry } = useRead<Detail>(`/api/assets/equipment/${encodeURIComponent(assetId)}`);
   if (error) return <p role="alert">{error} <button onClick={retry}>重试</button></p>;
@@ -56,6 +57,7 @@ export function EquipmentDetailPage({ assetId }: { assetId: string }) {
     </form>
     <DataTable name="子设备清单" rows={sorted.slice((page-1)*size, page*size)} total={sorted.length} columns={[{ key: 'display_name', label: '设备名称 / Tag number' }, { key: 'serial_number', label: '序列号' }, { key: 'model', label: '设备型号' }, { key: 'machine_type', label: '设备类型', render: row => machineNames[row.machine_type ?? ''] ?? '未分类设备' }]} query={{ ...query, page_size: String(size) }} update={update} href={childHref} />
     <TestHistory assetId={assetId} />
+    {data.equipment.asset_type === 'TRANSFORMER' && can('analysis.read') && <a href={`/assets/analysis/trends?asset_id=${encodeURIComponent(assetId)}&return_to=${encodeURIComponent(location.pathname + location.search)}`}>查看变压器趋势</a>}
     <LifecyclePanel assetId={assetId} />
   </div>;
 }

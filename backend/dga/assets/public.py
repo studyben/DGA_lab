@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Callable
+from typing import Callable, Protocol
 from uuid import UUID
 
 from sqlalchemy import Connection, Engine, text
@@ -92,6 +92,18 @@ def _asset(row) -> FormalAsset:
     )
 
 
+@dataclass(frozen=True)
+class TransformerIdentity:
+    id: UUID
+    system_asset_number: str
+    serial_number: str
+    model: str | None
+
+
+class TransformerReader(Protocol):
+    def transformer_identity(self, actor: ActorContext, asset_id: UUID) -> TransformerIdentity: ...
+
+
 class AssetDirectory:
     """Read-only official asset queries used by the portal and laboratory module."""
 
@@ -112,6 +124,18 @@ class AssetDirectory:
         except ValidationError as error:
             raise AssetQueryError('invalid_dashboard_query') from error
         return dashboard(self._engine, query, self._clock())
+
+    def transformer_identity(self, actor: ActorContext, asset_id: UUID) -> TransformerIdentity:
+        """Stable physical identity for analysis, independent of current installation."""
+        require_permission(actor, 'analysis.read')
+        with self._engine.connect() as connection:
+            row = connection.execute(text('''SELECT id,system_asset_number,serial_number,model,asset_type
+                FROM formal_assets WHERE id=:id'''), {'id': asset_id}).mappings().first()
+        if row is None:
+            raise AssetQueryError('asset_not_found', 404)
+        if row['asset_type'] != 'TRANSFORMER':
+            raise AssetQueryError('transformer_required')
+        return TransformerIdentity(row['id'], row['system_asset_number'], row['serial_number'], row['model'])
 
     def site_detail(self, actor: ActorContext, site_id: UUID, **filters) -> dict:
         require_permission(actor, 'assets.read')
@@ -137,7 +161,7 @@ class AssetDirectory:
                 if error.status == 404:
                     raise
                 raise AssetQueryError('asset_context_unavailable', 409) from error
-            columns = ('id,system_asset_number,serial_number,model,material_number,'
+            columns = ('id,system_asset_number,serial_number,model,material_number,asset_type,'
                        'machine_type,lifecycle_status,power_mw,energy_mwh,product_line,'
                        'equipment_name,tag_number,commissioning_date,battery_manufacturer,'
                        "COALESCE(NULLIF(tag_number,''),NULLIF(equipment_name,''),system_asset_number) AS display_name")

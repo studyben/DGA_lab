@@ -1,4 +1,5 @@
 import React from "react";
+import { TrendsPage } from './features/condition-analysis/TrendsPage';
 import { ConfigurationPage } from './features/laboratory/ConfigurationPage';
 import { createRoot } from "react-dom/client";
 import { assetPages } from "./features/assets/pages";
@@ -110,9 +111,9 @@ function App() {
                     "这个地址暂时无法访问，请从工作区导航选择页面。"}
                 </p>
               </div>
-              {!(equipmentId || siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
+              {!(path === '/assets/analysis/trends' || equipmentId || siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
             </div>
-            {equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <LaboratoryLedgerPage /> : path === '/lab/identity' ? <IdentityPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/configuration' ? <ConfigurationPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
+            {path === '/assets/analysis/trends' ? <TrendsPage /> : equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <LaboratoryLedgerPage /> : path === '/lab/identity' ? <IdentityPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/configuration' ? <ConfigurationPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>
