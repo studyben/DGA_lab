@@ -60,7 +60,7 @@ test('只读用户可看指标台账但不能确认身份或变更容器', async
   await page.getByRole('button', { name: '查看运营信息 DGA-20260802-000001', exact: true }).click();
   await expect(page.getByRole('region', { name: '油样运营信息' })).toBeVisible();
   await page.getByText('操作历史（0 条）', { exact: true }).click();
-  await expect(page.getByText('尚无身份确认或容器变更记录。', { exact: true })).toBeVisible();
+  await expect(page.getByText('尚无油样操作记录。', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '保存容器状态', exact: true })).toHaveCount(0);
   const path = '/api/laboratory/operations/DGA-20260802-000001';
   const state = await (await page.request.get(path)).json();

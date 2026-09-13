@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from tests.laboratory_seed import restore_placeholder_methods
 from uuid import UUID
 
 from sqlalchemy import create_engine, text
@@ -32,6 +33,7 @@ def reception_context(database_url):
                 "auth_sessions,user_roles,audit_logs,users CASCADE"
             )
         )
+        restore_placeholder_methods(connection)
         values = {
             "customer": CUSTOMER_ID,
             "site": SITE_ID,

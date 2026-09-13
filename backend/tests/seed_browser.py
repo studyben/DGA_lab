@@ -1,5 +1,6 @@
 """Destructive fixture setup exclusively for the isolated browser-test database."""
 from datetime import datetime, timezone
+from tests.laboratory_seed import restore_placeholder_methods
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -21,6 +22,7 @@ def main():
                 'TRUNCATE oil_samples,asset_installations,formal_assets,sites,customers,'
                 'auth_sessions,user_roles,audit_logs,users CASCADE'
             ))
+            restore_placeholder_methods(connection)
             connection.execute(text("ALTER SEQUENCE oil_sample_number_seq RESTART WITH 1"))
         service = IdentityService(engine)
         initial = 'Browser initial passphrase 42!'

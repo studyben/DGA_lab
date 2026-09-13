@@ -5,6 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 import pytest
+from tests.laboratory_seed import restore_placeholder_methods
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
@@ -82,6 +83,7 @@ def workbench_context(database_url):
                 'auth_sessions,user_roles,audit_logs,users CASCADE'
             )
         )
+        restore_placeholder_methods(connection)
         connection.execute(text('UPDATE test_method_versions SET is_active=TRUE'))
         connection.execute(
             text("INSERT INTO customers(id,customer_name) VALUES ('11000000-0000-0000-0000-000000000001','Prairie Solar LLC')")
@@ -484,6 +486,10 @@ def test_finalized_data_survives_0006_downgrade_and_reupgrade_as_open(workbench_
         if item.test_type == TestType.DGA
     )
     record = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    # This historical migration fixture represents pre-0017 tests, which had no
+    # quality evidence. New records must instead refuse evidence-losing rollback.
+    with engine.begin() as connection:
+        connection.execute(text('UPDATE laboratory_tests SET quality_snapshot=NULL WHERE id=:id'), {'id': record.id})
     workbench.finalize(actor, sample.barcode_value)
 
     config = Config('alembic.ini')

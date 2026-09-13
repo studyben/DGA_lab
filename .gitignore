@@ -11,3 +11,5 @@ playwright-report/
 !.env.example
 .tools/
 .cache/
+/tmp/pdfs/
+/tmp/configuration.png

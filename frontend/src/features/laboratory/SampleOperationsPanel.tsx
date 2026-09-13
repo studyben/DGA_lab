@@ -13,6 +13,7 @@ type Operations = {
   history: OperationEvent[];
 };
 const containerLabels: Record<string, string> = { RECEIVED: '已接收', IN_USE: '使用中', RETAINED: '留样', EXHAUSTED: '已耗尽', BROKEN: '已破损', DISPOSED: '已处置' };
+const operationLabels: Record<string, string> = { SAMPLE_ASSET_ASSOCIATED: '确认正式资产', SAMPLE_CONTAINER_CHANGED: '容器状态变更', PACKAGE_APPLIED: '应用检测包' };
 const messages: Record<string, string> = {
   stale_sample: '油样基础信息已被更新，请重新读取并核对采样时间后选择正式资产。',
   stale_container: '容器状态已被其他操作更新，请重新读取后核对当前状态。',
@@ -95,7 +96,7 @@ export function SampleOperationsPanel({ barcode, identity = false, onChanged }: 
       </>}
       {can('laboratory.write') && <p><a href={'/lab/workbench?barcode='+encodeURIComponent(barcode)+'&return_to='+encodeURIComponent('/lab/identity?barcode='+barcode)}>按此条码继续检测</a>{!identity && pending && <> · <a href={'/lab/identity?barcode='+encodeURIComponent(barcode)}>前往核实身份</a></>}</p>}
       {!identity && <><p>容器状态记录实物使用情况，不改变已定稿检测或报告。</p>{data.containers.map(container => can('laboratory.write') ? <ContainerForm key={container.id} container={container} disabled={busy || needsReload} submit={(target, changeReason) => submit('/containers/'+container.id, { target, reason: changeReason, expected_revision: container.revision }, '容器状态已保存。')} /> : <p key={container.id}>{container.container_number} · {containerLabels[container.status]}</p>)}</>}
-      <details><summary>操作历史（{data.history.length} 条）</summary>{data.history.length ? <ol>{data.history.map(event => <li key={event.id}><strong>{event.action_code === 'SAMPLE_ASSET_ASSOCIATED' ? '确认正式资产' : '容器状态变更'}</strong> · {chicagoTime(event.occurred_at)} · {event.reason}<p>操作人：{event.actor_id}</p>{event.container_id && <p>{data.containers.find(c => c.id === event.container_id)?.container_number}：{containerLabels[String(event.before_value.status)]} → {containerLabels[String(event.after_value.status)]}</p>}<details><summary>变更前后记录</summary><pre>{JSON.stringify({ before: event.before_value, after: event.after_value }, null, 2)}</pre></details></li>)}</ol> : <p>尚无身份确认或容器变更记录。</p>}</details>
+      <details><summary>操作历史（{data.history.length} 条）</summary>{data.history.length ? <ol>{data.history.map(event => <li key={event.id}><strong>{operationLabels[event.action_code] ?? '油样操作'}</strong> · {chicagoTime(event.occurred_at)} · {event.reason}<p>操作人：{event.actor_id}</p>{event.container_id && <p>{data.containers.find(c => c.id === event.container_id)?.container_number}：{containerLabels[String(event.before_value.status)]} → {containerLabels[String(event.after_value.status)]}</p>}<details><summary>变更前后记录</summary><pre>{JSON.stringify({ before: event.before_value, after: event.after_value }, null, 2)}</pre></details></li>)}</ol> : <p>尚无油样操作记录。</p>}</details>
     </>}
   </section>;
 }

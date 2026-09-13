@@ -1,5 +1,6 @@
 """Typed laboratory result workflow behind the public laboratory seam."""
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -15,6 +16,7 @@ from dga.shared.auth.public import ActorContext, AuditTrail, require_permission
 from dga.shared.files import FileStore
 
 from .errors import LaboratoryError
+from .configuration import MethodVersionInput, QaExecution, lock_configuration, instrument_evidence
 
 if TYPE_CHECKING:
     from .public import OilSample, SampleRegistry
@@ -92,6 +94,8 @@ class TestSubmission:
     instrument_name: str | None
     notes: str | None
     result: TypedResult
+    instrument_id: UUID | None = None
+    qa_results: tuple[QaExecution, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -108,6 +112,10 @@ class MethodField:
     unit_code: str | None
     display_decimal_places: int | None
     detection_limit: Decimal | None
+    quantitation_limit: Decimal | None = None
+    minimum: Decimal | None = None
+    maximum: Decimal | None = None
+    allowed_qualifiers: tuple[str, ...] = ('EQ', 'ND', 'LT', 'GT')
 
 
 @dataclass(frozen=True)
@@ -119,6 +127,7 @@ class MethodConfiguration:
     version_label: str
     is_active: bool
     fields: tuple[MethodField, ...]
+    qa_checks: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -143,6 +152,8 @@ class TestRecord:
     selected_for_report: bool
     created_at: datetime
     updated_at: datetime
+    instrument_id: UUID | None = None
+    quality_snapshot: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -151,6 +162,7 @@ class FinalizationAssessment:
     blocking_codes: tuple[str, ...]
     missing_test_types: tuple[TestType, ...]
     warning_codes: tuple[str, ...]
+    required_missing_test_types: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -185,6 +197,7 @@ class WorkbenchSample:
     tests: tuple[TestRecord, ...]
     finalization_assessment: FinalizationAssessment
     finalization_history: tuple[FinalizationEvent, ...]
+    package_snapshot: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -228,7 +241,7 @@ class LaboratoryWorkbench:
         with self._engine.connect() as connection:
             sample_row = connection.execute(
                 text("""SELECT id,testing_status,identity_status,testing_finalized_by,
-                testing_finalized_at FROM oil_samples WHERE barcode_value=:barcode"""),
+                testing_finalized_at,package_snapshot FROM oil_samples WHERE barcode_value=:barcode"""),
                 {'barcode': barcode},
             ).mappings().first()
             if not sample_row:
@@ -243,7 +256,7 @@ class LaboratoryWorkbench:
                     {'sample': sample_row['id']},
                 ).mappings()
             )
-            assessment = self._assessment(sample_row['identity_status'], tests)
+            assessment = self._assessment(sample_row['identity_status'], tests, sample_row['package_snapshot'])
             history = self._events(connection, sample_row['id'])
         return WorkbenchSample(
             sample=self._samples.find_by_barcode(actor, barcode),
@@ -254,6 +267,7 @@ class LaboratoryWorkbench:
             tests=tests,
             finalization_assessment=assessment,
             finalization_history=history,
+            package_snapshot=sample_row['package_snapshot'],
         )
 
     def add_test(
@@ -269,10 +283,12 @@ class LaboratoryWorkbench:
         object_key = None
         try:
             with self._engine.begin() as connection:
+                lock_configuration(connection)
                 sample_id = self._editable_sample(connection, self._barcode(barcode_value))
                 method = self._method(connection, submission.method_version_id, submission.test_type)
                 self._validate_configured_precision(submission, method)
                 self._insert_header(connection, test_id, sample_id, actor, submission, now)
+                self._save_quality(connection, test_id, submission, method)
                 self._replace_result(connection, test_id, submission)
                 if attachment:
                     object_key = self._store_attachment(connection, actor, test_id, attachment, now)
@@ -299,9 +315,10 @@ class LaboratoryWorkbench:
         object_key = None
         try:
             with self._engine.begin() as connection:
+                lock_configuration(connection)
                 sample_id = self._editable_sample(connection, self._barcode(barcode_value))
                 existing = connection.execute(
-                    text("""SELECT test_type,method_version_id,selected_for_report FROM laboratory_tests
+                    text("""SELECT test_type,method_version_id,selected_for_report,instrument_id FROM laboratory_tests
                     WHERE id=:id AND oil_sample_id=:sample AND record_status='ACTIVE' FOR UPDATE"""),
                     {'id': test_id, 'sample': sample_id},
                 ).mappings().first()
@@ -333,6 +350,7 @@ class LaboratoryWorkbench:
                      'actor': actor.user_id, 'now': now},
                 )
                 self._replace_result(connection, test_id, submission)
+                self._save_quality(connection, test_id, submission, method, existing_id=existing['instrument_id'])
                 if attachment:
                     object_key = self._store_attachment(connection, actor, test_id, attachment, now)
                 self._audit.append(connection, actor, _AuditAction.LAB_TEST_UPDATED, entity_id=test_id)
@@ -444,6 +462,7 @@ class LaboratoryWorkbench:
         sample_id = None
         try:
             with self._engine.begin() as connection:
+                lock_configuration(connection)
                 sample = self._locked_sample(connection, barcode)
                 sample_id = sample['id']
                 if sample['testing_status'] == TestingStatus.FINALIZED.value:
@@ -458,7 +477,7 @@ class LaboratoryWorkbench:
                         {'sample': sample_id},
                     ).mappings()
                 )
-                assessment = self._assessment(sample['identity_status'], tests)
+                assessment = self._assessment(sample['identity_status'], tests, sample['package_snapshot'])
                 self._raise_blocker(assessment)
                 acknowledged = set(acknowledged_warning_codes)
                 missing_warnings = [
@@ -693,16 +712,21 @@ class LaboratoryWorkbench:
 
     def _methods(self, connection, sample_id):
         rows = connection.execute(
-            text("""SELECT * FROM test_method_versions m
+            text("""SELECT m.*, s.is_active AS type_active FROM test_method_versions m
+            JOIN laboratory_type_settings s ON s.code=m.test_type
             WHERE m.is_active OR EXISTS (
                 SELECT 1 FROM laboratory_tests t
                 WHERE t.oil_sample_id=:sample AND t.method_version_id=m.id
             ) ORDER BY test_type,display_name,id"""),
             {'sample': sample_id},
         ).mappings().all()
-        return tuple(self._method_from_row(connection, row) for row in rows)
+        return tuple(self._method_from_row(connection, {**row, 'is_active': row['is_active'] and row['type_active']}) for row in rows)
 
     def _method(self, connection, method_id, test_type, *, allow_inactive=False):
+        if not allow_inactive and not connection.execute(text(
+                'SELECT is_active FROM laboratory_type_settings WHERE code=:code'),
+                {'code': test_type.value}).scalar():
+            raise LaboratoryError('test_type_disabled')
         row = connection.execute(
             text('SELECT * FROM test_method_versions WHERE id=:id'), {'id': method_id}
         ).mappings().first()
@@ -712,6 +736,12 @@ class LaboratoryWorkbench:
 
     @staticmethod
     def _method_from_row(connection, row):
+        if row['configuration'] is not None:
+            config = MethodVersionInput.model_validate(row['configuration'])
+            return MethodConfiguration(row['id'], TestType(config.test_type), config.display_name,
+                config.standard_reference, config.version_label, row['is_active'],
+                tuple(MethodField(**f.model_dump()) for f in config.fields),
+                tuple(q.model_dump() for q in config.qa_checks))
         fields = tuple(
             MethodField(field['field_code'], field['display_name'], field['unit_code'],
                         field['display_decimal_places'], field['detection_limit'])
@@ -748,9 +778,37 @@ class LaboratoryWorkbench:
         )
         return TestRecord(row['id'], TestType(row['test_type']), method, row['measured_at'],
                           row['instrument_name'], row['analyst_user_id'], row['notes'], result,
-                          attachments, row['selected_for_report'], row['created_at'], row['updated_at'])
+                          attachments, row['selected_for_report'], row['created_at'], row['updated_at'],
+                          row['instrument_id'], row['quality_snapshot'])
 
-    def _assessment(self, identity_status, tests):
+    @staticmethod
+    def _save_quality(connection, test_id, submission, method, *, existing_id=None):
+        evidence = instrument_evidence(connection, submission.instrument_id, submission.measured_at,
+                                       existing_id=existing_id)
+        executions = [QaExecution.model_validate(q) for q in submission.qa_results]
+        supplied = {q.code: q for q in executions}
+        if len(supplied) != len(executions) or set(supplied) - {q['code'] for q in method.qa_checks}:
+            raise LaboratoryError('invalid_qa_execution')
+        evidence['qa_results'] = [dict(q, **supplied.get(q['code'], QaExecution(code=q['code'], status='NOT_RUN')).model_dump())
+                                  for q in method.qa_checks]
+        evidence['test_id'] = str(test_id)
+        evidence['revision'] = str(uuid4())
+        warning_messages = []
+        if evidence['calibration']['status'] not in ('VALID', 'NOT_LINKED'):
+            label = {'UNKNOWN': '未知', 'EXPIRED': '已过期', 'FAILED': '失败'}[evidence['calibration']['status']]
+            warning_messages.append(f"{evidence['instrument']['code']}：检测时校准{label}")
+        for q in evidence['qa_results']:
+            if q['status'] != 'PASS':
+                warning_messages.append(f"QA/QC {q['label']}：{'失败' if q['status'] == 'FAIL' else '未执行'}")
+        evidence['warnings'] = [{'code': f"{test_id}:{evidence['revision']}:{i}", 'message': msg}
+                                for i, msg in enumerate(warning_messages)]
+        connection.execute(text('''UPDATE laboratory_tests SET instrument_id=:instrument,
+            quality_snapshot=CAST(:evidence AS jsonb),instrument_name=COALESCE(:name,instrument_name)
+            WHERE id=:id'''), dict(id=test_id, instrument=submission.instrument_id,
+            evidence=json.dumps(evidence),
+            name=evidence['instrument']['name'] if evidence['instrument'] else None))
+
+    def _assessment(self, identity_status, tests, package=None):
         blocking = []
         missing_types = []
         if identity_status != 'ASSOCIATED':
@@ -765,18 +823,28 @@ class LaboratoryWorkbench:
                 missing_types.append(test_type)
         if missing_types:
             blocking.append('report_result_selection_required')
-        warnings = tuple(dict.fromkeys(self._warning_source(tests)))
+        required_missing = tuple(i['test_type'] for i in (package or {}).get('items', [])
+                                 if i['required'] and i['test_type'] not in by_type)
+        if required_missing:
+            blocking.append('required_tests_missing')
+        warnings = tuple(dict.fromkeys([
+            warning['code'] for record in tests
+            for warning in (record.quality_snapshot or {}).get('warnings', [])
+        ] + list(self._warning_source(tests))))
         return FinalizationAssessment(
             ready=not blocking,
             blocking_codes=tuple(blocking),
             missing_test_types=tuple(missing_types),
             warning_codes=warnings,
+            required_missing_test_types=required_missing,
         )
 
     @staticmethod
     def _raise_blocker(assessment):
         if 'sample_identity_not_confirmed' in assessment.blocking_codes:
             raise LaboratoryError('sample_identity_not_confirmed')
+        if assessment.required_missing_test_types:
+            raise LaboratoryError('required_tests_missing', details={'test_types': list(assessment.required_missing_test_types)})
         if 'no_active_tests' in assessment.blocking_codes:
             raise LaboratoryError('no_active_tests')
         if assessment.missing_test_types:
@@ -790,7 +858,7 @@ class LaboratoryWorkbench:
     @staticmethod
     def _locked_sample(connection, barcode):
         row = connection.execute(
-            text("""SELECT id,identity_status,testing_status FROM oil_samples
+            text("""SELECT id,identity_status,testing_status,package_snapshot FROM oil_samples
             WHERE barcode_value=:barcode FOR UPDATE"""),
             {'barcode': barcode},
         ).mappings().first()
@@ -852,6 +920,8 @@ class LaboratoryWorkbench:
                 raise LaboratoryError('nd_must_not_have_value')
             if measurement.qualifier != ResultQualifier.ND and measurement.value is None:
                 raise LaboratoryError('qualifier_requires_value')
+            if measurement.value is not None and (not measurement.value.is_finite() or measurement.value >= Decimal('1000000000000')):
+                raise LaboratoryError('result_out_of_range')
             if measurement.value is not None and measurement.value < 0:
                 raise LaboratoryError('negative_result')
             if measurement.value is not None and measurement.value.as_tuple().exponent < -6:
@@ -868,6 +938,11 @@ class LaboratoryWorkbench:
             measurements = {method.fields[0].code: submission.result.result}
         for field in method.fields:
             value = measurements[field.code].value
+            if measurements[field.code].qualifier.value not in field.allowed_qualifiers:
+                raise LaboratoryError('configured_qualifier_not_allowed')
+            if value is not None and ((field.minimum is not None and value < field.minimum)
+                    or (field.maximum is not None and value > field.maximum)):
+                raise LaboratoryError('configured_range_exceeded')
             if (value is not None and field.display_decimal_places is not None
                     and value.as_tuple().exponent < -field.display_decimal_places):
                 raise LaboratoryError('configured_precision_exceeded')
