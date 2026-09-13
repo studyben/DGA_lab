@@ -1,4 +1,6 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { Catalog, QaCheck, QaResult, STATUS_LABEL, TestPackage } from './configurationTypes';
+import './configuration.css';
 
 import { useAuth } from '../../Auth';
 import { SampleOperationsPanel } from './SampleOperationsPanel';
@@ -12,6 +14,9 @@ type MethodField = {
   unit_code: string | null;
   display_decimal_places: number | null;
   detection_limit: number | null;
+  minimum: number | null;
+  maximum: number | null;
+  allowed_qualifiers: Qualifier[];
 };
 type Method = {
   id: string;
@@ -21,6 +26,7 @@ type Method = {
   version_label: string;
   is_active: boolean;
   fields: MethodField[];
+  qa_checks: QaCheck[];
 };
 type TestRecord = {
   id: string;
@@ -35,6 +41,8 @@ type TestRecord = {
   selected_for_report: boolean;
   created_at: string;
   updated_at: string;
+  instrument_id: string | null;
+  quality_snapshot: { calibration: { status:string }; qa_results:QaResult[]; warnings:{code:string;message:string}[] } | null;
 };
 type Workbench = {
   sample: {
@@ -52,16 +60,18 @@ type Workbench = {
   testing_finalized_by: string | null;
   testing_finalized_at: string | null;
   methods: Method[];
+  package_snapshot: TestPackage | null;
   tests: TestRecord[];
   finalization_assessment: {
     ready: boolean;
     blocking_codes: string[];
     missing_test_types: TestType[];
     warning_codes: string[];
+    required_missing_test_types: TestType[];
   };
 };
 
-const TYPE_LABEL: Record<TestType, string> = {
+const DEFAULT_TYPE_LABEL: Record<TestType, string> = {
   DGA: 'DGA',
   MOISTURE: '微水',
   BREAKDOWN_VOLTAGE: '击穿电压',
@@ -101,6 +111,19 @@ export function WorkbenchPage() {
   const [methodId, setMethodId] = useState('');
   const [measuredAt, setMeasuredAt] = useState('');
   const [instrument, setInstrument] = useState('');
+  const [instrumentId, setInstrumentId] = useState('');
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const TYPE_LABEL = { ...DEFAULT_TYPE_LABEL, ...Object.fromEntries((catalog?.types ?? []).map(t => [t.code, t.display_name])) } as Record<TestType, string>;
+  const [packageId, setPackageId] = useState('');
+  const [packageNeedsReload, setPackageNeedsReload] = useState(false);
+  const [qaResults, setQaResults] = useState<Record<string,{status:'PASS'|'FAIL'|'NOT_RUN';note:string}>>({});
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/laboratory/configuration',{cache:'no-store',signal:controller.signal}).then(async r=>{
+      if(r.ok) setCatalog(await r.json() as Catalog);
+    }).catch(()=>{});
+    return ()=>controller.abort();
+  }, []);
   const [notes, setNotes] = useState('');
   const [measurements, setMeasurements] = useState<Record<string, { qualifier: Qualifier; value: string }>>({});
   const [attachment, setAttachment] = useState<File | null>(null);
@@ -127,6 +150,7 @@ export function WorkbenchPage() {
       if (!response.ok) throw new Error('无法加载检测工作台，请稍后重试。');
       const loaded = await response.json() as Workbench;
       setData(loaded); setBarcode(loaded.sample.barcode_value); setShowForm(false); setEditing(null);
+      setPackageNeedsReload(false);
     } catch (failure) {
       setData(null); setError(failure instanceof Error ? failure.message : '无法加载检测工作台。');
     } finally { setBusy(false); }
@@ -134,9 +158,12 @@ export function WorkbenchPage() {
 
   function beginCreate(type: TestType) {
     setEditing(null); setTestType(type);
-    setMethodId(data?.methods.find(item => item.test_type === type && item.is_active)?.id ?? '');
+    const planned = data?.package_snapshot?.items.find(i=>i.test_type===type)?.method_version_id;
+    setMethodId(data?.methods.find(item => item.test_type === type && item.is_active && item.id===planned)?.id
+      ?? data?.methods.find(item => item.test_type === type && item.is_active)?.id ?? '');
     setMeasuredAt(localDateTime(new Date().toISOString()));
     setInstrument(''); setNotes(''); setMeasurements({}); setAttachment(null); setShowForm(true);
+    setInstrumentId(''); setQaResults({});
   }
 
   function beginEdit(record: TestRecord) {
@@ -144,6 +171,8 @@ export function WorkbenchPage() {
     setEditing(record); setTestType(record.test_type); setMethodId(record.method.id);
     setMeasuredAt(localDateTime(record.measured_at));
     setInstrument(record.instrument_name ?? ''); setNotes(record.notes ?? '');
+    setInstrumentId(record.instrument_id ?? '');
+    setQaResults(Object.fromEntries((record.quality_snapshot?.qa_results ?? []).map(q=>[q.code,{status:q.status,note:q.note}])));
     setMeasurements(Object.fromEntries(Object.entries(current).map(([code, item]) => [
       code.toLowerCase(), { qualifier: item.qualifier, value: item.value === null ? '' : String(item.value) },
     ])));
@@ -151,7 +180,7 @@ export function WorkbenchPage() {
   }
 
   function measurement(code: string) {
-    return measurements[code.toLowerCase()] ?? { qualifier: 'EQ' as Qualifier, value: '' };
+    return measurements[code.toLowerCase()] ?? { qualifier: method?.fields.find(f=>f.code.toLowerCase()===code.toLowerCase())?.allowed_qualifiers[0] ?? 'EQ' as Qualifier, value: '' };
   }
 
   function setMeasurement(code: string, change: Partial<{ qualifier: Qualifier; value: string }>) {
@@ -179,6 +208,8 @@ export function WorkbenchPage() {
         method_version_id: method.id,
         measured_at: new Date(measuredAt).toISOString(),
         instrument_name: instrument.trim() || null,
+        instrument_id: instrumentId || null,
+        qa_results: method.qa_checks.map(q=>({code:q.code,...(qaResults[q.code] ?? {status:'NOT_RUN',note:''})})),
         notes: notes.trim() || null,
         result,
         attachment: await attachmentPayload(attachment),
@@ -327,12 +358,28 @@ export function WorkbenchPage() {
       </section>
 
       <section className="test-records" aria-labelledby="test-records-title">
+        <div className="lab-config">
+          <p>检测包：{data.package_snapshot?.name ?? '未应用检测包'}</p>
+          {data.package_snapshot && <p>{data.package_snapshot.items.map(i=>`${TYPE_LABEL[i.test_type]}${i.required?'（必做）':'（可选）'}`).join('、')}</p>}
+          {data.testing_status==='OPEN' && catalog && can('laboratory.write') && <div className="config-row"><label>应用检测包<select aria-label="应用检测包" value={packageId} onChange={e=>setPackageId(e.target.value)}><option value="">请选择检测包</option>{catalog.packages.map(p=><option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}</select></label>
+            <button type="button" disabled={busy||!packageId||packageNeedsReload} onClick={async()=>{
+              if(!window.confirm('应用此检测包将替换当前待做项目要求，不删除已有检测，是否继续？'))return;
+              setBusy(true);setError('');
+              try {
+                const r=await fetch(`/api/laboratory/samples/${encodeURIComponent(data.sample.barcode_value)}/package`,{method:'PUT',headers:{'Content-Type':'application/json','X-CSRF-Token':session?.csrf_token??''},body:JSON.stringify({package_id:packageId,expected_package_id:data.package_snapshot?.id??null}),signal:AbortSignal.timeout(10000)});
+                if(!r.ok)throw new Error('无法应用检测包；请重新加载油样，核对是否被他人修改或方法已停用。');
+                await load(data.sample.barcode_value);
+              }catch(e){setPackageNeedsReload(true);setError(e instanceof Error?e.message:'结果未知，请重新加载油样。');}finally{setBusy(false);}
+            }}>应用到此油样</button></div>}
+        </div>
         <div className="section-heading"><div><span className="step">04 / 检测</span><h2 id="test-records-title">检测记录</h2></div>
           {data.testing_status === 'OPEN' && can('laboratory.write') && <div className="test-actions">{(Object.keys(TYPE_LABEL) as TestType[]).map(type => <button key={type} type="button" disabled={!data.methods.some(method => method.test_type === type && method.is_active)} onClick={() => beginCreate(type)}>新增{TYPE_LABEL[type]}</button>)}</div>}
         </div>
         {data.tests.length === 0 ? <p className="no-results">尚无检测记录。</p> : <div className="test-list">{data.tests.map((record, index) => <article className="test-card" aria-label={`${TYPE_LABEL[record.test_type]} 检测 #${index + 1}`} key={record.id}>
           <div><span className="test-type">{TYPE_LABEL[record.test_type]}</span><strong>{TYPE_LABEL[record.test_type]} 检测 #{index + 1}</strong><p>{new Date(record.measured_at).toLocaleString('zh-CN')} · {record.instrument_name || '未填写仪器'}</p></div>
           <div className="measurement-preview">{Object.entries(resultMeasurements(record)).slice(0, 3).map(([code, item]) => <span key={code}>{code.toUpperCase()} {item.qualifier === 'EQ' ? '' : `${item.qualifier} `}{item.value ?? ''}</span>)}</div>
+          <div className="quality-evidence"><p>{record.method.display_name} · {record.method.version_label}</p><p>检测时校准：{STATUS_LABEL[record.quality_snapshot?.calibration.status ?? 'NOT_LINKED']}</p>
+            {record.quality_snapshot?.qa_results.map(q=><p key={q.code}>{q.label}：{STATUS_LABEL[q.status]} {q.note}</p>)}</div>
           <div className="record-actions">
             {record.selected_for_report && <span className="report-result-badge">报告结果</span>}
             {data.testing_status === 'OPEN' && can('laboratory.write') && testTypeCounts[record.test_type] > 1 && !record.selected_for_report && <button type="button" onClick={() => void selectReportResult(record)}>设为报告结果</button>}
@@ -347,7 +394,8 @@ export function WorkbenchPage() {
           {data.finalization_assessment.blocking_codes.includes('sample_identity_not_confirmed') && <p className="finalization-blocker">油样身份尚未关联正式资产。</p>}
           {data.finalization_assessment.blocking_codes.includes('no_active_tests') && <p className="finalization-blocker">至少需要一条检测记录。</p>}
           {data.finalization_assessment.missing_test_types.map(type => <p className="finalization-blocker" key={type}>{TYPE_LABEL[type]} 有多份检测，请选择报告结果</p>)}
-          {data.finalization_assessment.warning_codes.length > 0 && <div className="finalization-warnings" role="status"><strong>检测警告（定稿前请核对）</strong><ul>{data.finalization_assessment.warning_codes.map(code => <li key={code}>{code}</li>)}</ul></div>}
+          {data.finalization_assessment.required_missing_test_types.map(type=><p className="finalization-blocker" key={type}>检测包必做项目尚未完成：{TYPE_LABEL[type]}</p>)}
+          {data.finalization_assessment.warning_codes.length > 0 && <div className="finalization-warnings" role="status"><strong>检测警告（定稿前请核对）</strong><ul>{data.finalization_assessment.warning_codes.map(code => <li key={code}>{data.tests.flatMap(t=>t.quality_snapshot?.warnings??[]).find(w=>w.code===code)?.message ?? code}</li>)}</ul></div>}
           {data.finalization_assessment.ready && <p className="finalization-ready">基础信息、检测数据和报告结果已具备定稿条件。</p>}
           {can('laboratory.finalize') && <button className="primary-action" type="button" disabled={busy || !data.finalization_assessment.ready} onClick={() => void finalizeTesting()}>整体检测定稿</button>}
         </> : <>
@@ -361,16 +409,22 @@ export function WorkbenchPage() {
         <div className="section-heading"><div><span className="step">06 / 录入</span><h2 id="test-editor-title">{editing ? `修改${TYPE_LABEL[testType]}` : `新增${TYPE_LABEL[testType]}`}</h2></div><button type="button" className="quiet-action" onClick={() => setShowForm(false)}>取消</button></div>
         <p className="method-note">{method.display_name} · {method.standard_reference ?? 'ASTM 方法编号待配置'}</p>
         <form className="test-form" onSubmit={saveTest}>
-          <label>检测方法<select value={method.id} disabled={Boolean(editing)} onChange={event => setMethodId(event.target.value)}>{data.methods.filter(item => item.test_type === testType && (item.is_active || item.id === editing?.method.id)).map(item => <option value={item.id} key={item.id}>{item.display_name} · {item.version_label}</option>)}</select></label>
+          <label>检测方法<select value={method.id} disabled={Boolean(editing)} onChange={event => { setMethodId(event.target.value); setMeasurements({}); setQaResults({}); }}>{data.methods.filter(item => item.test_type === testType && (item.is_active || item.id === editing?.method.id)).map(item => <option value={item.id} key={item.id}>{item.display_name} · {item.version_label}</option>)}</select></label>
           <label>检测时间<input type="datetime-local" value={measuredAt} onChange={event => setMeasuredAt(event.target.value)} required /></label>
           <label>仪器<input value={instrument} onChange={event => setInstrument(event.target.value)} maxLength={160} /></label>
+          <label>关联仪器<select value={instrumentId} onChange={e=>setInstrumentId(e.target.value)}><option value="">未关联（保留手填名称，校准未评估）</option>{catalog?.instruments.filter(i=>i.status==='ACTIVE'||i.id===editing?.instrument_id).map(i=><option key={i.id} value={i.id}>{i.code} · {i.name}</option>)}</select></label>
+          {!catalog && <p role="alert">仪器配置尚未加载，可刷新页面重试；手填名称不会作为校准证据。</p>}
+          {method.qa_checks.map(q=><fieldset className="wide-field" key={q.code}><legend>QA/QC {q.label}</legend><p>{q.instructions}</p>
+            <label>检查结果<select aria-label={`${q.label} 检查结果`} value={qaResults[q.code]?.status ?? 'NOT_RUN'} onChange={e=>setQaResults({...qaResults,[q.code]:{status:e.target.value as 'PASS'|'FAIL'|'NOT_RUN',note:qaResults[q.code]?.note ?? ''}})}>{['NOT_RUN','PASS','FAIL'].map(s=><option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></label>
+            <label>检查备注<input value={qaResults[q.code]?.note??''} maxLength={500} onChange={e=>setQaResults({...qaResults,[q.code]:{status:qaResults[q.code]?.status??'NOT_RUN',note:e.target.value}})} /></label>
+          </fieldset>)}
           <div className="measurement-grid wide-field">{method.fields.map(field => {
             const item = measurement(field.code);
             return <fieldset key={field.code}><legend>{field.display_name}</legend>
               <select aria-label={`${field.display_name}限定符`} value={item.qualifier} onChange={event => setMeasurement(field.code, { qualifier: event.target.value as Qualifier })}>
-                <option value="EQ">数值</option><option value="ND">ND 未检出</option><option value="LT">LT 小于</option><option value="GT">GT 大于</option>
+                {field.allowed_qualifiers.map(q=><option value={q} key={q}>{{EQ:'数值',ND:'ND 未检出',LT:'LT 小于',GT:'GT 大于'}[q]}</option>)}
               </select>
-              <input aria-label={`${field.display_name}结果`} type="number" min="0" step={field.display_decimal_places === null ? 'any' : 10 ** -field.display_decimal_places} disabled={item.qualifier === 'ND'} value={item.value} onChange={event => setMeasurement(field.code, { value: event.target.value })} required={item.qualifier !== 'ND'} />
+              <input aria-label={`${field.display_name}结果`} type="number" min={field.minimum ?? 0} max={field.maximum ?? undefined} step="any" disabled={item.qualifier === 'ND'} value={item.value} onChange={event => setMeasurement(field.code, { value: event.target.value })} required={item.qualifier !== 'ND'} />
               <small>{field.unit_code ?? '单位待配置'} · {field.display_decimal_places === null ? '精度待配置' : `${field.display_decimal_places} 位小数`} · {field.detection_limit === null ? '检出限待配置' : `检出限 ${field.detection_limit}`}</small>
             </fieldset>;
           })}</div>

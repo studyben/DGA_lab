@@ -1,0 +1,20 @@
+.lab-config { display:grid; gap:20px; min-width:0; }
+.lab-config fieldset { min-width:0; padding:20px; border:1px solid #dce2eb; border-radius:12px; background:white; }
+.lab-config input:not([type=checkbox]), .lab-config select, .lab-config textarea { width:100%; min-width:0; box-sizing:border-box; padding:10px 12px; border:1px solid #c6d2e2; border-radius:8px; background:white; font:inherit; color:inherit; }
+.lab-config label { display:grid; gap:7px; min-width:0; }
+.lab-config button { padding:10px 15px; border:1px solid #d4dce8; border-radius:8px; background:white; color:#a64900; cursor:pointer; }
+.lab-config button[aria-pressed=true], .lab-config button[type=submit] { background:#bf5700; color:white; }
+.lab-config button:disabled { opacity:.5; cursor:default; }
+.config-toolbar, .config-toolbar nav, .config-row { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+.config-row { padding:12px 0; }
+.config-row label { flex:1; min-width:140px; }
+.config-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.config-fields { grid-column:1/-1; display:grid; gap:16px; min-width:0; }
+.config-table-wrap { overflow:auto; background:white; border:1px solid #dce2eb; border-radius:12px; }
+.lab-config table { width:100%; border-collapse:collapse; font-size:14px; }
+.lab-config th, .lab-config td { padding:14px; text-align:left; border-bottom:1px solid #edf0f5; }
+.lab-config th { background:#f4f6f9; }
+.config-check { display:inline-flex!important; margin-right:12px; align-items:center; }
+.config-filter { max-width:430px; }
+.quality-evidence { font-size:14px; padding:12px; background:#fff7eb; border-radius:8px; }
+@media(max-width:850px) { .config-form { grid-template-columns:minmax(0,1fr); } }

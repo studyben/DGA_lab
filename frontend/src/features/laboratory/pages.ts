@@ -35,4 +35,5 @@ export const laboratoryPages = [
     title: "报告中心",
     description: "按油样条码查找整体检测定稿后的中文报告。",
   },
+  { path:'/lab/configuration', permission:'laboratory.read', title:'实验室配置', description:'维护检测方法版本、检测包、仪器校准与 QA/QC 检查。' },
 ] as const;

@@ -156,3 +156,46 @@ def test_calibration_boundaries(workbench_context, expires, outcome, status):
     record = bench.add_test(actor, sample.barcode_value, replace(_moisture(method['id'], value='8.50'), instrument_id=instrument['id']))
     assert record.quality_snapshot['calibration']['status'] == status
     assert len(bench.load(actor, sample.barcode_value).finalization_assessment.warning_codes) == (0 if status=='VALID' else 1)
+
+
+def test_configuration_http_requires_auth_csrf_and_strict_payload(workbench_context):
+    from fastapi.testclient import TestClient
+    from dga.main import create_app
+    from dga.shared.config import Settings
+    from tests.test_laboratory_workbench import CHANGED_PASSWORD
+    engine, identity, actor, sample = workbench_context
+    with TestClient(create_app(Settings(database_url=engine.url.render_as_string(hide_password=False), cookie_secure=False))) as client:
+        assert client.get('/api/laboratory/configuration').status_code == 401
+        login = identity.login('workbench-admin', CHANGED_PASSWORD)
+        client.cookies.set('dga_session', login.token)
+        assert client.get('/api/laboratory/configuration').status_code == 200
+        assert client.post('/api/laboratory/configuration/methods', json=method_input().model_dump(mode='json')).status_code == 403
+        headers = {'Origin': 'http://127.0.0.1:8080', 'X-CSRF-Token': login.csrf_token}
+        payload = method_input().model_dump(mode='json')
+        assert client.post('/api/laboratory/configuration/methods', headers=headers, json={**payload, 'unexpected': True}).status_code == 422
+        assert client.post('/api/laboratory/configuration/methods', headers=headers, json=payload).status_code == 201
+
+
+def test_disabled_type_is_not_offered_for_new_entry_but_history_remains(workbench_context):
+    from dga.laboratory.public import TypeSettingsInput
+    engine, _, actor, sample = workbench_context
+    config = LaboratoryConfiguration(engine)
+    method = config.create_method(actor, method_input())
+    bench = make_workbench(engine, RecordingObjectStore())
+    record = bench.add_test(actor, sample.barcode_value, _moisture(method['id'], value='8.50'))
+    try:
+        config.set_type(actor, 'MOISTURE', TypeSettingsInput(display_name='微水', is_active=False))
+        loaded = bench.load(actor, sample.barcode_value)
+        assert not any(m.is_active for m in loaded.methods if m.test_type.value == 'MOISTURE')
+        assert loaded.tests[0].id == record.id
+    finally:
+        config.set_type(actor, 'MOISTURE', TypeSettingsInput(display_name='微水', is_active=True))
+
+
+@pytest.mark.parametrize('value', ['NaN', 'Infinity', '1000000000000'])
+def test_results_reject_nonfinite_and_storage_overflow(workbench_context, value):
+    engine, _, actor, sample = workbench_context
+    method = LaboratoryConfiguration(engine).create_method(actor, method_input())
+    bench = make_workbench(engine, RecordingObjectStore())
+    with pytest.raises(LaboratoryError, match='result_out_of_range'):
+        bench.add_test(actor, sample.barcode_value, _moisture(method['id'], value=value))

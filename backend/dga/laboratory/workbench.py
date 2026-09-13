@@ -712,14 +712,15 @@ class LaboratoryWorkbench:
 
     def _methods(self, connection, sample_id):
         rows = connection.execute(
-            text("""SELECT * FROM test_method_versions m
+            text("""SELECT m.*, s.is_active AS type_active FROM test_method_versions m
+            JOIN laboratory_type_settings s ON s.code=m.test_type
             WHERE m.is_active OR EXISTS (
                 SELECT 1 FROM laboratory_tests t
                 WHERE t.oil_sample_id=:sample AND t.method_version_id=m.id
             ) ORDER BY test_type,display_name,id"""),
             {'sample': sample_id},
         ).mappings().all()
-        return tuple(self._method_from_row(connection, row) for row in rows)
+        return tuple(self._method_from_row(connection, {**row, 'is_active': row['is_active'] and row['type_active']}) for row in rows)
 
     def _method(self, connection, method_id, test_type, *, allow_inactive=False):
         if not allow_inactive and not connection.execute(text(
@@ -919,6 +920,8 @@ class LaboratoryWorkbench:
                 raise LaboratoryError('nd_must_not_have_value')
             if measurement.qualifier != ResultQualifier.ND and measurement.value is None:
                 raise LaboratoryError('qualifier_requires_value')
+            if measurement.value is not None and (not measurement.value.is_finite() or measurement.value >= Decimal('1000000000000')):
+                raise LaboratoryError('result_out_of_range')
             if measurement.value is not None and measurement.value < 0:
                 raise LaboratoryError('negative_result')
             if measurement.value is not None and measurement.value.as_tuple().exponent < -6:

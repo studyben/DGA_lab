@@ -373,3 +373,4 @@ from .operations_http import operations_router  # noqa: E402
 from .configuration import (  # noqa: E402
     LaboratoryConfiguration, MethodVersionInput, InstrumentInput, CalibrationInput, TypeSettingsInput, QaExecution, PackageInput,
 )
+from .configuration_http import configuration_router  # noqa: E402

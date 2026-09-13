@@ -173,11 +173,11 @@ class LaboratoryConfiguration:
         require_permission(actor, 'laboratory.read')
         with self._engine.connect().execution_options(isolation_level='REPEATABLE READ') as c:
             return {
-                'types': [dict(r) for r in c.execute(text('SELECT * FROM laboratory_type_settings ORDER BY code')).mappings()],
-                'methods': [dict(r) for r in c.execute(text('SELECT * FROM test_method_versions ORDER BY test_type,version_label')).mappings()],
-                'instruments': [dict(r) for r in c.execute(text('SELECT * FROM laboratory_instruments ORDER BY code')).mappings()],
-                'calibrations': [dict(r) for r in c.execute(text('SELECT * FROM laboratory_calibrations ORDER BY calibrated_on DESC,id')).mappings()],
-                'packages': [dict(r) for r in c.execute(text('SELECT * FROM laboratory_packages ORDER BY code')).mappings()],
+                'types': [dict(r) for r in c.execute(text('SELECT code,display_name,is_active FROM laboratory_type_settings ORDER BY code')).mappings()],
+                'methods': [dict(r) for r in c.execute(text('SELECT id,test_type,display_name,version_label,standard_reference,is_active,configuration FROM test_method_versions ORDER BY test_type,version_label')).mappings()],
+                'instruments': [dict(r) for r in c.execute(text('SELECT id,code,name,model,serial_number,status FROM laboratory_instruments ORDER BY code')).mappings()],
+                'calibrations': [dict(r) for r in c.execute(text('SELECT id,instrument_id,calibrated_on,expires_on,outcome,provider,certificate FROM laboratory_calibrations ORDER BY calibrated_on DESC,id')).mappings()],
+                'packages': [dict(r) for r in c.execute(text('SELECT id,code,name,items FROM laboratory_packages ORDER BY code')).mappings()],
             }
 
     def create_method(self, actor, command: MethodVersionInput):

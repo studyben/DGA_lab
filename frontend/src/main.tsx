@@ -1,4 +1,5 @@
 import React from "react";
+import { ConfigurationPage } from './features/laboratory/ConfigurationPage';
 import { createRoot } from "react-dom/client";
 import { assetPages } from "./features/assets/pages";
 import { laboratoryPages } from "./features/laboratory/pages";
@@ -111,7 +112,7 @@ function App() {
               </div>
               {!(equipmentId || siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
             </div>
-            {equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <LaboratoryLedgerPage /> : path === '/lab/identity' ? <IdentityPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
+            {equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <LaboratoryLedgerPage /> : path === '/lab/identity' ? <IdentityPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/configuration' ? <ConfigurationPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>

@@ -26,6 +26,7 @@ from .public import (
     TestSubmission,
     TestType,
     UpdateSampleBasics,
+    QaExecution,
 )
 
 
@@ -75,6 +76,8 @@ class TestInput(BaseModel):
     notes: str | None = Field(default=None, max_length=2000)
     result: DgaInput | SingleValueInput
     attachment: AttachmentInput | None = None
+    instrument_id: UUID | None = None
+    qa_results: tuple[QaExecution, ...] = Field(default=(), max_length=20)
 
 
 class SampleBasicsInput(BaseModel):
@@ -119,6 +122,7 @@ def _submission(payload: TestInput):
     return TestSubmission(
         payload.test_type, payload.method_version_id, payload.measured_at,
         payload.instrument_name, payload.notes, result,
+        payload.instrument_id, payload.qa_results,
     )
 
 
