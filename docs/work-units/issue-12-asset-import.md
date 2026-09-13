@@ -4,8 +4,9 @@
 
 - Goal and isolated branch confirmed by user; base `2eb45a7` (merged PR #32).
 - Branch: `codex/issue-12-asset-import`; separate worktree, no existing acceptance data touched.
-- Current gate: aggregate deepreview passed; local ready-to-open-draft-PR boundary (publication explicitly paused by user).
-- Accepted checkpoints: plan 89a78a9; S1 315b0d0; S2 3a02d35; S3 dc31c5e. Final aggregate review/fix/re-review passed: full backend 111, browser 18, TypeScript/build and diff check. Artifacts docs/reviews/code-review-20260912-183229.md and docs/reviews/code-review-20260912-183427.md. Do not push, open a PR, merge, close the issue or start later Issues. This is local completion, not full Gateflow PR/final closeout completion.
+- Current gate: PR review and final push passed; final closeout / authorized merge awaits successful final-head remote checks.
+- Accepted checkpoints: plan 89a78a9; S1 315b0d0; S2 3a02d35; S3 dc31c5e; aggregate 69ce595; PR review 9cadb01. Full backend 111, browser 18, TypeScript/build and diff check passed. PR https://github.com/studyben/DGA_lab/pull/33 targets main and contains Closes #12.
+- User subsequently authorized pushing and merging this work unit. This supersedes the earlier local-only stop boundary in historical artifacts below. No later Issue, original workspace changes or existing acceptance data are included. PR review artifact: docs/reviews/pr-33-review-20260912-214743.md. Its CI-composition finding is fixed and re-reviewed; remote checks must pass before merging.
 - Issue: https://github.com/studyben/DGA_lab/issues/12 ; parent #1, completed blocker #11.
 
 ## Confirmed goal / non-goals
@@ -87,3 +88,9 @@ Report delivered behavior, tests and counts, review findings/status, migration/s
 - Full real-PostgreSQL backend suite: 111 passed (two existing deprecation warnings); full browser suite: 18 passed; TypeScript/Vite build and git diff --check passed. Concurrent publication verifies exactly one publication audit in addition to stable asset IDs. STAGED/error batches cannot publish.
 - Isolated disposable preview: http://127.0.0.1:18095/assets/import, project dga-issue12-browser. Only its tmpfs data was seeded. Existing acceptance environment at port 18093 and original workspace edits were preserved.
 - No remaining accepted correctness findings. Operational residuals: source retention/orphan reconciliation and production worker monitoring remain deployment work; ambiguous legacy material mappings require administrator correction, not import guessing. CI/PR checks were not run because remote publication is explicitly prohibited.
+
+## Publication closeout preparation (supersedes prior local pause)
+
+PR #33 publishes the new-only asset import flow, migration, source retention, worker, UI and public-interface regressions described above. README and review artifacts document the fixed XLSX contract, master-data prerequisite, error recovery and operational ownership. All accepted application findings are fixed. PR review additionally fixed CI browser composition to start the same object-store/seed/worker overlay used by the successful local full suite; no test was skipped or weakened.
+
+The first post-fix remote runs passed deployable portal/migrations and the full backend step while browser acceptance was still running. Final-head remote results, merge SHA and issue closing outcome must be read from GitHub before reporting completion; no bypass or speculative success. PR body carries the closeout summary and Closes #12. No separate Issue comment is published without separate authorization. The requested push/merge operation can complete without representing this omitted comment as a full Gateflow final-closeout pass. No branch deletion or automatic work on #13.
