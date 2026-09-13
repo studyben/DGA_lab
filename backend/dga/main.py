@@ -29,13 +29,17 @@ from dga.laboratory.public import (
     LaboratoryReports,
     LaboratoryOperations,
     LaboratoryConfiguration,
+    LaboratoryTrendSource,
     configuration_router,
     operations_router,
     SampleRegistry,
     access_context as laboratory_access,
     http_router as laboratory_router,
 )
-from dga.condition_analysis.public import MODULE as CONDITION_ANALYSIS, access_context as analysis_access
+from dga.condition_analysis.public import (
+    MODULE as CONDITION_ANALYSIS, access_context as analysis_access,
+    TransformerTrends, http_router as analysis_router,
+)
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
 from dga.shared.auth.http import AuthenticatedRequests, auth_router
@@ -103,6 +107,7 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
     mutation_actor = requests.mutation_actor
 
     asset_directory = AssetDirectory(engine)
+    app.include_router(analysis_router(TransformerTrends(asset_directory, LaboratoryTrendSource(engine)), current_actor))
     app.include_router(assets_router(asset_directory, current_actor, AssetLifecycle(engine), mutation_actor))
     configured_object_store = file_store if file_store is not None else UnavailableFileStore()
     if file_store is None and all((settings.object_store_endpoint, settings.object_store_bucket,

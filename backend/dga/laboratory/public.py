@@ -374,3 +374,4 @@ from .configuration import (  # noqa: E402
     LaboratoryConfiguration, MethodVersionInput, InstrumentInput, CalibrationInput, TypeSettingsInput, QaExecution, PackageInput,
 )
 from .configuration_http import configuration_router  # noqa: E402
+from .trends import LaboratoryTrendSource, FinalizedResultReader, FinalizedMeasurement  # noqa: E402
