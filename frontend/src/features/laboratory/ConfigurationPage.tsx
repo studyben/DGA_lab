@@ -13,6 +13,7 @@ function blankMethod(type: TestType): MethodDraft {
 export function ConfigurationPage() {
   const { can, session } = useAuth();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [catalogRevision, setCatalogRevision] = useState(0);
   const [tab, setTab] = useState('methods');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
@@ -23,6 +24,7 @@ export function ConfigurationPage() {
     const response = await fetch('/api/laboratory/configuration', { cache:'no-store', signal:AbortSignal.timeout(10000) });
     if (!response.ok) throw new Error('无法读取配置，请确认登录状态后重试。');
     setCatalog(await response.json() as Catalog);
+    setCatalogRevision(revision => revision + 1);
     setUncertain(false);
   }
   useEffect(() => { void load().catch(e => setError(String(e))); }, []);
@@ -71,7 +73,7 @@ export function ConfigurationPage() {
         <fieldset disabled={busy || uncertain || !can('laboratory.configure')}><MethodEditor catalog={catalog} submit={submit} /></fieldset>
       </>}
       {tab==='types' && <fieldset disabled={busy || uncertain || !can('laboratory.configure')}><h2>已支持的检测类型</h2><p>新检测类型需要对应的类型化结果结构；这里维护现有类型。</p>
-        {catalog.types.filter(t => matches(t.display_name,t.code)).map(t => <form className="config-row" key={t.code} onSubmit={e => {e.preventDefault(); const f = new FormData(e.currentTarget); void submit(`configuration/types/${t.code}`, {display_name:f.get('name'),is_active:f.get('active')==='on'},'PUT');}}>
+        {catalog.types.filter(t => matches(t.display_name,t.code)).map(t => <form className="config-row" key={`${catalogRevision}:${t.code}`} onSubmit={e => {e.preventDefault(); const f = new FormData(e.currentTarget); void submit(`configuration/types/${t.code}`, {display_name:f.get('name'),is_active:f.get('active')==='on'},'PUT');}}>
           <strong>{t.code}</strong><label>显示名称<input name="name" defaultValue={t.display_name} required maxLength={100} /></label><label><input type="checkbox" name="active" defaultChecked={t.is_active} />启用类型</label><button>保存类型</button>
         </form>)}</fieldset>}
       {tab==='instruments' && <>

@@ -10,12 +10,13 @@ Closes #14
 - No guessed ASTM IDs/scientific values, automated acquisition or accreditation workflows.
 
 ## Validation
--190 public-interface/backend tests passed with real dedicated PostgreSQL.
--28 browser acceptance tests passed; TypeScript/Vite build and diff checks passed.
--1280×720 configuration screenshot inspected,1920×1080 browser flows validated.
+- 190 public-interface/backend tests passed with real dedicated PostgreSQL.
+- 29 browser acceptance tests passed; TypeScript/Vite build and diff checks passed.
+- 1280×720 configuration screenshot inspected,1920×1080 browser flows validated.
 - Slice and aggregate review findings fixed and re-reviewed; artifacts in docs/reviews/code-review-20260913-005104.md and code-review-20260913-005931.md.
 
 ## Remaining scope
 - Laboratory owner supplies approved scientific parameters/QA contents; test values are not production defaults.
 - Existing#13 manual feedback stays tracked separately; deployment#20 owns production rollout/dynamic upstream handling. Local API replacement may require restarting the matching frontend container, not resetting data.
-- This is a draft PR, not merge approval. PR review runs after creation; issue closeout comment requires separate authorization.
+- PR review fixed stale type controls after rereading configuration; RED/GREEN regression and independent re-review passed. Artifact: docs/reviews/pr-35-review-20260913-011638.md.
+- This is a draft PR, not merge approval. Issue closeout comment requires separate authorization.

@@ -94,3 +94,23 @@ test('配置提交返回非 JSON 网关错误时先核对结果而非重复提�
   await page.getByRole('button',{name:'重新读取配置'}).click();
   await expect(page.getByRole('button',{name:'新增仪器',exact:true})).toBeEnabled();
 });
+
+test('重新读取检测类型配置后显示最新名称和启用状态',async({page,baseURL})=>{
+  const origin=new URL(baseURL!).origin;
+  const login=await page.request.post('/api/auth/login',{headers:{Origin:origin},data:{username:'browser-admin',password:'Browser changed passphrase 84!'}});
+  const headers={Origin:origin,'X-CSRF-Token':(await login.json()).csrf_token};
+  const catalog=await (await page.request.get('/api/laboratory/configuration')).json();
+  const original=catalog.types.find((t:{code:string})=>t.code==='MOISTURE');
+  await page.goto('/lab/configuration');
+  await page.getByRole('button',{name:'检测类型',exact:true}).click();
+  await page.getByLabel('筛选当前列表').fill('MOISTURE');
+  await expect(page.getByLabel('显示名称',{exact:true})).toHaveValue(original.display_name);
+  try {
+    expect((await page.request.put('/api/laboratory/configuration/types/MOISTURE',{headers,data:{display_name:'更新的微水名称',is_active:false}})).status()).toBe(204);
+    await page.getByRole('button',{name:'重新读取配置'}).click();
+    await expect(page.getByLabel('显示名称',{exact:true})).toHaveValue('更新的微水名称');
+    await expect(page.getByRole('checkbox',{name:'启用类型'})).not.toBeChecked();
+  } finally {
+    await page.request.put('/api/laboratory/configuration/types/MOISTURE',{headers,data:{display_name:original.display_name,is_active:original.is_active}});
+  }
+});
