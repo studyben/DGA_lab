@@ -596,7 +596,8 @@ class LaboratoryWorkbench:
                 raise LaboratoryError('associated_identity_is_fixed', 409)
             connection.execute(
                 text("""UPDATE oil_samples SET sampled_at=:sampled,received_at=:received,
-                site_name=:site,equipment_serial=:serial,notes=:notes,updated_by=:actor,updated_at=:now
+                site_name=:site,equipment_serial=:serial,notes=:notes,updated_by=:actor,updated_at=:now,
+                operations_revision=operations_revision+1
                 WHERE id=:id"""),
                 {'id': sample_id, 'sampled': command.sampled_at, 'received': command.received_at,
                  'site': site, 'serial': serial, 'notes': notes,

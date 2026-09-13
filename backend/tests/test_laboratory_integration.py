@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
 from dga.assets.public import AssetDirectory
-from dga.laboratory.public import ReceiveSample, SampleIdentityStatus, SampleRegistry, LaboratoryReports, ReportState
+from dga.laboratory.public import ReceiveSample, SampleIdentityStatus, SampleRegistry, LaboratoryReports, ReportState, LaboratoryOperations
 from dga.laboratory.report_worker import ReportWorker
 from dga.shared.auth.public import AuditTrail
 from tests.test_asset_import import import_context, new_rows, workbook
@@ -46,6 +46,10 @@ def test_populated_main_upgrade_preserves_assets_samples_imports_and_enables_rep
         asset_before = directory.equipment_detail(actor, TRANSFORMER_ID)
         command.upgrade(config, 'head')
         assert registry.find_by_barcode(actor, sample.barcode_value) == sample
+        operations = LaboratoryOperations(engine,registry,directory,AuditTrail()).sample_operations(actor,sample.barcode_value)
+        assert operations['sample'] == sample
+        assert operations['history'] == []
+        assert all(c['status']=='RECEIVED' and c['revision']==0 for c in operations['containers'])
         assert directory.equipment_detail(actor, TRANSFORMER_ID) == asset_before
         assert imports.get(actor, batch['id']) == published
         files = MemoryFileStore()

@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Callable
 from uuid import UUID
 
-from sqlalchemy import Engine, text
+from sqlalchemy import Connection, Engine, text
 from pydantic import ValidationError
 
 from .dashboard import DashboardQuery, EquipmentQuery
@@ -266,11 +266,19 @@ class AssetDirectory:
         asset_id: UUID,
         *,
         sampled_at: datetime,
+        connection: Connection | None = None,
     ) -> SamplingAssetContext:
-        """Resolve the site and complete equipment path at the sampling instant."""
+        """Resolve sampling identity; optionally join a caller-owned DB transaction.
+
+        The optional connection is transaction infrastructure, not asset-table access:
+        asset traversal/interpretation remains here. Caller retains commit/rollback
+        ownership; this method never closes or commits the supplied connection.
+        """
         require_permission(actor, 'assets.read')
         if sampled_at.tzinfo is None:
             raise AssetQueryError('sampled_at_requires_timezone')
+        if connection is not None:
+            return self._context(connection, asset_id, sampled_at)
         with self._engine.connect() as connection:
             return self._context(connection, asset_id, sampled_at)
 
