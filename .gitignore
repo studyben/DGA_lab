@@ -12,3 +12,4 @@ playwright-report/
 .tools/
 .cache/
 /tmp/pdfs/
+/tmp/configuration.png

@@ -171,6 +171,8 @@ docker compose run --rm migrate alembic upgrade head
 
 独立自动化环境使用 `dga-issue14`（真实 PostgreSQL 公共接口测试）及 `dga-issue14-browser`（端口18104，临时浏览器夹具）。原18093/18097环境不变。测试科学参数如 `TEST-UNIT` 仅是自动化数据，不能作为实验室正式方法。
 
+本地迭代若只重建 API 容器，nginx 可能保留旧容器地址；出现 upstream connect refused/502 时，应重启同一 Compose 项目的 frontend 后检查登录 API。不要为此清空数据库或对象存储。生产滚动更新与动态 DNS 策略留给 #20 部署验收。
+
 ### Issue #13：实验室运营
 
 本地开发基线已整合 #7/#8 至 `0014_merge_laboratory`，保留资产侧 #9–#12 的迁移链。`0015_lab_operations` 在其后新增油样操作修订号、容器状态和不可修改的操作历史；已有油样/条码/检测不重建，已有容器初始显示“已接收”，不补造历史。存在操作历史时禁止直接降级丢弃记录。部署/升级须先备份，不能对验收或生产数据运行测试 fixture。

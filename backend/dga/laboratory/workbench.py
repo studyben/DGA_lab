@@ -805,7 +805,7 @@ class LaboratoryWorkbench:
         connection.execute(text('''UPDATE laboratory_tests SET instrument_id=:instrument,
             quality_snapshot=CAST(:evidence AS jsonb),instrument_name=COALESCE(:name,instrument_name)
             WHERE id=:id'''), dict(id=test_id, instrument=submission.instrument_id,
-            evidence=json.dumps(evidence) if submission.instrument_id or method.qa_checks else None,
+            evidence=json.dumps(evidence),
             name=evidence['instrument']['name'] if evidence['instrument'] else None))
 
     def _assessment(self, identity_status, tests, package=None):

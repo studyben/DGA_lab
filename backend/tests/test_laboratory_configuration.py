@@ -199,3 +199,36 @@ def test_results_reject_nonfinite_and_storage_overflow(workbench_context, value)
     bench = make_workbench(engine, RecordingObjectStore())
     with pytest.raises(LaboratoryError, match='result_out_of_range'):
         bench.add_test(actor, sample.barcode_value, _moisture(method['id'], value=value))
+
+
+def test_unlinked_instrument_is_explicit_in_saved_and_report_evidence(workbench_context):
+    from dga.laboratory.public import LaboratoryReports
+    from dga.shared.auth.public import AuditTrail
+    from dga.laboratory.report_pdf import render_report_pdf
+    from reportlab.lib.rl_accel import escapePDF
+    from datetime import datetime, timezone
+    engine, _, actor, sample = workbench_context
+    method = LaboratoryConfiguration(engine).create_method(actor, method_input())
+    store = RecordingObjectStore()
+    bench = make_workbench(engine, store)
+    record = bench.add_test(actor, sample.barcode_value, _moisture(method['id'], value='8.50'))
+    assert record.quality_snapshot['calibration']['status'] == 'NOT_LINKED'
+    bench.finalize(actor, sample.barcode_value)
+    claim = LaboratoryReports(engine, AuditTrail(), store).claim_next_report('test', lease_seconds=30)
+    assert claim.snapshot['quality_evidence'][0]['calibration']['status'] == 'NOT_LINKED'
+    content = render_report_pdf(claim.snapshot, generated_at=datetime.now(timezone.utc))
+    assert escapePDF('未关联仪器，未评估'.encode('utf-16-be')).encode('ascii') in content
+
+
+def test_downgrade_refuses_to_erase_saved_quality_evidence(workbench_context):
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy.exc import DBAPIError
+    engine, _, actor, sample = workbench_context
+    method = LaboratoryConfiguration(engine).create_method(actor, method_input())
+    bench = make_workbench(engine, RecordingObjectStore())
+    bench.add_test(actor, sample.barcode_value, _moisture(method['id'], value='8.50'))
+    before = bench.load(actor, sample.barcode_value)
+    with pytest.raises(DBAPIError, match='Retained quality evidence'):
+        command.downgrade(Config('alembic.ini'), '0016_lab_configuration')
+    assert bench.load(actor, sample.barcode_value) == before
