@@ -2,6 +2,7 @@ import React from "react";
 import { TrendsPage } from './features/condition-analysis/TrendsPage';
 import { RulesPage } from './features/condition-analysis/RulesPage';
 import { HealthOverview } from './features/condition-analysis/HealthPanel';
+import { AlarmCenterPage } from './features/condition-analysis/AlarmCenterPage';
 import { ConfigurationPage } from './features/laboratory/ConfigurationPage';
 import { createRoot } from "react-dom/client";
 import { assetPages } from "./features/assets/pages";
@@ -115,7 +116,7 @@ function App() {
               </div>
               {!(path === '/assets/analysis/trends' || equipmentId || siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
             </div>
-            {path === '/assets/analysis/rules' ? <RulesPage/> : path === '/assets/analysis/health' ? <HealthOverview/> : path === '/assets/analysis/trends' ? <TrendsPage /> : equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <LaboratoryLedgerPage /> : path === '/lab/identity' ? <IdentityPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/configuration' ? <ConfigurationPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
+            {path === '/assets/analysis/alarms' ? <AlarmCenterPage/> : path === '/assets/analysis/rules' ? <RulesPage/> : path === '/assets/analysis/health' ? <HealthOverview/> : path === '/assets/analysis/trends' ? <TrendsPage /> : equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <LaboratoryLedgerPage /> : path === '/lab/identity' ? <IdentityPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/configuration' ? <ConfigurationPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>
