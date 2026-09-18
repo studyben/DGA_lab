@@ -1,4 +1,5 @@
 """Public application interface for physical transformer trends."""
+from .alarms import AlarmCenter
 from dataclasses import asdict
 import json
 from datetime import date, datetime, time, timedelta, timezone
