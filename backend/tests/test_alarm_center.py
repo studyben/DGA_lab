@@ -9,6 +9,7 @@ from dataclasses import replace
 from dga.shared.auth.public import IdentityError
 from dga.condition_analysis.public import HealthError
 from tests.test_laboratory_workbench import make_workbench, RecordingObjectStore
+from tests.test_asset_search import official_assets
 
 
 def opened(context):
@@ -353,3 +354,39 @@ def test_late_tied_nd_invalidates_recovery(workbench_context):
     assert detail['state']=='UNACKNOWLEDGED'
     assert detail['observation']['reason']=='qualified_result'
     assert detail['events'][-1]['action']=='RECOVERY_INVALIDATED'
+
+
+def test_duplicate_serials_remain_separate_physical_alarm_episodes(official_assets):
+    from tests.test_asset_lifecycle import lifecycle_context
+    from tests.test_asset_search import DUPLICATE_TRANSFORMER_A_ID, DUPLICATE_TRANSFORMER_B_ID
+    _,actor,_=lifecycle_context(official_assets)
+    method=configured_method(official_assets,actor,'DUPLICATE-SERIAL')
+    rule=rules(official_assets).create(actor,command(method))
+    rules(official_assets).activate(actor,rule['id'],0,'test')
+    for asset_id in (DUPLICATE_TRANSFORMER_A_ID,DUPLICATE_TRANSFORMER_B_ID):
+        add_point(official_assets,actor,asset_id,method['id'],0,'20')
+    result=center(official_assets).query(actor,AlarmQuery(equipment='TX-DUP-9009'))
+    assert result['unresolved_count']==2
+    assert {a['asset_id'] for a in result['items']}=={str(DUPLICATE_TRANSFORMER_A_ID),str(DUPLICATE_TRANSFORMER_B_ID)}
+
+
+def test_replacement_normal_does_not_resolve_removed_transformer_alarm(official_assets):
+    from dga.assets.public import AssetLifecycle
+    from tests.test_asset_lifecycle import lifecycle_context,at
+    from tests.test_asset_search import CURRENT_TRANSFORMER_ID,DUPLICATE_TRANSFORMER_B_ID,WHOLE_UNIT_ID
+    _,actor,_=lifecycle_context(official_assets)
+    method=configured_method(official_assets,actor,'REPLACEMENT')
+    rule=rules(official_assets).create(actor,command(method))
+    rules(official_assets).activate(actor,rule['id'],0,'test')
+    add_point(official_assets,actor,CURRENT_TRANSFORMER_ID,method['id'],0,'20')
+    alarm=center(official_assets).query(actor)['items'][0]
+    lifecycle=AssetLifecycle(official_assets,clock=lambda:NOW)
+    lifecycle.move(actor,DUPLICATE_TRANSFORMER_B_ID,destination='REPAIR_CENTER',effective_at=at(2026,8,2),reason='prepare',expected_revision=0)
+    lifecycle.change_status(actor,DUPLICATE_TRANSFORMER_B_ID,status='SPARE',effective_at=at(2026,8,3),reason='ready',expected_revision=1)
+    lifecycle.replace_transformer(actor,CURRENT_TRANSFORMER_ID,replacement_id=DUPLICATE_TRANSFORMER_B_ID,effective_at=at(2026,8,4),reason='replace',expected_revision=0,replacement_revision=2)
+    add_point(official_assets,actor,DUPLICATE_TRANSFORMER_B_ID,method['id'],5,'2')
+    assert center(official_assets).query(actor,AlarmQuery(asset_id=WHOLE_UNIT_ID))['unresolved_count']==0
+    detail=center(official_assets).detail(actor,alarm['id'])
+    assert detail['state']=='UNACKNOWLEDGED'
+    assert detail['current_asset']['location_kind']=='REPAIR_CENTER'
+    assert detail['trigger']['measurement']['sampling_context']['site_name']=='Prairie Sun'
