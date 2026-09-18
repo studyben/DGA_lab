@@ -11,6 +11,8 @@ from dga.laboratory.public import HealthResultReader
 from dga.shared.auth.public import require_permission, AuditTrail
 from .rules import encode, HealthError, validate_revision
 from .alarm_inputs import stable_observation, assessments, worst
+from .alarm_state import can_recover, sampled, observation, inherit_baseline, recovery_valid
+from .alarm_query import AlarmQuery, filtered
 
 
 class _Action(StrEnum):
@@ -75,28 +77,75 @@ class AlarmCenter:
                 if current['version'] != generation:
                     continue
                 rows = self._rows(c)
+                previous = {a['id']:(a['revision'],encode(a)) for a in rows}
+                valid_measurements = {encode(asdict(p)) for p in points}
+                groups={}
+                for point in points:
+                    groups.setdefault((str(point.asset_id),point.test_type,point.analyte,point.sampled_at),set()).add(encode(asdict(point)))
+                for alarm in rows:
+                    sources = observed.get((alarm['asset_id'],alarm['test_type'],alarm['analyte']),[])
+                    alarm['trigger_currently_finalized']=encode(alarm['trigger']['measurement']) in valid_measurements
+                    alarm['observation']=observation(alarm,sources)
+                # Reconcile all invalidated episodes before attempting recovery.
+                for alarm in sorted(rows,key=lambda a: sampled([a['trigger']])):
+                    sources = observed.get((alarm['asset_id'],alarm['test_type'],alarm['analyte']),[])
+                    if alarm['state']=='RESOLVED' and not alarm['superseded_by'] and not recovery_valid(alarm,groups):
+                        for other in rows:
+                            if other['id']!=alarm['id'] and not other['superseded_by'] and other['state']!='RESOLVED' and (other['asset_id'],other['test_type'],other['analyte'])==(alarm['asset_id'],alarm['test_type'],alarm['analyte']):
+                                if sampled([other['trigger']])>=sampled([alarm['trigger']]):
+                                    inherit_baseline(alarm,other)
+                                    other['superseded_by']=alarm['id']
+                                    self._save(c,other,'CONSOLIDATED',now)
+                                else:
+                                    inherit_baseline(other,alarm)
+                                    other['observation']=observation(other,sources)
+                                    self._save(c,other,'BASELINE_INHERITED',now)
+                                    alarm['superseded_by']=other['id']
+                        alarm['state']='ACKNOWLEDGED' if alarm['acknowledgement'] else 'UNACKNOWLEDGED'
+                        alarm['recovery']=None
+                        alarm['observation']=observation(alarm,sources)
+                        self._save(c,alarm,'RECOVERY_INVALIDATED',now)
                 for key, sources in observed.items():
                     source = worst(sources)
                     if source['status'] not in ('ATTENTION','WARNING','CRITICAL'):
                         continue
                     existing = next((a for a in rows if (a['asset_id'],a['test_type'],a['analyte'])==key and a['state']!='RESOLVED' and not a['superseded_by']),None)
                     if existing:
+                        if sampled(sources)>=sampled(existing['latest_abnormal']) and sources!=existing['latest_abnormal']:
+                            existing['latest_abnormal']=sources
+                            existing['severity']=source['status']
+                            existing['observation']=observation(existing,sources)
+                            self._save(c,existing,'ABNORMAL_UPDATED',now)
+                        continue
+                    recovered = [a for a in rows if (a['asset_id'],a['test_type'],a['analyte'])==key and a['recovery']]
+                    if recovered and sampled(sources)<=max(sampled(a['recovery']['sources']) for a in recovered):
                         continue
                     alarm = dict(id=str(uuid4()),asset_id=key[0],test_type=key[1],analyte=key[2],state='UNACKNOWLEDGED',
                         revision=0,opened_at=now.isoformat(),superseded_by=None,trigger=source,latest_abnormal=sources,
                         severity=source['status'],acknowledgement=None,recovery=None)
+                    alarm['trigger_currently_finalized']=True
+                    alarm['observation']=observation(alarm,sources)
                     c.execute(text('INSERT INTO alarm_episodes(id,asset_id,test_type,analyte,state,revision,opened_at,data) VALUES(:id,:asset_id,:test_type,:analyte,:state,:revision,:opened_at,CAST(:data AS jsonb))'),alarm|{'data':encode(alarm)})
                     self._event(c,alarm,'OPENED',now)
                     rows.append(alarm)
+                for alarm in rows:
+                    sources = observed.get((alarm['asset_id'],alarm['test_type'],alarm['analyte']),[])
+                    if alarm['state']!='RESOLVED' and not alarm['superseded_by'] and can_recover(alarm,sources):
+                        alarm['state']='RESOLVED'
+                        alarm['recovery']=dict(at=now.isoformat(),sources=sources)
+                        alarm['observation']=observation(alarm,sources)
+                        self._save(c,alarm,'RESOLVED',now)
+                    prior=previous.get(alarm['id'])
+                    if prior and prior[0]==alarm['revision'] and prior[1]!=encode(alarm):
+                        self._save(c,alarm,'OBSERVATION_CHANGED',now)
                 if fingerprint != current['fingerprint']:
                     c.execute(text('UPDATE alarm_generation SET version=version+1,fingerprint=:fingerprint WHERE id=1'),{'fingerprint':fingerprint})
                 return rows, {a['id']:a for a in contexts}, now
         raise HealthError('alarm_inputs_changed',409)
 
-    def query(self, actor):
+    def query(self, actor, query: AlarmQuery | None=None):
         rows, contexts, now = self._refresh(actor)
-        rows = [a|{'current_asset':contexts.get(a['asset_id'])} for a in rows if not a['superseded_by']]
-        return dict(items=rows,total=len(rows),unresolved_count=sum(a['state']!='RESOLVED' for a in rows),checked_at=now.isoformat())
+        return filtered(rows,contexts,query or AlarmQuery(),now)
 
     def detail(self, actor, identifier):
         rows, contexts, now = self._refresh(actor)
