@@ -169,6 +169,17 @@ class LaboratoryConfiguration:
         self._engine = engine
         self._audit = AuditTrail()
 
+    def health_methods(self, actor):
+        """Narrow analysis catalog; exposes no instrument or package maintenance data."""
+        require_permission(actor, 'analysis.read')
+        with self._engine.connect() as c:
+            rows = c.execute(text('''SELECT id,test_type,display_name,version_label,is_active,configuration
+                FROM test_method_versions ORDER BY test_type,version_label''')).mappings().all()
+            fields = c.execute(text('SELECT method_version_id,field_code,unit_code FROM test_method_fields ORDER BY sort_order')).mappings().all()
+            return tuple(dict(id=r['id'], test_type=r['test_type'], name=r['display_name'],
+                version_label=r['version_label'], is_active=r['is_active'], configured=r['configuration'] is not None,
+                fields=[dict(code=f['field_code'], unit_code=f['unit_code']) for f in fields if f['method_version_id'] == r['id']]) for r in rows)
+
     def catalog(self, actor):
         require_permission(actor, 'laboratory.read')
         with self._engine.connect().execution_options(isolation_level='REPEATABLE READ') as c:

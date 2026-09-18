@@ -39,6 +39,7 @@ from dga.laboratory.public import (
 from dga.condition_analysis.public import (
     MODULE as CONDITION_ANALYSIS, access_context as analysis_access,
     TransformerTrends, http_router as analysis_router,
+    HealthRules, DeviceHealth, HealthError, health_router,
 )
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
@@ -72,6 +73,10 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
     @app.exception_handler(IdentityError)
     async def identity_error(request, error):
         return JSONResponse(status_code=error.status, content={'code': error.code}, headers={'Cache-Control': 'no-store'})
+
+    @app.exception_handler(HealthError)
+    async def health_error(request,error):
+        return JSONResponse(status_code=error.status,content={'code':error.code},headers={'Cache-Control':'no-store'})
 
     @app.exception_handler(AssetQueryError)
     async def asset_query_error(request, error):
@@ -107,6 +112,8 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
     mutation_actor = requests.mutation_actor
 
     asset_directory = AssetDirectory(engine)
+    health_rules=HealthRules(engine,LaboratoryConfiguration(engine),asset_directory)
+    app.include_router(health_router(health_rules,DeviceHealth(engine,asset_directory,LaboratoryTrendSource(engine),health_rules),current_actor,mutation_actor))
     app.include_router(analysis_router(TransformerTrends(asset_directory, LaboratoryTrendSource(engine)), current_actor))
     app.include_router(assets_router(asset_directory, current_actor, AssetLifecycle(engine), mutation_actor))
     configured_object_store = file_store if file_store is not None else UnavailableFileStore()

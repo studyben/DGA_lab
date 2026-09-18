@@ -104,6 +104,19 @@ class TransformerReader(Protocol):
     def transformer_identity(self, actor: ActorContext, asset_id: UUID) -> TransformerIdentity: ...
 
 
+@dataclass(frozen=True)
+class HealthAsset:
+    id: UUID
+    asset_type: str
+    serial_number: str
+    system_asset_number: str
+    parent_asset_id: UUID | None
+
+
+class HealthAssetReader(Protocol):
+    def health_assets(self, actor: ActorContext, root: UUID, at: datetime) -> tuple[HealthAsset, ...]: ...
+
+
 class AssetDirectory:
     """Read-only official asset queries used by the portal and laboratory module."""
 
@@ -136,6 +149,32 @@ class AssetDirectory:
         if row['asset_type'] != 'TRANSFORMER':
             raise AssetQueryError('transformer_required')
         return TransformerIdentity(row['id'], row['system_asset_number'], row['serial_number'], row['model'])
+
+    def health_assets(self, actor: ActorContext, root: UUID, at: datetime) -> tuple[HealthAsset, ...]:
+        """Current subtree facts, without analysis policy or inferred health."""
+        require_permission(actor, 'analysis.read')
+        if at.tzinfo is None or at.utcoffset() is None:
+            raise AssetQueryError('timezone_required')
+        with self._engine.connect() as c:
+            rows = c.execute(text('''WITH RECURSIVE tree AS (
+                SELECT a.id,a.asset_type,a.serial_number,a.system_asset_number,NULL::uuid AS parent_asset_id,
+                    ARRAY[a.id] AS path,false AS cycle FROM formal_assets a WHERE a.id=:root
+                UNION ALL
+                SELECT a.id,a.asset_type,a.serial_number,a.system_asset_number,i.parent_asset_id,
+                    t.path||a.id,a.id=ANY(t.path) FROM tree t
+                JOIN asset_installations i ON i.parent_asset_id=t.id AND i.valid_from<=:at
+                    AND (i.valid_to IS NULL OR :at<i.valid_to)
+                JOIN formal_assets a ON a.id=i.asset_id WHERE NOT t.cycle
+            ), active_counts AS (
+                SELECT asset_id,count(*) AS locations FROM asset_installations
+                WHERE valid_from<=:at AND (valid_to IS NULL OR :at<valid_to) GROUP BY asset_id
+            ) SELECT tree.*,COALESCE(active_counts.locations,0) AS locations FROM tree
+              LEFT JOIN active_counts ON active_counts.asset_id=tree.id ORDER BY tree.id'''), dict(root=root,at=at)).mappings().all()
+        if not rows:
+            raise AssetQueryError('asset_not_found',404)
+        if any(r['cycle'] or r['locations']>1 for r in rows) or len({r['id'] for r in rows}) != len(rows):
+            raise AssetQueryError('ambiguous_asset_hierarchy',409)
+        return tuple(HealthAsset(r['id'],r['asset_type'],r['serial_number'],r['system_asset_number'],r['parent_asset_id']) for r in rows)
 
     def site_detail(self, actor: ActorContext, site_id: UUID, **filters) -> dict:
         require_permission(actor, 'assets.read')

@@ -1,4 +1,5 @@
 export const analysisPages = [
+  { path: '/assets/analysis/rules', permission: 'analysis.read', title: '健康规则', description: '配置、批准与追溯设备健康评估规则。' },
   {
     path: "/assets/analysis/trends",
     permission: 'analysis.read',
