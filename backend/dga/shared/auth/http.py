@@ -24,7 +24,7 @@ def session_body(session: Session):
     return dict(actor=dict(id=str(actor.user_id), username=actor.username, display_name=actor.display_name),
                 roles=sorted(actor.roles), permissions=sorted(actor.permissions),
                 must_change_password=actor.must_change_password, csrf_token=session.csrf_token,
-                expires_at=session.expires_at.isoformat())
+                expires_at=session.expires_at.isoformat(), local_password_available=session.local_password_available)
 
 
 class AuthenticatedRequests:

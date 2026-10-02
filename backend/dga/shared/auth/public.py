@@ -102,6 +102,7 @@ class Session:
     csrf_token: str
     expires_at: datetime
     token: str  # Transport secret: never serialize this record directly to JSON or logs.
+    local_password_available: bool = True
 
 
 def _token_hash(token: str) -> str:
@@ -145,12 +146,12 @@ class IdentityService:
             JOIN user_roles ur ON ur.role_id=r.id WHERE ur.user_id=:id AND r.is_active'''), {'id': user['id']}).scalars().all()
         return ActorContext(user['id'], user['username'], user['display_name'], frozenset(roles), frozenset(grants), user['must_change_password'])
 
-    def _new_session(self, connection, user) -> Session:
+    def _new_session(self, connection, user, *, expires_at=None) -> Session:
         token, csrf = token_urlsafe(32), token_urlsafe(32)
-        expiry = self._clock() + self._lifetime
+        expiry = expires_at or self._clock() + self._lifetime
         connection.execute(text('INSERT INTO auth_sessions(token_hash,user_id,csrf_token,expires_at) VALUES (:hash,:id,:csrf,:expiry)'),
                            dict(hash=_token_hash(token), id=user['id'], csrf=csrf, expiry=expiry))
-        return Session(self._actor(connection, user), csrf, expiry, token)
+        return Session(self._actor(connection, user), csrf, expiry, token, bool(user['password_hash']))
 
     def bootstrap_admin(self, username: str, display_name: str, password: str) -> UUID:
         """Trusted local operator operation only; refuses once any user exists."""
@@ -206,14 +207,14 @@ class IdentityService:
     def session(self, token: str) -> Session:
         with self._engine.begin() as c:
             user, row = self._resolve(c, token)
-            return Session(self._actor(c, user), row['csrf_token'], row['expires_at'], token)
+            return Session(self._actor(c, user), row['csrf_token'], row['expires_at'], token, bool(user['password_hash']))
 
     def change_password(self, token: str, current_password: str, new_password: str) -> Session:
         _validate_password(new_password)
         result = None
         with self._engine.begin() as c:
             user, _ = self._resolve(c, token, lock=True)
-            if _password_ok(current_password, user['password_hash']) and not _password_ok(new_password, user['password_hash']):
+            if user['password_hash'] and _password_ok(current_password, user['password_hash']) and not _password_ok(new_password, user['password_hash']):
                 c.execute(text('UPDATE users SET password_hash=:hash,must_change_password=FALSE,updated_at=:now WHERE id=:id'),
                           dict(id=user['id'], hash=HASHER.hash(new_password), now=self._clock()))
                 c.execute(text('DELETE FROM auth_sessions WHERE user_id=:id'), {'id': user['id']})

@@ -22,12 +22,13 @@ import { ReportPage } from './features/laboratory/ReportPage';
 import { LaboratoryHomePage } from './features/laboratory/OperationsPages';
 import { IdentityPage, LaboratoryLedgerPage } from './features/laboratory/SampleOperationsPanel';
 import { UserManagementPage } from './features/identity/UserManagementPage';
+import { OidcConfigurationPage } from './features/identity/OidcConfigurationPage';
 
 const path =
   window.location.pathname === "/"
     ? "/assets"
     : window.location.pathname.replace(/\/$/, "");
-const allPages = [...assetPages, ...laboratoryPages, ...analysisPages, { path: '/settings/users', title: '用户与角色', description: '管理内部账号、业务角色及访问状态。', permission: 'assets.read' }];
+const allPages = [...assetPages, ...laboratoryPages, ...analysisPages, { path: '/settings/users', title: '用户与角色', description: '管理内部账号、业务角色及访问状态。', permission: 'assets.read' }, { path: '/settings/sso', title: 'Okta OIDC 配置', description: '管理公司登录配置、测试证明及外部身份关联。', permission: 'identity.manage' }];
 const siteId = path.match(/^\/assets\/sites\/([^/]+)$/)?.[1];
 const equipmentId = path.match(/^\/assets\/equipment\/([^/]+)$/)?.[1];
 const current = equipmentId ? { title: '设备详情', description: '查看设备属性、子设备和油样检测历史。', permission: 'assets.read' } : siteId ? { title: '现场详情', description: '查看现场基础资料及当前一级设备。', permission: 'assets.read' } : allPages.find((page) => page.path === path);
@@ -92,6 +93,7 @@ function App() {
               </>
             )}
             {['identity.manage', 'identity.ordinary.manage', 'identity.am.manage'].some(can) && <><p className="nav-caption analysis-caption">系统管理</p><a href="/settings/users" aria-current={path === '/settings/users' ? 'page' : undefined}>用户与角色</a></>}
+            {can('identity.manage') && <a href="/settings/sso" aria-current={path === '/settings/sso' ? 'page' : undefined}>Okta OIDC 配置</a>}
           </nav>
           <div className="sidebar-foot">
             <span className="small-mark">DGA LAB</span>
@@ -118,7 +120,7 @@ function App() {
               </div>
               {!(path === '/assets/analysis/trends' || equipmentId || siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
             </div>
-            {path === '/settings/users' ? <UserManagementPage/> : path === '/assets/analysis/alarms' ? <AlarmCenterPage/> : path === '/assets/analysis/rules' ? <RulesPage/> : path === '/assets/analysis/health' ? <HealthOverview/> : path === '/assets/analysis/trends' ? <TrendsPage /> : equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <LaboratoryLedgerPage /> : path === '/lab/identity' ? <IdentityPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/configuration' ? <ConfigurationPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
+            {path === '/settings/sso' ? <OidcConfigurationPage/> : path === '/settings/users' ? <UserManagementPage/> : path === '/assets/analysis/alarms' ? <AlarmCenterPage/> : path === '/assets/analysis/rules' ? <RulesPage/> : path === '/assets/analysis/health' ? <HealthOverview/> : path === '/assets/analysis/trends' ? <TrendsPage /> : equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <LaboratoryLedgerPage /> : path === '/lab/identity' ? <IdentityPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/configuration' ? <ConfigurationPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>

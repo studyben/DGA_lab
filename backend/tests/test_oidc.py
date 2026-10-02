@@ -231,3 +231,121 @@ def test_token_expired_in_transit_is_rejected(oidc_context):
     state['patch'] = {'iat': timestamp, 'exp': timestamp + 1}
     with pytest.raises(IdentityError, match='oidc_provider_rejected'):
         service.complete_test(challenge, flow['browser_binding'], 'code', admin.token)
+
+
+def activate(context):
+    service, admin, candidate, _ = context
+    flow, challenge = start_test(context)
+    proof = service.complete_test(challenge, flow['browser_binding'], 'code', admin.token)
+    service.activate(admin.actor, candidate, proof['proof_id'], expected_revision=0)
+    return proof
+
+
+def employee_login(context):
+    service, _, _, state = context
+    flow = service.start_login()
+    query = parse_qs(urlsplit(flow['authorization_url']).query)
+    state['nonce'] = query['nonce'][0]
+    return service.complete_login(query['state'][0], flow['browser_binding'], 'code')
+
+
+def test_verified_employee_login_is_stable_least_privilege_and_absolute(oidc_context, identity):
+    from datetime import timedelta
+    service, admin, _, state = oidc_context
+    identity_service, _ = identity
+    activate(oidc_context)
+    state['patch'] = {'roles': ['system_admin'], 'groups': ['admins']}
+    first = employee_login(oidc_context)
+    assert first.actor.roles == frozenset({'field_engineer'})
+    assert first.expires_at == state['now'] + timedelta(hours=8)
+    identity_service.change_roles(admin.actor, first.actor.user_id, add=['analyst'], remove=[], expected_revision=0)
+    second = employee_login(oidc_context)
+    assert second.actor.user_id == first.actor.user_id
+    assert second.actor.roles == frozenset({'field_engineer', 'analyst'})
+    state['now'] += timedelta(hours=7)
+    # Reconstructed identity facade shares the injected verification clock, not sliding expiry.
+    clocked = IdentityService(identity_service._engine, clock=lambda: state['now'], session_hours=24)
+    assert clocked.session(first.token).expires_at == first.expires_at
+    state['now'] += timedelta(hours=1)
+    with pytest.raises(IdentityError, match='session_expired'):
+        clocked.session(first.token)
+
+
+def test_candidate_requires_recent_same_admin_proof_and_stale_activation_keeps_active(oidc_context, identity):
+    from tests.test_identity_management import INITIAL
+    service, admin, candidate, state = oidc_context
+    identity_service, _ = identity
+    proof = activate(oidc_context)
+    another = service.save_candidate(admin.actor, issuer='https://tenant.example', client_id='another', client_secret='another-secret')
+    with pytest.raises(IdentityError, match='oidc_test_required'):
+        service.activate(admin.actor, another, proof['proof_id'], expected_revision=1)
+    with pytest.raises(IdentityError, match='stale_oidc_configuration'):
+        service.activate(admin.actor, candidate, proof['proof_id'], expected_revision=0)
+    identity_service.provision_user(admin.actor, 'backup', 'Backup', INITIAL, ['system_admin'])
+    first = identity_service.login('backup', INITIAL)
+    backup = identity_service.change_password(first.token, INITIAL, CHANGED)
+    with pytest.raises(IdentityError, match='oidc_test_required'):
+        service.activate(backup.actor, candidate, proof['proof_id'], expected_revision=1)
+    assert service.configuration(admin.actor)['active_id'] == candidate
+
+
+def test_external_employee_cannot_change_password_and_disabled_account_cannot_login(oidc_context, identity):
+    from tests.test_identity_management import INITIAL
+    service, admin, _, _ = oidc_context
+    identity_service, _ = identity
+    activate(oidc_context)
+    employee = employee_login(oidc_context)
+    with pytest.raises(IdentityError, match='password_change_failed'):
+        identity_service.change_password(employee.token, INITIAL, CHANGED)
+    identity_service.set_status(admin.actor, employee.actor.user_id, 'DISABLED', expected_revision=0)
+    with pytest.raises(IdentityError, match='oidc_account_unavailable'):
+        employee_login(oidc_context)
+
+
+@pytest.mark.parametrize('hints', [ {'preferred_username': 'employee@example.com'},
+    {'preferred_username': 'different', 'email': 'employee@example.com'} ])
+def test_existing_username_not_auto_linked_and_explicit_proof_binding_preserves_roles(oidc_context, identity, hints):
+    from tests.identity_seed import seed_legacy_user
+    from tests.test_identity_management import INITIAL
+    service, admin, _, state = oidc_context
+    identity_service, _ = identity
+    activate(oidc_context)
+    target = seed_legacy_user(identity_service._engine.url.render_as_string(hide_password=False), 'employee@example.com', 'Employee', INITIAL, ['analyst'])
+    state['patch'] = hints
+    with pytest.raises(IdentityError, match='oidc_link_required'):
+        employee_login(oidc_context)
+    flow, challenge = start_test(oidc_context)
+    proof = service.complete_test(challenge, flow['browser_binding'], 'code', admin.token)
+    service.bind_identity(admin.actor, target, proof['proof_id'], expected_revision=0)
+    employee = employee_login(oidc_context)
+    assert employee.actor.user_id == target
+    assert employee.actor.roles == frozenset({'analyst'})
+
+
+def test_candidate_callback_is_allowlisted_immutable_and_bound_to_start_origin(oidc_context, identity):
+    service, admin, _, state = oidc_context
+    configured = OidcService(identity[0]._engine, encryption_key=KEY, allowed_hosts={'tenant.example'},
+        callback_url='http://127.0.0.1:18118/api/auth/oidc/callback',
+        callback_origins={'http://127.0.0.1:18118', 'https://portal.example'}, provider=service._provider)
+    candidate = configured.save_candidate(admin.actor, issuer='https://tenant.example', client_id='test-client',
+        client_secret='secret', callback_url='https://portal.example/api/auth/oidc/callback')
+    with pytest.raises(IdentityError, match='oidc_callback_origin_mismatch'):
+        configured.start_test(admin.token, candidate, origin='http://127.0.0.1:18118')
+    for callback in ('https://evil.example/api/auth/oidc/callback', 'https://portal.example/other',
+                     'https://portal.example/api/auth/oidc/callback?x=1'):
+        with pytest.raises(IdentityError, match='oidc_callback_not_allowed'):
+            configured.save_candidate(admin.actor, issuer='https://tenant.example', client_id='test-client',
+                client_secret='secret', callback_url=callback)
+    reopened = OidcService(identity[0]._engine, encryption_key=KEY, allowed_hosts={'tenant.example'},
+        callback_url='http://127.0.0.1:18118/api/auth/oidc/callback',
+        callback_origins={'https://portal.example'}, provider=service._provider)
+    flow = reopened.start_test(admin.token, candidate, origin='https://portal.example')
+    query = parse_qs(urlsplit(flow['authorization_url']).query)
+    assert query['redirect_uri'] == ['https://portal.example/api/auth/oidc/callback']
+    state['nonce'] = query['nonce'][0]
+    proof = reopened.complete_test(query['state'][0], flow['browser_binding'], 'code', admin.token)
+    token_request = [r for r in state['requests'] if r.url.path == '/token'][-1]
+    assert parse_qs(token_request.content.decode())['redirect_uri'] == query['redirect_uri']
+    reopened.activate(admin.actor, candidate, proof['proof_id'], expected_revision=0)
+    with pytest.raises(IdentityError, match='oidc_callback_origin_mismatch'):
+        reopened.start_login(origin='http://127.0.0.1:18118')

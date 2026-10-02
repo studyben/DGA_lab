@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     oidc_encryption_key: SecretStr | None = None
     oidc_allowed_hosts: str = ''
     oidc_callback_url: str = ''
+    oidc_callback_origins: str = ''
     object_store_endpoint: str | None = None
     object_store_bucket: str | None = None
     object_store_access_key: SecretStr | None = None

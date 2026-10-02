@@ -44,13 +44,14 @@ from dga.condition_analysis.public import (
     AlarmCenter, alarm_router,
 )
 from dga.shared.contracts import ModuleDescriptor
-from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
+from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError, OidcService
+from dga.shared.auth.oidc_http import oidc_router
 from dga.shared.auth.http import AuthenticatedRequests, auth_router
 from dga.shared.auth.management_http import management_router
 from dga.shared.files import FileStore, ObjectStorageError, S3CompatibleFileStore, UnavailableFileStore
 
 
-def create_app(settings: Settings | None = None, *, file_store: FileStore | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, file_store: FileStore | None = None, oidc_provider=None) -> FastAPI:
     settings = settings or Settings()
     migrations = Config(str(Path(__file__).resolve().parents[1] / 'alembic.ini'))
     expected_heads = set(ScriptDirectory.from_config(migrations).get_heads())
@@ -73,6 +74,13 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
     requests = AuthenticatedRequests(identity, settings)
     app.include_router(auth_router(identity, settings, requests))
     app.include_router(management_router(identity, requests))
+    oidc = OidcService(engine,
+        encryption_key=settings.oidc_encryption_key.get_secret_value() if settings.oidc_encryption_key else None,
+        allowed_hosts={host.strip().lower() for host in settings.oidc_allowed_hosts.split(',') if host.strip()},
+        callback_url=settings.oidc_callback_url,
+        callback_origins={origin.strip() for origin in settings.oidc_callback_origins.split(',') if origin.strip()},
+        provider=oidc_provider)
+    app.include_router(oidc_router(oidc, requests, settings))
 
     @app.exception_handler(IdentityError)
     async def identity_error(request, error):

@@ -63,6 +63,8 @@ TEST callback revalidates initiating administrator session/authority, does not c
 
 ## Ordered small slices (one at a time)
 
+B2 review correction (ADR-0007 alignment, no goal expansion): registered callback_url belongs to each immutable candidate, editable in Settings within deployment callback-origin allowlist and fixed /api/auth/oidc/callback path. Deployment default only prefills new candidates. Start rejects a different browser Origin before redirect (host-only binding cookie); pre-B2 candidates without stored callback require explicit recreation/retest, never silent fallback. Sequential migration0029 preserves their records. This supersedes the earlier service-global callback description above. Nginx OIDC prefix retains query-free status/timing logs and suppresses raw-request error logs, including noncanonical callback paths. Review artifact code-review-20261002-031441.md.
+
 Each slice: red public-interface test → minimal implementation → repeat, then deepreview/fix/re-review artifact and protected local commit. No bulk imagined tests. Tests query observable public outcomes, not internal schema except migration fixtures.
 
 ### A0 — last local administrator safety

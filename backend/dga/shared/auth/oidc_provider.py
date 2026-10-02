@@ -16,7 +16,7 @@ class VerifiedIdentity:
     issuer: str
     subject: str
     display_name: str
-    login_hint: str | None
+    login_hints: tuple[str, ...]
 
 
 class OidcProvider(Protocol):
@@ -113,9 +113,10 @@ class OktaProvider:
                 if not isinstance(subject, str) or not 1 <= len(subject) <= 255:
                     raise ValueError('invalid subject')
                 name = claims.get('name')
-                hint = claims.get('preferred_username') or claims.get('email')
+                hints = tuple({value.strip().lower() for value in (claims.get('preferred_username'), claims.get('email'))
+                    if isinstance(value, str) and 1 <= len(value.strip()) <= 320})
                 return VerifiedIdentity(config['issuer'], subject,
                     name[:150] if isinstance(name, str) and name.strip() else 'Okta employee',
-                    hint.strip().lower()[:320] if isinstance(hint, str) else None)
+                    hints)
         except Exception:
             raise IdentityError('oidc_provider_rejected', 502) from None
