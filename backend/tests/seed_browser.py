@@ -1,6 +1,7 @@
 """Destructive fixture setup exclusively for the isolated browser-test database."""
 from datetime import datetime, timezone
 from tests.laboratory_seed import restore_placeholder_methods
+from tests.identity_seed import seed_legacy_user
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -30,11 +31,11 @@ def main():
         service.bootstrap_admin('browser-admin', '测试管理员', initial)
         login = service.login('browser-admin', initial)
         admin = service.change_password(login.token, initial, changed)
-        service.provision_user(admin.actor, 'first-login', '首次登录测试', initial, ['lab_admin'])
-        service.provision_user(admin.actor, 'field-user', '现场工程师', initial, ['field_engineer'])
+        seed_legacy_user(value, 'first-login', '首次登录测试', initial, ['lab_admin'])
+        seed_legacy_user(value, 'field-user', '现场工程师', initial, ['field_engineer'])
         field = service.login('field-user', initial)
         service.change_password(field.token, initial, changed)
-        service.provision_user(admin.actor, 'operations-reader', '实验室只读测试', initial, ['management_readonly'])
+        seed_legacy_user(value, 'operations-reader', '实验室只读测试', initial, ['management_readonly'])
         reader = service.login('operations-reader', initial)
         service.change_password(reader.token, initial, changed)
         with engine.begin() as connection:

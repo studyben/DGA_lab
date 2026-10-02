@@ -109,7 +109,8 @@ def workbench_context(database_url):
             {'asset': ASSET_ID},
         )
     identity = IdentityService(engine)
-    identity.bootstrap_admin('workbench-admin', 'Workbench Admin', INITIAL_PASSWORD)
+    from tests.identity_seed import seed_legacy_user
+    seed_legacy_user(database_url, 'workbench-admin', 'Workbench Admin', INITIAL_PASSWORD, ['system_admin'])
     first = identity.login('workbench-admin', INITIAL_PASSWORD)
     actor = identity.change_password(first.token, INITIAL_PASSWORD, CHANGED_PASSWORD).actor
     sample = SampleRegistry(engine, AssetDirectory(engine), AuditTrail()).receive(
@@ -478,6 +479,7 @@ def test_removing_a_selected_result_audits_selection_clear(workbench_context):
     assert actions[-2:] == ['LAB_TEST_REMOVED', 'REPORT_RESULT_CLEARED']
 
 
+@pytest.mark.parametrize('database_url', ['0024_alarm_observation'], indirect=True)
 def test_finalized_data_survives_0006_downgrade_and_reupgrade_as_open(workbench_context):
     engine, _, actor, sample = workbench_context
     workbench = make_workbench(engine, RecordingObjectStore())

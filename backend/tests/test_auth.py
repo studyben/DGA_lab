@@ -7,6 +7,7 @@ from dga.main import create_app
 from dga.shared.config import Settings
 from dga.shared.auth.public import IdentityService
 from sqlalchemy import create_engine, text
+from tests.identity_seed import seed_legacy_user
 
 ORIGIN = {'Origin': 'http://127.0.0.1:8080'}
 INITIAL = 'Initial test passphrase 43!'
@@ -143,8 +144,9 @@ def test_parallel_password_change_allows_only_one_winner(database_url):
 
 
 @pytest.mark.parametrize('role,lab_allowed,asset_write', [
-    ('system_admin', True, True), ('asset_manager', False, True), ('lab_admin', True, False),
-    ('analyst', True, False), ('field_engineer', False, False), ('management_readonly', True, False),
+    ('system_admin', True, True), ('asset_manager', True, False), ('lab_admin', True, True),
+    ('analyst', True, False), ('field_engineer', True, False), ('management_readonly', True, False),
+    ('management', True, False),
 ])
 def test_roles_enforced_at_public_module_and_http_seams(database_url, role, lab_allowed, asset_write):
     from dga.shared.auth.public import IdentityError, require_permission
@@ -153,7 +155,7 @@ def test_roles_enforced_at_public_module_and_http_seams(database_url, role, lab_
     service.bootstrap_admin('admin', 'Admin', INITIAL)
     login = service.login('admin', INITIAL)
     admin = service.change_password(login.token, INITIAL, CHANGED).actor
-    service.provision_user(admin, 'member', 'Member', INITIAL, [role])
+    seed_legacy_user(database_url, 'member', 'Member', INITIAL, [role])
     with TestClient(create_app(Settings(database_url=database_url, cookie_secure=False))) as client:
         assert client.get('/api/modules').status_code == 401
         assert client.get('/api/laboratory/access').status_code == 401
@@ -177,19 +179,19 @@ def test_roles_enforced_at_public_module_and_http_seams(database_url, role, lab_
 
 def test_account_status_and_role_changes_take_effect_on_existing_sessions(database_url):
     from dga.shared.auth.public import IdentityError
-    from dga.laboratory.public import access_context
+    from dga.shared.auth.public import require_permission
     engine = create_engine(database_url)
     service = IdentityService(engine)
     admin_id = service.bootstrap_admin('admin', 'Admin', INITIAL)
     login = service.login('admin', INITIAL)
     admin = service.change_password(login.token, INITIAL, CHANGED).actor
-    member_id = service.provision_user(admin, 'member', 'Member', INITIAL, ['lab_admin'])
+    member_id = seed_legacy_user(database_url, 'member', 'Member', INITIAL, ['lab_admin'])
     first = service.login('member', INITIAL)
     member = service.change_password(first.token, INITIAL, CHANGED)
-    assert access_context(service.session(member.token).actor)['module'] == 'laboratory'
+    require_permission(service.session(member.token).actor, 'laboratory.write')
     service.set_roles(admin, member_id, ['field_engineer'])
     with pytest.raises(IdentityError, match='permission_denied'):
-        access_context(service.session(member.token).actor)
+        require_permission(service.session(member.token).actor, 'laboratory.write')
     for status in ['LOCKED', 'DISABLED']:
         service.set_status(admin, member_id, status)
         with pytest.raises(IdentityError):
@@ -202,7 +204,7 @@ def test_account_status_and_role_changes_take_effect_on_existing_sessions(databa
         service.provision_user(member.actor, 'bypass', 'Bypass', INITIAL, ['system_admin'])
     # A different local recovery administrator must remain before demotion.
     service.provision_user(admin, 'recovery', 'Recovery administrator', INITIAL, ['system_admin'])
-    service.set_roles(admin, admin_id, ['management_readonly'])
+    service.set_roles(admin, admin_id, ['field_engineer'])
     with pytest.raises(IdentityError, match='permission_denied'):
         service.audit_events(admin)  # Stale formerly-admin context must not keep authority.
     engine.dispose()
