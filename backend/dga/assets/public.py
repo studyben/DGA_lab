@@ -430,15 +430,16 @@ class AssetDirectory:
         raise AssetQueryError('asset_context_unavailable', 409)
 
 
-def http_router(directory: AssetDirectory, actor_dependency: Callable, lifecycle, mutation_actor: Callable):
+def http_router(directory: AssetDirectory, actor_dependency: Callable, lifecycle, mutation_actor: Callable, site_basics):
     """Compose the asset-owned HTTP adapter without exposing internal imports."""
     from .http import assets_router
 
-    return assets_router(directory, actor_dependency, lifecycle, mutation_actor)
+    return assets_router(directory, actor_dependency, lifecycle, mutation_actor, site_basics)
 
 
 from .lifecycle import AssetLifecycle
 from .imports import AssetImports
+from .site_basics import SiteBasics
 
 
 def import_http_router(imports: AssetImports, actor_dependency, mutation_actor):
