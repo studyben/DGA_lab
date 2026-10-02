@@ -1,14 +1,18 @@
 # Isolated Issue #12 test overlay; never combine with acceptance overrides.
 services:
   object-store:
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    build:
+      context: ./deploy/minio
+      target: server
     command: ["server", "/data"]
     environment:
       MINIO_ROOT_USER: dga-local
       MINIO_ROOT_PASSWORD: local-object-storage-only
     tmpfs: [/data]
   object-store-init:
-    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    build:
+      context: ./deploy/minio
+      target: client
     entrypoint: ["/bin/sh", "-c"]
     command: ["until mc alias set local http://object-store:9000 dga-local local-object-storage-only; do sleep 1; done; mc mb --ignore-existing local/dga-lab"]
     depends_on:

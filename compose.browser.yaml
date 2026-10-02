@@ -14,7 +14,9 @@ services:
       timeout: 3s
       retries: 30
   object-store:
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    build:
+      context: ./deploy/minio
+      target: server
     command: ["server", "/data"]
     environment:
       MINIO_ROOT_USER: dga-browser
@@ -22,7 +24,9 @@ services:
     tmpfs:
       - /data
   object-store-init:
-    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    build:
+      context: ./deploy/minio
+      target: client
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
