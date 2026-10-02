@@ -121,6 +121,25 @@ def test_expiry_throttle_recovery_and_single_bootstrap(database_url):
     engine.dispose()
 
 
+def test_password_rotation_cookie_respects_remaining_absolute_lifetime(database_url):
+    from datetime import datetime, timedelta, timezone
+    from http.cookies import SimpleCookie
+    engine = create_engine(database_url)
+    earlier = datetime.now(timezone.utc) - timedelta(hours=7)
+    service = IdentityService(engine, clock=lambda: earlier)
+    service.bootstrap_admin('admin', 'Admin', INITIAL)
+    original = service.login('admin', INITIAL)
+    with TestClient(create_app(Settings(database_url=database_url, cookie_secure=False, session_hours=24))) as client:
+        client.cookies.set('dga_session', original.token)
+        response = client.post('/api/auth/password', headers={**ORIGIN, 'X-CSRF-Token': original.csrf_token},
+            json={'current_password': INITIAL, 'new_password': CHANGED})
+        assert response.status_code == 200
+        assert datetime.fromisoformat(response.json()['expires_at']) == original.expires_at
+        cookie = SimpleCookie(response.headers['set-cookie'])['dga_session']
+        assert 3500 < int(cookie['max-age']) <= 3600
+    engine.dispose()
+
+
 def test_parallel_password_change_allows_only_one_winner(database_url):
     from concurrent.futures import ThreadPoolExecutor
     from dga.shared.auth.public import IdentityError

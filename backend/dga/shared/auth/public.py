@@ -213,12 +213,15 @@ class IdentityService:
         _validate_password(new_password)
         result = None
         with self._engine.begin() as c:
-            user, _ = self._resolve(c, token, lock=True)
+            user, existing = self._resolve(c, token, lock=True)
             if user['password_hash'] and _password_ok(current_password, user['password_hash']) and not _password_ok(new_password, user['password_hash']):
                 c.execute(text('UPDATE users SET password_hash=:hash,must_change_password=FALSE,updated_at=:now WHERE id=:id'),
                           dict(id=user['id'], hash=HASHER.hash(new_password), now=self._clock()))
                 c.execute(text('DELETE FROM auth_sessions WHERE user_id=:id'), {'id': user['id']})
-                result = self._new_session(c, {**user, 'must_change_password': False})
+                # Credential rotation is not a new login. In particular, a linked
+                # local credential must not renew an OIDC absolute deadline.
+                result = self._new_session(c, {**user, 'must_change_password': False},
+                                           expires_at=existing['expires_at'])
             self._audit(c, 'PASSWORD_CHANGE', 'SUCCESS' if result else 'FAILURE', user['id'])
         if not result:
             raise IdentityError('password_change_failed', 400)

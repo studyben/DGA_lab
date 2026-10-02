@@ -39,7 +39,7 @@
 
 已存在本地管理员遗失密码：可信服务器维护人员执行 `docker compose exec -it api python -m dga.shared.auth.cli recover-admin --username admin`，交互输入新初始密码；密码不放命令行、不提交日志。命令会撤销旧会话、解除登录冷却/LOCKED，要求登录后改密；不创建新管理员，不恢复 DISABLED。
 
-恢复账号被停用时，应由另一个有效系统管理员明确恢复。最后一个启用的本地密码管理员不能被停用、锁定或降权。`/login/local` 不请求 Okta 可用性；仍需正确本地凭据，保留失败防护。既有普通本地密码账号仅作受控迁移兼容，不提供新普通本地账号注册。
+恢复账号被停用时，应由另一个有效系统管理员明确恢复。最后一个启用的本地密码管理员不能被停用、锁定或降权。`/login/local` 不请求 Okta 可用性；仍需正确本地凭据，保留失败防护。既有普通本地密码账号仅作受控迁移兼容，不提供新普通本地账号注册。修改密码撤销旧会话并轮换当前凭据，但保留原会话到期时间，不视作重新登录；即使关联账号仍有本地密码，也不能借改密延长 OIDC 八小时上限。
 
 ## IT 与部署配置清单
 
@@ -75,6 +75,8 @@ OIDC 代理前缀仅记录无 URL/query 的方法、状态、上游状态和耗�
 ## 独立自动化环境（非真实 Okta）
 
 本任务新建 `dga-issue18-test`（临时 PostgreSQL）与 `dga-issue18-browser`（18118），不使用原18117/18120验收数据。`compose.browser.yaml` 是新建临时环境专用，默认 migrate 会 seed，禁止用于原验收项目。已运行环境仅重建 API/前端时用 `--no-deps`，迁移显式运行，不重新 seed。
+
+API 容器重建后，当前 Nginx 静态上游可能仍保存旧容器 IP。API 健康后，在**同一项目**执行 `docker compose ... exec frontend nginx -s reload`，再检查经前端的 `/api/health` 返回200，而不是仅检查静态首页。省略号表示该环境原有的 `-p`/`-f` 参数，不能省掉项目隔离参数直接操作其他环境。实测重建后502可通过仅重载该隔离代理恢复200，不需要重置数据库或修改鉴权检查。
 
 `compose.oidc-test.yaml` 仅测试 overlay，明确以 `tests.oidc_browser_app:app` 启动签名 JWT 协议夹具；正式入口始终是 `uvicorn dga.main:create_app --factory`，没有 HTTP/env 开关绕过验证。测试浏览器把 Docker 内网传输映射到登记 loopback origin，因而它只验证页面/服务交互，不证明实际域名、TLS、Okta分配或第三方Cookie行为。完成测试后移除此 overlay 并恢复正常 API 入口；不要把夹具的公开测试密钥当部署机密。
 

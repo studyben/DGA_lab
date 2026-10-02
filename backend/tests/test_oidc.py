@@ -278,6 +278,29 @@ def test_verified_employee_login_is_stable_least_privilege_and_absolute(oidc_con
         clocked.session(first.token)
 
 
+def test_linked_account_password_rotation_cannot_extend_oidc_deadline(oidc_context, identity, database_url):
+    from datetime import timedelta
+    from tests.identity_seed import seed_legacy_user
+    from tests.test_identity_management import INITIAL
+    service, admin, _, state = oidc_context
+    proof = activate(oidc_context)
+    target = seed_legacy_user(database_url, 'linked-local', 'Linked employee', INITIAL, ['analyst'])
+    service.bind_identity(admin.actor, target, proof['proof_id'], expected_revision=0)
+    employee = employee_login(oidc_context)
+    deadline = employee.expires_at
+    state['now'] += timedelta(hours=7)
+    local = IdentityService(identity[0]._engine, clock=lambda: state['now'], session_hours=24)
+    rotated = local.change_password(employee.token, INITIAL, CHANGED)
+    assert rotated.expires_at == deadline
+    assert not rotated.actor.must_change_password
+    with pytest.raises(IdentityError, match='session_expired'):
+        local.session(employee.token)
+    assert local.session(rotated.token).actor.user_id == target
+    state['now'] = deadline
+    with pytest.raises(IdentityError, match='session_expired'):
+        local.session(rotated.token)
+
+
 def test_candidate_requires_recent_same_admin_proof_and_stale_activation_keeps_active(oidc_context, identity):
     from tests.test_identity_management import INITIAL
     service, admin, candidate, state = oidc_context

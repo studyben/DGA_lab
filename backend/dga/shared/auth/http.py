@@ -1,5 +1,6 @@
 """HTTP transport for the shared identity application interface."""
 from secrets import compare_digest
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, Field
@@ -72,7 +73,8 @@ def auth_router(
 
     def issue(response, session):
         response.set_cookie(COOKIE, session.token, httponly=True, secure=settings.cookie_secure,
-                            samesite='lax', path='/', max_age=settings.session_hours * 3600)
+                            samesite='lax', path='/',
+                            max_age=max(0, int((session.expires_at - datetime.now(timezone.utc)).total_seconds())))
         response.headers['Cache-Control'] = 'no-store'
         return session_body(session)
 
