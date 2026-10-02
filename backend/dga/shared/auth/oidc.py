@@ -305,6 +305,7 @@ class OidcService:
                 raise IdentityError('oidc_flow_invalid', 400)
             user_id = c.execute(text('''SELECT user_id FROM external_identities
                 WHERE issuer=:issuer AND subject=:subject'''), {'issuer': verified.issuer, 'subject': verified.subject}).scalar()
+            created = user_id is None
             if not user_id:
                 if verified.login_hints and c.execute(text('SELECT 1 FROM users WHERE lower(username)=ANY(:hints)'),
                         {'hints': list(verified.login_hints)}).first():
@@ -322,6 +323,9 @@ class OidcService:
                 raise IdentityError('oidc_account_unavailable', 403)
             c.execute(text('UPDATE users SET last_login_at=:now WHERE id=:id'), {'id': user_id, 'now': verified_at})
             session = self._identity._new_session(c, user, expires_at=verified_at+timedelta(hours=8))
+            if created:
+                self._identity._identity_event(c, session.actor, 'OIDC_PROVISION', user_id, {},
+                    {'roles': ['field_engineer'], 'issuer': verified.issuer, 'subject': verified.subject})
             self._identity._audit(c, 'OIDC_LOGIN', 'SUCCESS', user_id)
             return session
 

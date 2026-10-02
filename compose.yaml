@@ -52,7 +52,12 @@ services:
         condition: service_healthy
   api:
     build: ./backend
-    environment: *app-env
+    environment:
+      <<: *app-env
+      OIDC_ENCRYPTION_KEY: ${OIDC_ENCRYPTION_KEY:-}
+      OIDC_ALLOWED_HOSTS: ${OIDC_ALLOWED_HOSTS:-}
+      OIDC_CALLBACK_URL: ${OIDC_CALLBACK_URL:-}
+      OIDC_CALLBACK_ORIGINS: ${OIDC_CALLBACK_ORIGINS:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

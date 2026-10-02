@@ -52,9 +52,12 @@ def oidc_context(identity, database_url):
             return httpx.Response(200, json={'keys': [private.as_dict(is_private=False)]})
         if request.url.path == '/token':
             from datetime import timedelta
+            if state.get('on_exchange'):
+                state.pop('on_exchange')()
             state['now'] += timedelta(seconds=state.get('latency', 0))
             payload = dict(iss='https://tenant.example', sub='employee-1', aud='test-client',
-                nonce=state['nonce'], iat=int(state['now'].timestamp()), auth_time=int(state['now'].timestamp()),
+                nonce=parse_qs(request.content.decode())['code'][0] if state.get('nonce_from_code') else state['nonce'],
+                iat=int(state['now'].timestamp()), auth_time=int(state['now'].timestamp()),
                 exp=int(state['now'].timestamp()) + 300, name='Test employee') | state['patch']
             payload = {k: v for k, v in payload.items() if v is not None}
             header = {'alg': 'RS256', 'kid': 'test-key'} if not state.get('missing_kid') else {'alg': 'RS256'}
@@ -257,11 +260,15 @@ def test_verified_employee_login_is_stable_least_privilege_and_absolute(oidc_con
     state['patch'] = {'roles': ['system_admin'], 'groups': ['admins']}
     first = employee_login(oidc_context)
     assert first.actor.roles == frozenset({'field_engineer'})
+    provisioning = [e for e in identity_service.audit_events(admin.actor) if e['action_code'] == 'OIDC_PROVISION']
+    assert len(provisioning) == 1
+    assert provisioning[0]['after_value']['roles'] == ['field_engineer']
     assert first.expires_at == state['now'] + timedelta(hours=8)
     identity_service.change_roles(admin.actor, first.actor.user_id, add=['analyst'], remove=[], expected_revision=0)
     second = employee_login(oidc_context)
     assert second.actor.user_id == first.actor.user_id
     assert second.actor.roles == frozenset({'field_engineer', 'analyst'})
+    assert len([e for e in identity_service.audit_events(admin.actor) if e['action_code'] == 'OIDC_PROVISION']) == 1
     state['now'] += timedelta(hours=7)
     # Reconstructed identity facade shares the injected verification clock, not sliding expiry.
     clocked = IdentityService(identity_service._engine, clock=lambda: state['now'], session_hours=24)
@@ -349,3 +356,153 @@ def test_candidate_callback_is_allowlisted_immutable_and_bound_to_start_origin(o
     reopened.activate(admin.actor, candidate, proof['proof_id'], expected_revision=0)
     with pytest.raises(IdentityError, match='oidc_callback_origin_mismatch'):
         reopened.start_login(origin='http://127.0.0.1:18118')
+
+
+def test_test_proof_expiry_and_admin_revocation_during_exchange(oidc_context, identity):
+    from datetime import timedelta
+    from tests.test_identity_management import INITIAL
+    service, admin, candidate, state = oidc_context
+    identities, _ = identity
+    proof = activate(oidc_context)
+    state['now'] += timedelta(minutes=16)
+    with pytest.raises(IdentityError, match='oidc_test_required'):
+        service.activate(admin.actor, candidate, proof['proof_id'], expected_revision=1)
+    identities.provision_user(admin.actor, 'backup', 'Backup', INITIAL, ['system_admin'])
+    session = identities.login('backup', INITIAL)
+    backup = identities.change_password(session.token, INITIAL, CHANGED)
+    flow, challenge = start_test(oidc_context)
+    state['on_exchange'] = lambda: identities.set_roles(backup.actor, admin.actor.user_id, ['field_engineer'])
+    with pytest.raises(IdentityError, match='permission_denied'):
+        service.complete_test(challenge, flow['browser_binding'], 'code', admin.token)
+    identities.set_roles(backup.actor, admin.actor.user_id, ['system_admin'])
+    assert service.configuration(admin.actor)['proofs'] == []
+
+
+def test_changed_active_config_rejects_inflight_login(oidc_context, identity):
+    service, admin, candidate, state = oidc_context
+    proof = activate(oidc_context)
+    count = identity[0].list_users(admin.actor)['total']
+    state['on_exchange'] = lambda: service.activate(admin.actor, candidate, proof['proof_id'], expected_revision=1)
+    with pytest.raises(IdentityError, match='stale_oidc_configuration'):
+        employee_login(oidc_context)
+    assert identity[0].list_users(admin.actor)['total'] == count
+
+
+def test_concurrent_activations_and_employee_logins_are_serialized(oidc_context, identity):
+    from concurrent.futures import ThreadPoolExecutor
+    service, admin, candidate, state = oidc_context
+    flow, challenge = start_test(oidc_context)
+    proof = service.complete_test(challenge, flow['browser_binding'], 'code', admin.token)
+    def enable(_):
+        try:
+            service.activate(admin.actor, candidate, proof['proof_id'], expected_revision=0)
+            return 'success'
+        except IdentityError as error:
+            return error.code
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(enable, range(2))) == ['stale_oidc_configuration', 'success']
+    state['nonce_from_code'] = True
+    flows = [service.start_login() for _ in range(2)]
+    def login(flow):
+        query = parse_qs(urlsplit(flow['authorization_url']).query)
+        return service.complete_login(query['state'][0], flow['browser_binding'], query['nonce'][0])
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        sessions = list(pool.map(login, flows))
+    assert sessions[0].actor.user_id == sessions[1].actor.user_id
+    assert identity[0].list_users(admin.actor)['total'] == 2
+
+
+def test_concurrent_identity_binding_cannot_reassign_external_subject(oidc_context, identity, database_url):
+    from concurrent.futures import ThreadPoolExecutor
+    from tests.identity_seed import seed_legacy_user
+    from tests.test_identity_management import INITIAL
+    service, admin, _, _ = oidc_context
+    proof = activate(oidc_context)
+    targets = [seed_legacy_user(database_url, f'member-{i}', 'Member', INITIAL, ['analyst']) for i in range(2)]
+    def bind(target):
+        try:
+            service.bind_identity(admin.actor, target, proof['proof_id'], expected_revision=0)
+            return 'success'
+        except IdentityError as error:
+            return error.code
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(bind, targets)) == ['oidc_identity_already_bound', 'success']
+    account = employee_login(oidc_context)
+    assert account.actor.user_id in targets
+    assert account.actor.roles == frozenset({'analyst'})
+
+
+def test_wrong_decryption_key_disables_oidc_not_local_login(oidc_context, identity):
+    from cryptography.fernet import Fernet
+    service, admin, candidate, _ = oidc_context
+    activate(oidc_context)
+    reopened = OidcService(identity[0]._engine, encryption_key=Fernet.generate_key().decode(),
+        allowed_hosts={'tenant.example'}, callback_url='http://127.0.0.1:18118/api/auth/oidc/callback', provider=service._provider)
+    assert reopened.availability() == {'enabled': False}
+    with pytest.raises(IdentityError, match='oidc_key_unavailable'):
+        reopened.start_test(admin.token, candidate)
+    assert identity[0].login('admin', CHANGED).actor.user_id == admin.actor.user_id
+
+
+@pytest.mark.parametrize('action', ['OIDC_TEST', 'OIDC_ACTIVATE', 'OIDC_LOGIN'])
+def test_database_audit_failure_cannot_leave_partial_oidc_success(oidc_context, identity, action):
+    from sqlalchemy import text
+    from sqlalchemy.exc import DBAPIError
+    service, admin, candidate, _ = oidc_context
+    proof = activate(oidc_context)
+    identities, _ = identity
+    before = identities.list_users(admin.actor)['total']
+    proofs = service.configuration(admin.actor)['proofs']
+    flow, challenge = start_test(oidc_context)
+    # Explicit PostgreSQL fault injection at the persistence boundary. Assertions
+    # observe the public interfaces, not private table shapes.
+    with identities._engine.begin() as c:
+        c.execute(text("""CREATE FUNCTION test_oidc_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN IF NEW.action_code = TG_ARGV[0] AND NEW.result='SUCCESS' THEN
+            RAISE EXCEPTION 'isolated audit unavailable'; END IF; RETURN NEW; END $$"""))
+        c.execute(text(f"CREATE TRIGGER test_oidc_audit BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION test_oidc_audit_failure('{action}')"))
+    try:
+        with pytest.raises(DBAPIError, match='isolated audit unavailable'):
+            if action == 'OIDC_TEST':
+                service.complete_test(challenge, flow['browser_binding'], 'code', admin.token)
+            elif action == 'OIDC_ACTIVATE':
+                service.activate(admin.actor, candidate, proof['proof_id'], expected_revision=1)
+            else:
+                employee_login(oidc_context)
+    finally:
+        with identities._engine.begin() as c:
+            c.execute(text('DROP TRIGGER test_oidc_audit ON audit_logs; DROP FUNCTION test_oidc_audit_failure()'))
+    view = service.configuration(admin.actor)
+    assert view['revision'] == 1
+    assert view['proofs'] == proofs
+    assert identities.list_users(admin.actor)['total'] == before
+
+
+@pytest.mark.parametrize('database_url', ['0028_oidc'], indirect=True)
+def test_pre_callback_candidate_is_retained_but_requires_explicit_recreation(database_url):
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import text
+    from uuid import uuid4
+    from cryptography.fernet import Fernet
+    from tests.test_identity_management import INITIAL
+    engine = create_engine(database_url)
+    identity = IdentityService(engine)
+    identity.bootstrap_admin('migration-admin', 'Admin', INITIAL)
+    session = identity.login('migration-admin', INITIAL)
+    admin = identity.change_password(session.token, INITIAL, CHANGED)
+    candidate = uuid4()
+    with engine.begin() as c:
+        c.execute(text('''INSERT INTO oidc_config_versions(id,issuer,client_id,secret_cipher,created_by,created_at)
+            VALUES (:id,'https://tenant.example','old-client',:secret,:admin,now())'''),
+            {'id': candidate, 'secret': Fernet(KEY.encode()).encrypt(b'old-secret').decode(), 'admin': admin.actor.user_id})
+        c.execute(text('UPDATE oidc_active SET config_id=:id,revision=1'), {'id': candidate})
+    command.upgrade(Config('alembic.ini'), 'head')
+    oidc = OidcService(engine, encryption_key=KEY, allowed_hosts={'tenant.example'}, callback_url='https://portal.example/api/auth/oidc/callback')
+    assert oidc.configuration(admin.actor)['candidates'][0]['id'] == candidate
+    assert oidc.configuration(admin.actor)['candidates'][0]['callback_url'] is None
+    assert oidc.availability() == {'enabled': False}
+    with pytest.raises(IdentityError, match='oidc_candidate_callback_required'):
+        oidc.start_test(admin.token, candidate)
+    assert identity.login('migration-admin', CHANGED).actor.user_id == admin.actor.user_id
+    engine.dispose()

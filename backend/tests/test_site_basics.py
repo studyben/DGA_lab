@@ -53,6 +53,28 @@ def test_invalid_changes_leave_site_and_history_intact(database_url, patch):
     engine.dispose()
 
 
+def test_ess_capacity_edit_preserves_pv_capacity_and_append_only_evidence(database_url):
+    from sqlalchemy import text
+    from sqlalchemy.exc import DBAPIError
+    engine, admin, _, _ = import_context(database_url)
+    with engine.begin() as connection:
+        connection.execute(text("INSERT INTO site_product_lines(site_id,product_line) VALUES (:id,'ESS')"), {'id': SITE_ID})
+    assets, sites = AssetDirectory(engine), SiteBasics(engine)
+    before_pv = assets.site_detail(admin, SITE_ID, product_line='PV')['site']['power_mw']
+    sites.update(admin, SITE_ID, **values(product_line='ESS', power_mw='50.125', energy_mwh='200.5'))
+    ess = assets.site_detail(admin, SITE_ID, product_line='ESS')['site']
+    assert ess['power_mw'] == Decimal('50.125') and ess['energy_mwh'] == Decimal('200.5')
+    assert assets.site_detail(admin, SITE_ID, product_line='PV')['site']['power_mw'] == before_pv
+    history = sites.history(admin, SITE_ID)
+    # Storage-enforced immutability is a migration invariant, unlike layout details.
+    for command in ('UPDATE site_basic_events SET before_value=after_value', 'DELETE FROM site_basic_events'):
+        with pytest.raises(DBAPIError, match='append only'):
+            with engine.begin() as c:
+                c.execute(text(command))
+    assert sites.history(admin, SITE_ID) == history
+    engine.dispose()
+
+
 def test_field_cannot_edit_and_am_cannot_mutate_assets(database_url):
     from dga.assets.public import AssetLifecycle
     from dga.shared.auth.public import IdentityError

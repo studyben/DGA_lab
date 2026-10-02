@@ -32,24 +32,25 @@ docker compose exec -it api python -m dga.shared.auth.cli bootstrap --username a
 
 按提示输入并确认 15–128 字符初始密码（输入不回显、不放在命令行参数中）。然后浏览器登录并强制修改初始密码，才能进入业务门户。bootstrap 在任何账号已存在时拒绝执行，不会重置或覆盖密码。不要把实际密码提交到 Git、截图或聊天中。
 
-完整用户管理 UI 不在 #3 范围；管理员首次改密后可用交互命令添加账号：
+Issue #18 提供 `/settings/users` 用户与角色管理。新建本地密码账号仅用于管理员恢复；普通员工首次通过 OIDC 登录创建账号，既有本地普通账号保留用于受控迁移。管理员首次改密后也可用交互命令：
 
 ```sh
-docker compose exec -it api python -m dga.shared.auth.cli create-user --admin admin --username colleague --display-name Colleague --role field_engineer
+docker compose exec -it api python -m dga.shared.auth.cli create-user --admin admin --username recovery --display-name Recovery --role system_admin
 docker compose exec -it api python -m dga.shared.auth.cli set-status --admin admin --user-id USER_UUID --status DISABLED
-docker compose exec -it api python -m dga.shared.auth.cli set-roles --admin admin --user-id USER_UUID --role management_readonly
+docker compose exec -it api python -m dga.shared.auth.cli set-roles --admin admin --user-id USER_UUID --role field_engineer
 ```
 
-USER_UUID 使用创建账号时输出的 ID。所有管理命令都校验当前管理员权限；无自助注册或开放的用户创建 API。不要停用/降权最后一个管理员；账号恢复、密码重置与完整管理 UI 不在本票范围。
+USER_UUID 使用用户详情接口或创建命令返回的 ID。所有管理命令都校验当前权限；无自助注册。系统保护最后一个启用且有本地密码的管理员。恢复、迁移影响报告及 OIDC 配置见 [Issue #18 操作手册](docs/identity-operations.md)。本地模拟测试不代表真实 Okta 验收，#18 仍须完成 IT 联调。
 
 | 角色代码 | 初始能力 |
 | --- | --- |
 | system_admin | 所有当前能力，包括账号管理、审计读取 |
-| asset_manager | 资产读写、状态分析读取 |
-| lab_admin | 资产读取、实验室读写/定稿、状态分析读取 |
-| analyst | 资产读取、实验室读写、状态分析读取 |
-| field_engineer | 资产读取、状态分析读取 |
-| management_readonly | 资产、实验室、状态分析读取 |
+| asset_manager | 三模块读取、现场基础资料编辑 |
+| lab_admin | 实验室经理：资产维护、实验室写入/定稿/配置、规则维护、报警确认、审计读取、普通用户管理 |
+| analyst | 三模块读取、实验室写入/定稿、报警确认 |
+| field_engineer | 三模块读取、报警确认；首次 OIDC 登录默认角色 |
+| management | 三模块读取、现场基础资料编辑、普通用户 AM 角色增减 |
+| management_readonly | 历史兼容读取角色，保留既有分配，不再新增分配 |
 
 角色可叠加，权限取并集。尚未交付的能力仍可能只有授权契约，不表示对应业务已经实现。前端按能力隐藏工作区或禁用子页，直接访问未授权路径有明确提示；后端模块公开入口仍独立校验，不信任前端角色声明。
 
@@ -61,7 +62,7 @@ nginx 提供 React/TypeScript 静态构建，并将 `/api/` 转发给 FastAPI；
 - `BUSINESS_TIMEZONE`：默认 `America/Chicago`，必须是有效 IANA 时区。
 - `DGA_PORT`：Compose 前端宿主端口，默认 8080；应用数据和测试数据有独立数据库与存储。
 - `COOKIE_SECURE`：应用默认 true；本机 Compose 显式 false。生产必须使用 HTTPS + Secure cookie。
-- `SESSION_HOURS`：绝对会话时长，默认 8，小于 1 或大于 24 拒绝启动。
+- `SESSION_HOURS`：本地密码登录的绝对会话时长，默认 8，小于 1 或大于 24 拒绝启动。OIDC 会话固定为最近一次成功验证后 8 小时，不随此值改变、不滑动续期。
 - `AUTH_ALLOWED_ORIGINS`：逗号分隔的完整来源（协议、主机、端口），认证 POST 必须带匹配 Origin；同源浏览器会自动发送。部署时仅列允许的 HTTPS 地址。
 - `OBJECT_STORE_ENDPOINT`、`OBJECT_STORE_BUCKET`、`OBJECT_STORE_ACCESS_KEY`、`OBJECT_STORE_SECRET_KEY`：共同配置一个 path-style S3 兼容对象存储；`OBJECT_STORE_REGION` 默认 `us-east-1`。四项缺失时普通检测数据仍可使用，但附件保存会明确失败且不会生成伪成功记录。本地 Compose 运行隔离 MinIO，生产凭据不得提交仓库。
 - `GET /api/health`：数据库可连接且迁移版本匹配时 200 `{ "status": "ok", "database": "ok" }`；连接失败或未迁移时 503，字段均为 `unavailable`。不自动执行迁移，不输出数据库异常或凭据。
