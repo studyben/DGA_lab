@@ -117,8 +117,19 @@ class HealthAssetReader(Protocol):
     def health_assets(self, actor: ActorContext, root: UUID, at: datetime) -> tuple[HealthAsset, ...]: ...
 
 
+class AlarmAssetReader(Protocol):
+    def alarm_assets(self, actor: ActorContext, at: datetime) -> tuple[dict, ...]: ...
+
+
 class AssetDirectory:
     """Read-only official asset queries used by the portal and laboratory module."""
+
+    def alarm_assets(self, actor: ActorContext, at: datetime) -> tuple[dict, ...]:
+        require_permission(actor, 'analysis.read')
+        if at.tzinfo is None or at.utcoffset() is None:
+            raise AssetQueryError('timezone_required')
+        from .alarm_context import alarm_contexts
+        return alarm_contexts(self._engine, at, AssetQueryError)
 
     def __init__(
         self,

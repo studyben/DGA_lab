@@ -40,6 +40,7 @@ from dga.condition_analysis.public import (
     MODULE as CONDITION_ANALYSIS, access_context as analysis_access,
     TransformerTrends, http_router as analysis_router,
     HealthRules, DeviceHealth, HealthError, health_router,
+    AlarmCenter, alarm_router,
 )
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
@@ -113,6 +114,7 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
 
     asset_directory = AssetDirectory(engine)
     health_rules=HealthRules(engine,LaboratoryConfiguration(engine),asset_directory)
+    app.include_router(alarm_router(AlarmCenter(engine,asset_directory,LaboratoryTrendSource(engine)),current_actor,mutation_actor))
     app.include_router(health_router(health_rules,DeviceHealth(engine,asset_directory,LaboratoryTrendSource(engine),health_rules),current_actor,mutation_actor))
     app.include_router(analysis_router(TransformerTrends(asset_directory, LaboratoryTrendSource(engine)), current_actor))
     app.include_router(assets_router(asset_directory, current_actor, AssetLifecycle(engine), mutation_actor))

@@ -60,6 +60,7 @@ class _Sample(BaseModel):
     sampled_at: AwareDatetime
     site_name: str
     equipment_serial: str
+    asset_snapshot: dict | None = None
 
 
 class _Snapshot(BaseModel):
@@ -96,6 +97,8 @@ class FinalizedMeasurement:
     instrument_name: str | None
     warnings: tuple[str, ...]
     asset_id: UUID | None = None
+    finalization_token: UUID | None = None
+    sampling_context: dict | None = None
 
 
 class FinalizedResultReader(Protocol):
@@ -122,7 +125,7 @@ class LaboratoryTrendSource:
         if not asset_ids:
             return ()
         with self._engine.connect() as connection:
-            rows = connection.execute(text('''SELECT s.id,s.formal_asset_id,r.report_snapshot FROM oil_samples s
+            rows = connection.execute(text('''SELECT s.id,s.formal_asset_id,r.finalization_token,r.report_snapshot FROM oil_samples s
                 JOIN laboratory_reports r ON r.oil_sample_id=s.id
                     AND r.finalization_token=s.testing_finalization_token
                 WHERE s.formal_asset_id=ANY(CAST(:assets AS uuid[])) AND s.identity_status='ASSOCIATED'
@@ -145,7 +148,8 @@ class LaboratoryTrendSource:
                             result.measured_at.astimezone(timezone.utc), result.test_type, code, method.method_version_id,
                             method.display_name, method.version_label, field.unit_code, method.configuration is not None,
                             reading.qualifier, reading.value, sample.site_name, sample.equipment_serial,
-                            result.instrument_name, tuple(snapshot.acknowledged_warning_codes),row['formal_asset_id']))
+                            result.instrument_name, tuple(snapshot.acknowledged_warning_codes),row['formal_asset_id'],
+                            row['finalization_token'], sample.asset_snapshot))
         except (KeyError, ValueError, TypeError, ArithmeticError) as error:
             raise LaboratoryError('trend_snapshot_unavailable', 503) from error
         return tuple(points)

@@ -5,6 +5,7 @@ import { machineNames, lifecycleNames as statuses } from './assetPresentation';
 import { EquipmentDetails, equipmentLayouts, fieldValue, unknownLayout } from './equipmentLayouts';
 import { LifecyclePanel } from './LifecyclePanel';
 import { HealthPanel } from '../condition-analysis/HealthPanel';
+import { AlarmLink } from '../condition-analysis/AlarmLink';
 
 type Detail = { equipment: EquipmentDetails; path: EquipmentDetails[]; children: EquipmentDetails[];
   health_status: 'UNASSESSED'; location: { kind: string; label: string }; site: { id: string; site_name: string; customer_name: string; location_text: string | null } | null };
@@ -52,6 +53,7 @@ export function EquipmentDetailPage({ assetId }: { assetId: string }) {
     <nav aria-label="设备路径" className="equipment-path"><a href={siteHref}>{data.site?.site_name ?? data.location.label}</a>{data.path.map(node => <span key={node.id}> / <a href={childHref(node)} aria-current={node.id === assetId ? 'page' : undefined}>{node.display_name}</a></span>)}</nav>
     <section className="site-facts" aria-label="设备属性"><h2>{data.equipment.display_name} <small>{layout.title}</small></h2>
       {can('analysis.read')&&<HealthPanel assetId={assetId}/>}
+      <AlarmLink filters={{asset_id:assetId}}/>
       <dl><div><dt>设备状态</dt><dd>{statuses[data.equipment.lifecycle_status] ?? data.equipment.lifecycle_status}</dd></div>{layout.fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{fieldValue(data.equipment, field)}</dd></div>)}<div><dt>客户</dt><dd>{data.site?.customer_name ?? '不适用'}</dd></div><div><dt>当前位置</dt><dd>{data.location.label}</dd></div><div><dt>现场位置</dt><dd>{data.site?.location_text ?? '不适用'}</dd></div></dl>
     </section>
     <form className="dashboard-filters" onSubmit={e => { e.preventDefault(); const form = new FormData(e.currentTarget); update({ child_search: String(form.get('search') ?? ''), child_type: String(form.get('type') ?? ''), page: '1' }); }}>

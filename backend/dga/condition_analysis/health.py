@@ -15,6 +15,18 @@ SEVERITY = {'UNASSESSED': 0, 'NORMAL': 1, 'ATTENTION': 2, 'WARNING': 3, 'CRITICA
 COMPARE = {'GT': gt, 'GE': ge, 'LT': lt, 'LE': le}
 
 
+def latest_groups(points):
+    groups = {}
+    for point in points:
+        key = (point.asset_id, point.test_type, point.analyte)
+        group = groups.get(key)
+        if not group or point.sampled_at > group[0].sampled_at:
+            groups[key] = [point]
+        elif point.sampled_at == group[0].sampled_at:
+            group.append(point)
+    return groups
+
+
 def aggregate(sources):
     return dict(status=max((s['status'] for s in sources), key=SEVERITY.get, default='UNASSESSED'),
                 incomplete=any(s['status']=='UNASSESSED' for s in sources) or not sources)
@@ -76,13 +88,7 @@ class DeviceHealth:
         tree,points,policies=self._stable_source(actor,asset_id,now)
         with self._engine.begin() as c:
             ids = tuple(a.id for a in tree if a.asset_type=='TRANSFORMER')
-            latest = {}
-            for point in points:
-                key = (point.asset_id,point.test_type,point.analyte)
-                if key not in latest or point.sampled_at>latest[key][0].sampled_at:
-                    latest[key]=[point]
-                elif point.sampled_at==latest[key][0].sampled_at:
-                    latest[key].append(point)
+            latest = latest_groups(points)
             sources = [assess(p.asset_id,p,policies) | {'latest_time_tied':len(group)>1}
                        for group in latest.values() for p in group]
             observed = {p.asset_id for p in points}

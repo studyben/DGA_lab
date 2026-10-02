@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { DataTable, useQuery, useRead } from './assetUi';
 import { machineNames, gridNames, operationNames, lifecycleNames, quantity, label } from './assetPresentation';
 import './dashboard.css';
+import { AlarmLink } from '../condition-analysis/AlarmLink';
 
 type Values = Record<string, string>;
 type Site = {
@@ -55,6 +56,7 @@ export function DashboardPage() {
   return <div className="asset-dashboard">
     <div className="line-toggle" aria-label="产品线"><button aria-pressed={!ess} onClick={() => update({ product_line: 'PV', page: '1', sort: 'site_name' })}>光伏 PV</button><button aria-pressed={ess} onClick={() => update({ product_line: 'ESS', page: '1', sort: 'site_name' })}>储能 ESS</button></div>
     <Filters fields={siteFields} query={query} update={update} />
+    <AlarmLink filters={{product_line:ess?'ESS':'PV',site:query.site??'',customer:query.customer??''}} description="按产品线、当前现场和客户筛选；不应用位置关键词、调试状态或投运状态筛选"/>
     {error ? <p role="alert">{error} <button onClick={retry}>重试</button></p> : !data ? <p role="status">正在加载现场资料…</p> : <>
       <section aria-label="筛选结果指标" className="dashboard-metrics">
         <article><span>现场数量</span><strong>{data.site_count}</strong></article><article><span>客户数量</span><strong>{data.customer_count}</strong></article>
