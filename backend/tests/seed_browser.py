@@ -38,6 +38,10 @@ def main():
         seed_legacy_user(value, 'operations-reader', '实验室只读测试', initial, ['management_readonly'])
         reader = service.login('operations-reader', initial)
         service.change_password(reader.token, initial, changed)
+        for username, role in [('identity-lab-manager', 'lab_admin'), ('identity-management', 'management')]:
+            seed_legacy_user(value, username, username, initial, [role])
+            login = service.login(username, initial)
+            service.change_password(login.token, initial, changed)
         with engine.begin() as connection:
             connection.execute(text("""
                 INSERT INTO customers(id,customer_name) VALUES

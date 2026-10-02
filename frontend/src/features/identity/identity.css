@@ -1,0 +1,18 @@
+.identity-management { display: grid; gap: 20px; }
+.identity-panel { background: white; border: 1px solid #dce3ed; border-radius: 16px; padding: 24px; min-width: 0; }
+.identity-help { font-size: 14px; line-height: 1.6; color: #66758a; }
+.identity-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 16px; align-items: end; }
+.identity-management label { display: grid; gap: 6px; }
+.identity-management input:not([type=checkbox]), .identity-management select { width: 100%; min-width: 0; box-sizing: border-box; padding: 12px; border: 1px solid #c9d5e5; border-radius: 8px; font: inherit; }
+.identity-management button { padding: 10px 16px; border: 1px solid #c9d5e5; border-radius: 8px; background: white; color: #ae500d; font: inherit; cursor: pointer; }
+.identity-management button:disabled { color: #7d8898; cursor: default; opacity: .6; }
+.identity-management form { margin-block: 16px; }
+.identity-table { overflow-x: auto; }
+.identity-table table { width: 100%; border-collapse: collapse; text-align: left; }
+.identity-table th, .identity-table td { padding: 14px 10px; border-bottom: 1px solid #e4e9f1; }
+.identity-actions, .identity-role-options { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-block: 16px; }
+.identity-role-options label { display: flex; align-items: center; }
+.identity-management fieldset { border: 1px solid #dce3ed; border-radius: 8px; min-width: 0; }
+.identity-management [role=alert] { color: #b3261e; }
+.identity-management [role=status] { color: #006d55; }
+@media (max-width: 1100px) { .identity-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

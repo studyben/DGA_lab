@@ -45,6 +45,7 @@ from dga.condition_analysis.public import (
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
 from dga.shared.auth.http import AuthenticatedRequests, auth_router
+from dga.shared.auth.management_http import management_router
 from dga.shared.files import FileStore, ObjectStorageError, S3CompatibleFileStore, UnavailableFileStore
 
 
@@ -70,6 +71,7 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
     identity = IdentityService(engine, session_hours=settings.session_hours)
     requests = AuthenticatedRequests(identity, settings)
     app.include_router(auth_router(identity, settings, requests))
+    app.include_router(management_router(identity, requests))
 
     @app.exception_handler(IdentityError)
     async def identity_error(request, error):

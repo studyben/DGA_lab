@@ -337,8 +337,39 @@ class IdentityService:
     def user_detail(self, actor: ActorContext, user_id: UUID) -> dict:
         with self._engine.begin() as c:
             c.execute(text('SELECT pg_advisory_xact_lock(30003)'))
-            self._manager(c, actor)
-            return self._user_view(c, self._target(c, user_id))
+            current = self._manager(c, actor)
+            user = self._target(c, user_id)
+            return {**self._user_view(c, user), 'actions': self._available_actions(c, current, user)}
+
+    def _available_actions(self, c, actor, user):
+        actions = []
+        try:
+            self._ordinary_policy(c, actor, user)
+            actions.append('profile')
+            for status in ('ACTIVE', 'LOCKED', 'DISABLED'):
+                if status == user['user_status'] and not (status == 'ACTIVE' and user['blocked_until']):
+                    continue
+                if user['user_status'] == 'DISABLED' and 'identity.manage' not in actor.permissions:
+                    continue
+                if status != 'ACTIVE':
+                    try:
+                        self._protect_local_admin(c, user['id'])
+                    except IdentityError:
+                        continue
+                actions.append('status:' + status)
+        except IdentityError:
+            pass
+        old = self._actor(c, user).roles
+        for code in c.execute(text('SELECT role_code FROM roles WHERE is_active ORDER BY role_code')).scalars():
+            requested = old - {code} if code in old else old | {code}
+            try:
+                self._roles_policy(c, actor, user, requested)
+                if 'system_admin' not in requested:
+                    self._protect_local_admin(c, user['id'])
+                actions.append('roles:' + code)
+            except IdentityError:
+                continue
+        return actions
 
     def update_profile(self, actor: ActorContext, user_id: UUID, display_name: str,
                        *, expected_revision: int) -> None:
