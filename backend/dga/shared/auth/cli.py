@@ -20,6 +20,8 @@ def new_password():
 def main():
     parser = argparse.ArgumentParser(description='DGA trusted account operator; passwords are prompted, never command-line arguments.')
     actions = parser.add_subparsers(dest='action', required=True)
+    recover = actions.add_parser('recover-admin', help='Trusted server operator: recover an existing local administrator')
+    recover.add_argument('--username', required=True)
     bootstrap = actions.add_parser('bootstrap', help='Create the first administrator; refuses if any account exists')
     create = actions.add_parser('create-user', help='Provision an internal account using an existing administrator')
     for command in (bootstrap, create):
@@ -42,6 +44,10 @@ def main():
     service = IdentityService(engine, session_hours=settings.session_hours)
     session = None
     try:
+        if args.action == 'recover-admin':
+            service.recover_local_admin(args.username, new_password())
+            print('Local administrator recovered; previous sessions revoked. Sign in and change the initial password.')
+            return
         if args.action == 'bootstrap':
             user_id = service.bootstrap_admin(args.username, args.display_name, new_password())
             print(f'Administrator created: {user_id}. Sign in through the portal to change the initial password.')

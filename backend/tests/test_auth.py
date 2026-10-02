@@ -200,6 +200,8 @@ def test_account_status_and_role_changes_take_effect_on_existing_sessions(databa
     assert service.login('member', CHANGED).actor.username == 'member'
     with pytest.raises(IdentityError):
         service.provision_user(member.actor, 'bypass', 'Bypass', INITIAL, ['system_admin'])
+    # A different local recovery administrator must remain before demotion.
+    service.provision_user(admin, 'recovery', 'Recovery administrator', INITIAL, ['system_admin'])
     service.set_roles(admin, admin_id, ['management_readonly'])
     with pytest.raises(IdentityError, match='permission_denied'):
         service.audit_events(admin)  # Stale formerly-admin context must not keep authority.

@@ -276,6 +276,8 @@ class IdentityService:
             c.execute(text('SELECT pg_advisory_xact_lock(30003)'))
             self._authorized(c, actor, 'identity.manage')
             self._target(c, user_id)
+            if 'system_admin' not in roles:
+                self._protect_local_admin(c, user_id)
             self._assign_roles(c, user_id, roles, actor.user_id)
             self._audit(c, 'ROLES_CHANGE', 'SUCCESS', actor.user_id, entity=user_id)
 
@@ -290,8 +292,35 @@ class IdentityService:
             c.execute(text('SELECT pg_advisory_xact_lock(30003)'))
             self._authorized(c, actor, 'identity.manage')
             self._target(c, user_id)
+            if status != 'ACTIVE':
+                self._protect_local_admin(c, user_id)
             c.execute(text('UPDATE users SET user_status=:status,failed_logins=0,blocked_until=NULL,updated_at=:now WHERE id=:id'),
                       dict(id=user_id, status=status, now=self._clock()))
             if status != 'ACTIVE':
                 c.execute(text('DELETE FROM auth_sessions WHERE user_id=:id'), {'id': user_id})
             self._audit(c, 'STATUS_CHANGE', 'SUCCESS', actor.user_id, entity=user_id)
+
+    def _protect_local_admin(self, c, user_id):
+        # Every account mutation holds advisory lock 30003 before reading this set.
+        administrators = set(c.execute(text('''SELECT u.id FROM users u
+            JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id
+            WHERE u.user_status='ACTIVE' AND u.password_hash IS NOT NULL
+              AND u.password_hash<>'' AND r.role_code='system_admin' AND r.is_active''')).scalars())
+        if administrators == {user_id}:
+            raise IdentityError('last_local_admin', 409)
+
+    def recover_local_admin(self, username: str, password: str) -> None:
+        """Trusted server operator only. Never expose as an HTTP password-reset route."""
+        _validate_password(password)
+        with self._engine.begin() as c:
+            c.execute(text('SELECT pg_advisory_xact_lock(30003)'))
+            user = c.execute(text('''SELECT * FROM users WHERE lower(username)=:username
+                FOR UPDATE'''), {'username': username.strip().lower()}).mappings().first()
+            if (not user or not user['password_hash'] or user['user_status'] == 'DISABLED'
+                    or 'system_admin' not in self._actor(c, user).roles):
+                raise IdentityError('local_recovery_unavailable', 409)
+            c.execute(text('''UPDATE users SET password_hash=:password,must_change_password=TRUE,
+                user_status='ACTIVE',failed_logins=0,blocked_until=NULL,updated_at=:now WHERE id=:id'''),
+                {'password': HASHER.hash(password), 'id': user['id'], 'now': self._clock()})
+            c.execute(text('DELETE FROM auth_sessions WHERE user_id=:id'), {'id': user['id']})
+            self._audit(c, 'LOCAL_ADMIN_RECOVERY', 'SUCCESS', entity=user['id'])
