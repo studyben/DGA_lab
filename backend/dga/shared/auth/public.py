@@ -538,3 +538,6 @@ class IdentityService:
                 {'password': HASHER.hash(password), 'id': user['id'], 'now': self._clock()})
             c.execute(text('DELETE FROM auth_sessions WHERE user_id=:id'), {'id': user['id']})
             self._audit(c, 'LOCAL_ADMIN_RECOVERY', 'SUCCESS', entity=user['id'])
+
+
+from .oidc import OidcService

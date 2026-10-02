@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
     session_hours: int = Field(default=8, ge=1, le=24)
     auth_allowed_origins: str = 'http://127.0.0.1:8080'
+    oidc_encryption_key: SecretStr | None = None
+    oidc_allowed_hosts: str = ''
+    oidc_callback_url: str = ''
     object_store_endpoint: str | None = None
     object_store_bucket: str | None = None
     object_store_access_key: SecretStr | None = None
