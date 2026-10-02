@@ -17,6 +17,7 @@ from dga.assets.public import (
     AssetDirectory,
     AssetLifecycle,
     AssetImports,
+    SiteBasics,
     import_http_router,
     AssetQueryError,
     access_context as asset_access,
@@ -119,7 +120,7 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
     app.include_router(alarm_router(AlarmCenter(engine,asset_directory,LaboratoryTrendSource(engine)),current_actor,mutation_actor))
     app.include_router(health_router(health_rules,DeviceHealth(engine,asset_directory,LaboratoryTrendSource(engine),health_rules),current_actor,mutation_actor))
     app.include_router(analysis_router(TransformerTrends(asset_directory, LaboratoryTrendSource(engine)), current_actor))
-    app.include_router(assets_router(asset_directory, current_actor, AssetLifecycle(engine), mutation_actor))
+    app.include_router(assets_router(asset_directory, current_actor, AssetLifecycle(engine), mutation_actor, SiteBasics(engine)))
     configured_object_store = file_store if file_store is not None else UnavailableFileStore()
     if file_store is None and all((settings.object_store_endpoint, settings.object_store_bucket,
             settings.object_store_access_key, settings.object_store_secret_key)):

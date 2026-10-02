@@ -40,6 +40,12 @@
 .site-facts dl { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 24px; }
 .site-facts dt { color: #667085; font-size: 12px; margin-bottom: 8px; }
 .site-facts dd { margin: 0; overflow-wrap: anywhere; }
+.site-basics-editor { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; padding: 24px; background: white; border: 1px solid #dce3ed; border-radius: 12px; margin-bottom: 24px; }
+.site-basics-editor label { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.site-basics-editor input, .site-basics-editor select { min-width: 0; width: 100%; box-sizing: border-box; }
+.site-basics-editor > p, .site-basics-editor > div { grid-column: 1 / -1; }
+.site-basics-editor [role=alert] { color: #ae2020; }
+@media (max-width: 760px) { .site-basics-editor { grid-template-columns: minmax(0,1fr); } }
 .equipment-path { margin: 16px 0; line-height: 2; overflow-wrap: anywhere; }
 .equipment-path a { color: #a94f0b; }
 .equipment-path [aria-current="page"] { color: #202a39; font-weight: 600; }
