@@ -49,7 +49,7 @@
 - 部署环境：`OIDC_ENCRYPTION_KEY` 为 Fernet 密钥；`OIDC_ALLOWED_HOSTS` 为精确 Okta 主机名（逗号分隔、不带协议/通配符）；`OIDC_CALLBACK_ORIGINS` 为允许的完整应用 origin；`OIDC_CALLBACK_URL` 可选，仅为新候选默认值。未设置 origins 时，显式 default callback 的 origin 是唯一允许项。密钥和允许列表缺失时 OIDC 禁用，不影响本地恢复。
 - `AUTH_ALLOWED_ORIGINS` 同时允许该应用 origin；生产必须 HTTPS 且 `COOKIE_SECURE=true`。仅本机 localhost/127.0.0.1/::1 可用 HTTP 回调。浏览器从与候选回调相同的 origin 发起登录；不共享跨域 Cookie。
 - 候选 issuer、metadata 的授权/token/JWKS 主机全部须在允许列表；拒绝重定向和非 HTTPS 端点。代理须允许这些出站 HTTPS 请求；不通过跳过 TLS 或放宽 URL 校验解决联调失败。
-- 开发 Compose 仅 API 显式接收以上 OIDC 环境变量。生产 Docker 注入仍由部署人员按 #20 安全方案配置，不能将开发 Compose 暴露公网。无须新增付费服务或改变对象存储。
+- 默认开发 Compose 不注入 OIDC 环境变量。需要联调时，由部署人员通过独立环境配置向 API 容器注入上述参数；仅设置宿主机变量不会传入容器。生产 Docker 注入仍由部署人员按 #20 安全方案配置，不能将开发 Compose 暴露公网。无须新增付费服务或改变对象存储。
 
 加密密钥应在受控终端生成并通过受保护的部署机密注入，单独备份和限制访问；不要贴到 GitHub、聊天、截图或命令参数中。数据库中只有加密 secret；配置读取不会回显。丢失原密钥时恢复备份密钥，或使用本地管理员重新建立候选并测试；不要直接替换密钥后声称旧密文可用。Client secret 轮换需保留原 secret 有效至新候选真实测试/启用成功，再由 IT 撤销原 secret。当前不提供在线批量重加密旧候选；Fernet 主密钥轮换需单独受控维护与备份计划。
 
