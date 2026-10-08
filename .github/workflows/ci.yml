@@ -13,8 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Start deployable portal and migrate PostgreSQL
         run: docker compose up --build -d --wait
-      - name: Public interfaces and module ownership with real PostgreSQL
-        run: docker compose --profile test run --build --rm api-test
+      - name: Public interfaces with PostgreSQL, MinIO and Azure emulator
+        run: docker compose -f compose.yaml -f compose.storage-test.yaml --profile test run --build --rm api-test
       - name: Browser acceptance on production build
         run: |
           docker compose -f compose.browser.yaml -f compose.import-browser.yaml up --build -d --wait frontend import-worker
@@ -22,10 +22,10 @@ jobs:
       - name: Service logs
         if: always()
         run: |
-          docker compose --profile test logs --tail=100
+          docker compose -f compose.yaml -f compose.storage-test.yaml --profile test logs --tail=100
           docker compose -f compose.browser.yaml -f compose.import-browser.yaml --profile test logs --tail=100
       - name: Stop runner containers
         if: always()
         run: |
-          docker compose --profile test down
+          docker compose -f compose.yaml -f compose.storage-test.yaml --profile test down
           docker compose -f compose.browser.yaml -f compose.import-browser.yaml --profile test down
