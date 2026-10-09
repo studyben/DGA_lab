@@ -1,4 +1,5 @@
 from zoneinfo import ZoneInfo
+from typing import Literal
 
 from pydantic import SecretStr, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,6 +13,10 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
     session_hours: int = Field(default=8, ge=1, le=24)
     auth_allowed_origins: str = 'http://127.0.0.1:8080'
+    object_store_provider: Literal['s3', 'azure'] | None = None
+    azure_blob_account_url: str | None = None
+    azure_blob_container: str | None = None
+    azure_blob_emulator_key: SecretStr | None = None
     object_store_endpoint: str | None = None
     object_store_bucket: str | None = None
     object_store_access_key: SecretStr | None = None

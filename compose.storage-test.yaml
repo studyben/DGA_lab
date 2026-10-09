@@ -1,0 +1,50 @@
+# Isolated protocol tests. No host ports, production credentials, or persistent data.
+services:
+  storage-azure:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    profiles: [test]
+    command: [azurite-blob, --blobHost, 0.0.0.0, --disableProductStyleUrl, --skipApiVersionCheck, --silent]
+    environment:
+      AZURITE_ACCOUNTS: 'dgatest:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE='
+    tmpfs: [/data]
+    healthcheck:
+      test: [CMD, node, -e, "require('http').get('http://127.0.0.1:10000/dgatest', r => process.exit(r.statusCode === 400 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  storage-minio:
+    profiles: [test]
+    build:
+      context: ./deploy/minio
+      target: server
+    command: [server, /data]
+    environment:
+      MINIO_ROOT_USER: dga-storage-test
+      MINIO_ROOT_PASSWORD: isolated-storage-tests-only
+    tmpfs: [/data]
+  storage-minio-init:
+    profiles: [test]
+    build:
+      context: ./deploy/minio
+      target: client
+    entrypoint: [/bin/sh, -c]
+    command:
+      - >-
+        for attempt in $$(seq 1 30); do
+          if mc alias set local http://storage-minio:9000 dga-storage-test isolated-storage-tests-only; then
+            mc mb --ignore-existing local/dga-storage-tests && exit 0;
+          fi;
+          sleep 1;
+        done;
+        exit 1
+    depends_on:
+      storage-minio:
+        condition: service_started
+  api-test:
+    environment:
+      RUN_STORAGE_CONTRACT_TESTS: '1'
+    depends_on:
+      storage-azure:
+        condition: service_healthy
+      storage-minio-init:
+        condition: service_completed_successfully

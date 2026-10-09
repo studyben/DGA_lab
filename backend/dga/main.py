@@ -45,7 +45,8 @@ from dga.condition_analysis.public import (
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import AuditTrail, IdentityService, IdentityError
 from dga.shared.auth.http import AuthenticatedRequests, auth_router
-from dga.shared.files import FileStore, ObjectStorageError, S3CompatibleFileStore, UnavailableFileStore
+from dga.shared.files import FileStore, ObjectStorageError
+from dga.shared.file_store_factory import create_file_store
 
 
 def create_app(settings: Settings | None = None, *, file_store: FileStore | None = None) -> FastAPI:
@@ -118,16 +119,7 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
     app.include_router(health_router(health_rules,DeviceHealth(engine,asset_directory,LaboratoryTrendSource(engine),health_rules),current_actor,mutation_actor))
     app.include_router(analysis_router(TransformerTrends(asset_directory, LaboratoryTrendSource(engine)), current_actor))
     app.include_router(assets_router(asset_directory, current_actor, AssetLifecycle(engine), mutation_actor))
-    configured_object_store = file_store if file_store is not None else UnavailableFileStore()
-    if file_store is None and all((settings.object_store_endpoint, settings.object_store_bucket,
-            settings.object_store_access_key, settings.object_store_secret_key)):
-        configured_object_store = S3CompatibleFileStore(
-            settings.object_store_endpoint,
-            settings.object_store_bucket,
-            settings.object_store_access_key.get_secret_value(),
-            settings.object_store_secret_key.get_secret_value(),
-            region=settings.object_store_region,
-        )
+    configured_object_store = file_store if file_store is not None else create_file_store(settings)
     app.include_router(import_http_router(AssetImports(engine, configured_object_store), current_actor, mutation_actor))
 
     @app.exception_handler(ObjectStorageError)

@@ -10,7 +10,8 @@ from sqlalchemy import create_engine
 
 from dga.shared.auth.public import AuditTrail
 from dga.shared.config import Settings
-from dga.shared.files import ObjectStorageError, S3CompatibleFileStore
+from dga.shared.files import ObjectStorageError, UnavailableFileStore
+from dga.shared.file_store_factory import create_file_store
 
 from .report_pdf import render_report_pdf
 from .reports import LaboratoryReports, StaleReportClaim
@@ -73,26 +74,13 @@ class ReportWorker:
 
 def main() -> None:
     settings = Settings()
-    if not all(
-        (
-            settings.object_store_endpoint,
-            settings.object_store_bucket,
-            settings.object_store_access_key,
-            settings.object_store_secret_key,
-        )
-    ):
+    store = create_file_store(settings)
+    if isinstance(store, UnavailableFileStore):
         raise RuntimeError('object_storage_not_configured')
     engine = create_engine(
         settings.database_url.get_secret_value(),
         pool_pre_ping=True,
         pool_timeout=3,
-    )
-    store = S3CompatibleFileStore(
-        settings.object_store_endpoint,
-        settings.object_store_bucket,
-        settings.object_store_access_key.get_secret_value(),
-        settings.object_store_secret_key.get_secret_value(),
-        region=settings.object_store_region,
     )
     reports = LaboratoryReports(engine, AuditTrail(), store)
     worker = ReportWorker(reports, store)

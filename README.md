@@ -63,7 +63,7 @@ nginx 提供 React/TypeScript 静态构建，并将 `/api/` 转发给 FastAPI；
 - `COOKIE_SECURE`：应用默认 true；本机 Compose 显式 false。生产必须使用 HTTPS + Secure cookie。
 - `SESSION_HOURS`：绝对会话时长，默认 8，小于 1 或大于 24 拒绝启动。
 - `AUTH_ALLOWED_ORIGINS`：逗号分隔的完整来源（协议、主机、端口），认证 POST 必须带匹配 Origin；同源浏览器会自动发送。部署时仅列允许的 HTTPS 地址。
-- `OBJECT_STORE_ENDPOINT`、`OBJECT_STORE_BUCKET`、`OBJECT_STORE_ACCESS_KEY`、`OBJECT_STORE_SECRET_KEY`：共同配置一个 path-style S3 兼容对象存储；`OBJECT_STORE_REGION` 默认 `us-east-1`。四项缺失时普通检测数据仍可使用，但附件保存会明确失败且不会生成伪成功记录。本地 Compose 运行隔离 MinIO，生产凭据不得提交仓库。
+- `OBJECT_STORE_PROVIDER=s3|azure`：API 和 report-worker 共用存储工厂。本地 Compose 明确选择 `s3`，使用 `OBJECT_STORE_ENDPOINT`、`OBJECT_STORE_BUCKET`、`OBJECT_STORE_ACCESS_KEY`、`OBJECT_STORE_SECRET_KEY`，区域默认 `us-east-1`；Azure 使用 `AZURE_BLOB_ACCOUNT_URL`、`AZURE_BLOB_CONTAINER` 和 SDK token credential。显式选择但配置不完整会阻止启动；未选择且没有完整旧 S3 配置时保留不可用存储行为。配置、隔离测试及真实 Azure 验收边界见 [对象存储说明](docs/object-storage.md)。生产凭据不得提交仓库。
 - `GET /api/health`：数据库可连接且迁移版本匹配时 200 `{ "status": "ok", "database": "ok" }`；连接失败或未迁移时 503，字段均为 `unavailable`。不自动执行迁移，不输出数据库异常或凭据。
 - `GET /api/modules`：登录且完成首次改密后返回获授权模块的稳定代码和标签；不是业务 CRUD。
 - `/api/auth/login`、`/api/auth/password`、`/api/auth/logout`：POST；`/api/auth/session`：GET。会话 cookie 为 HttpOnly/SameSite=Lax，不放 localStorage；改密和退出需当前会话返回的 X-CSRF-Token。
@@ -86,7 +86,7 @@ nginx 提供 React/TypeScript 静态构建，并将 `/api/` 转发给 FastAPI；
 ## 测试
 
 ```sh
-docker compose --profile test run --build --rm api-test
+docker compose -f compose.yaml -f compose.storage-test.yaml --profile test run --build --rm api-test
 docker compose -f compose.browser.yaml up --build -d --wait frontend
 docker compose -f compose.browser.yaml --profile test run --build --no-deps --rm browser-test
 ```
@@ -152,7 +152,7 @@ docker compose run --rm migrate alembic upgrade head
 
 普通 `compose.yaml` 包含 `import-worker`，执行 `python -m dga.assets.import_worker`；`--once` 处理最多一个批次，供操作检查使用。进程用数据库行锁领取待校验批次：崩溃释放锁，下一次继续处理；异常校验记录失败码，不无限重试同一个坏批次。长时间处于 STAGED 时先检查 worker 日志与数据库可用性。恢复后对于 FAILED 文件重新上传，不手改批次状态。
 
-源文件使用既有 S3 兼容 FileStore，配置沿用 `OBJECT_STORE_*`。对象存储失败不生成可发布批次；上传成功后数据库写入失败会尝试删除该次孤立对象，删除失败日志记录对象键供管理员核对。S3与PostgreSQL不是分布式事务；生产源文件保留、备份与孤立对象清理由部署 #20 运维策略负责，不自动删除已发布源文件。
+源文件使用 FileStore，支持配置选择 Azure Blob 或本地 MinIO，保持原有对象键和数据库引用。对象存储失败不生成可发布批次；上传成功后数据库写入失败会尝试删除该次孤立对象，删除失败日志记录对象键供管理员核对。对象存储与PostgreSQL不是分布式事务；生产源文件保留、备份与孤立对象清理由部署 #20 运维策略负责，不自动删除已发布源文件。
 
 例外：如果已开始 COMMIT 而提交响应丢失，结果可能已经落库，此时**保留源文件而不删除**，日志记录对象键供核对。用户先查批次历史确认是否已有批次，再决定是否重新上传。只有明确发生在 COMMIT 之前的失败才尝试即时清理孤立源文件。
 
