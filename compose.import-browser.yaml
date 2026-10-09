@@ -22,6 +22,7 @@ services:
     command: ["sh", "-c", "alembic upgrade head && python -m tests.seed_browser && python -m tests.seed_import_browser"]
   api:
     environment:
+      OBJECT_STORE_PROVIDER: s3
       OBJECT_STORE_ENDPOINT: http://object-store:9000
       OBJECT_STORE_BUCKET: dga-lab
       OBJECT_STORE_ACCESS_KEY: dga-local

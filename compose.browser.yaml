@@ -42,6 +42,7 @@ services:
       DATABASE_URL: postgresql+psycopg://dga_browser:isolated-browser-only@db:5432/dga_browser
       COOKIE_SECURE: "false"
       AUTH_ALLOWED_ORIGINS: http://frontend:8080,http://127.0.0.1:${DGA_BROWSER_PORT:-18080}
+      OBJECT_STORE_PROVIDER: s3
       OBJECT_STORE_ENDPOINT: http://object-store:9000
       OBJECT_STORE_BUCKET: dga-lab
       OBJECT_STORE_ACCESS_KEY: dga-browser

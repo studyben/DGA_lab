@@ -25,6 +25,8 @@ def build_app():
     settings.oidc_encryption_key = SecretStr('LbsTTNRHHGjNpCacJPmxNYIyFVwnX-uviZEgmPMMKaI=')
     settings.oidc_allowed_hosts = 'tenant.example'
     settings.oidc_callback_url = 'http://127.0.0.1:18118/api/auth/oidc/callback'
+    # The protocol test models this registered origin even when Compose uses a different port.
+    settings.auth_allowed_origins += ',http://127.0.0.1:18118'
     private = JsonWebKey.generate_key('RSA', 2048, is_private=True, options={'kid': 'browser-test-key'})
     def transport(request):
         if request.url.path.endswith('openid-configuration'):
