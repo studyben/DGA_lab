@@ -64,6 +64,39 @@ attachment-backed tests through real provider selection and PostgreSQL; injected
 storage failures verify the existing 503 response and no successful database record.
 Azure SDK transport failures are tested at the external client boundary.
 
-Azurite evidence is local protocol coverage, not real Azure acceptance. Azure report
-lifecycle acceptance belongs to #42. Hosted identity, real Azure smoke tests and
-deployment acceptance belong to #44. Production recovery remains part of #20.
+Azurite evidence is local protocol coverage, not real Azure acceptance. The report
+lifecycle checks below cover #42 locally. Hosted identity, real Azure smoke tests
+and deployment acceptance belong to #44. Production recovery remains part of #20.
+
+## Report lifecycle verification (#42)
+
+```sh
+docker compose -f compose.yaml -f compose.storage-test.yaml --profile test run --build --rm api-test pytest -q tests/test_report_storage.py -p no:cacheprovider
+```
+
+The existing report worker already uses the shared provider factory introduced in
+#41. These tests verify that integration without adding a new report workflow,
+schema, public Blob URL, or SAS-sharing feature. Each provider runs the same report
+cases with real PostgreSQL; the worker renders a PDF and a separately constructed
+API instance reads it through its own configured adapter.
+
+| Scenario | Required observable result |
+| --- | --- |
+| Finalize, generate, and download | QUEUED/GENERATING before completion; READY only after upload and metadata completion; exact PDF bytes and safe download headers |
+| Storage outage and recovery | FAILED with a sanitized error; authorized retry queues a new generation and succeeds |
+| Missing, truncated, or same-size corrupted PDF | Safe 503 response and no successful download audit |
+| Correct hash but wrong size metadata | Integrity failure, independently exercising the byte-size guard |
+| Storage credentials denied | Safe 503 response without SDK details or object keys |
+| Missing login or business permission | Authentication/authorization denial; retry still requires finalization permission and CSRF |
+| Withdrawal while upload finishes | Proven stale object is deleted best-effort; cleanup failure never exposes the stale PDF; re-finalization produces a new current report |
+| Lost database COMMIT response | Uploaded PDF is retained whether the database actually committed or rolled back; a committed report stays downloadable, and a failed report can be retried |
+
+Deterministic storage faults are injected at the FileStore boundary. The uncertain
+commit test injects a one-shot lost response at the PostgreSQL driver boundary,
+after upload, and verifies both database outcomes through the report API. Tests
+clean only their own isolated objects. They do not authorize automated cleanup of
+production orphan files; reconcile uncertain commits before deleting anything.
+
+A separate import-worker subprocess test validates retained parsed database rows
+with an explicitly selected but unconfigured Azure provider. The import worker
+still needs no Blob credentials or access.
