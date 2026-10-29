@@ -5,8 +5,31 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.responses import StreamingResponse
+from starlette.types import Receive, Scope, Send
 
-from .public import AssetDirectory, AssetLifecycle, DashboardQuery, EquipmentQuery
+from .public import AssetDirectory, AssetLifecycle, DashboardQuery, EquipmentQuery, SiteExportFile
+
+
+class _SiteDownload(StreamingResponse):
+    """The HTTP response owns the prepared file, including disconnect cleanup."""
+
+    def __init__(self, exported: SiteExportFile):
+        self._file = exported.file
+
+        def chunks():
+            while chunk := self._file.read(64 * 1024):
+                yield chunk
+
+        super().__init__(chunks(), media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                         headers={'Content-Disposition': f'attachment; filename="{exported.filename}"',
+                                  'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self._file.close()
 
 
 class ChangeInput(BaseModel):
@@ -74,6 +97,10 @@ def assets_router(directory: AssetDirectory, actor_dependency: Callable, lifecyc
     @router.get('/dashboard')
     def dashboard(query: DashboardQuery = Query(), actor=Depends(actor_dependency)):
         return directory.dashboard(actor, **query.model_dump())
+
+    @router.get('/sites/export')
+    def export_sites(actor=Depends(actor_dependency)):
+        return _SiteDownload(directory.export_sites(actor))
 
     @router.get('/sites/{site_id}')
     def site_detail(site_id: UUID, query: EquipmentQuery = Query(), actor=Depends(actor_dependency)):
