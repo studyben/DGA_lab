@@ -1,3 +1,4 @@
+import {ImportSourcesPanel} from './ImportSourcesPanel';
 import { useState } from 'react';
 import { useAuth } from '../../Auth';
 import { DataTable, useQuery, useRead } from './assetUi';
@@ -34,6 +35,11 @@ function TestHistory({ assetId }: { assetId: string }) {
   </section>;
 }
 
+function MaterialFacts({number}:{number:string}) {
+  const material=useRead<{material_number:string;model:string;asset_type:string}>(`/api/assets/materials/detail?material_number=${encodeURIComponent(number)}`);
+  return <><section className="dashboard-table-panel" aria-label="物料资料"><h2>物料资料</h2>{material.data?<p>{material.data.material_number} · {material.data.model} · {material.data.asset_type}</p>:material.error?<p>{material.error}<button onClick={material.retry}>重试物料资料</button></p>:<p>正在读取物料…</p>}</section><ImportSourcesPanel kind="materials" id={number}/></>;
+}
+
 export function EquipmentDetailPage({ assetId }: { assetId: string }) {
   const { can } = useAuth();
   const { query, update } = useQuery();
@@ -43,13 +49,13 @@ export function EquipmentDetailPage({ assetId }: { assetId: string }) {
   const layout = equipmentLayouts[data.equipment.machine_type ?? ''] ?? unknownLayout;
   const line = data.path[0].product_line === 'ESS' ? 'ESS' : 'PV';
   const siteHref = data.site ? `/assets/sites/${data.site.id}?product_line=${line}` : '/assets/repair-center';
-  const returnTo = /^\/assets\/sites\/[a-f0-9-]+\?/.test(query.return_to ?? '') ? query.return_to : siteHref;
+  const returnTo = /^\/assets\/(sites\/[a-f0-9-]+|import)\?/.test(query.return_to ?? '') ? query.return_to : siteHref;
   const childHref = (row: EquipmentDetails) => `/assets/equipment/${row.id}?return_to=${encodeURIComponent(returnTo)}`;
   const sorted = data.children.filter(child => (!query.child_search || [child.display_name, child.serial_number, child.model].some(value => value?.toLowerCase().includes(query.child_search.toLowerCase()))) && (!query.child_type || child.machine_type === query.child_type));
   const sortKey = ['display_name', 'serial_number', 'model', 'machine_type'].includes(query.sort) ? query.sort as keyof EquipmentDetails : 'display_name';
   sorted.sort((a, b) => String(a[sortKey] ?? '').localeCompare(String(b[sortKey] ?? ''), 'zh-CN') * (query.direction === 'desc' ? -1 : 1) || a.id.localeCompare(b.id));
   const page = Math.max(1, Number(query.page) || 1), size = [1,10,20,50,100].includes(Number(query.page_size)) ? Number(query.page_size) : 20;
-  return <div className="asset-dashboard"><a href={returnTo}>返回现场详情</a>
+  return <div className="asset-dashboard"><a href={returnTo}>{returnTo.startsWith('/assets/import?')?'返回导入批次':'返回现场详情'}</a>
     <nav aria-label="设备路径" className="equipment-path"><a href={siteHref}>{data.site?.site_name ?? data.location.label}</a>{data.path.map(node => <span key={node.id}> / <a href={childHref(node)} aria-current={node.id === assetId ? 'page' : undefined}>{node.display_name}</a></span>)}</nav>
     <section className="site-facts" aria-label="设备属性"><h2>{data.equipment.display_name} <small>{layout.title}</small></h2>
       {can('analysis.read')&&<HealthPanel assetId={assetId}/>}
@@ -62,6 +68,8 @@ export function EquipmentDetailPage({ assetId }: { assetId: string }) {
     <DataTable name="子设备清单" rows={sorted.slice((page-1)*size, page*size)} total={sorted.length} columns={[{ key: 'display_name', label: '设备名称 / Tag number' }, { key: 'serial_number', label: '序列号' }, { key: 'model', label: '设备型号' }, { key: 'machine_type', label: '设备类型', render: row => machineNames[row.machine_type ?? ''] ?? '未分类设备' }]} query={{ ...query, page_size: String(size) }} update={update} href={childHref} />
     <TestHistory assetId={assetId} />
     {data.equipment.asset_type === 'TRANSFORMER' && can('analysis.read') && <a href={`/assets/analysis/trends?asset_id=${encodeURIComponent(assetId)}&return_to=${encodeURIComponent(location.pathname + location.search)}`}>查看变压器趋势</a>}
+    <ImportSourcesPanel kind="equipment" id={assetId}/>
+    {data.equipment.material_number&&<MaterialFacts number={data.equipment.material_number}/>}
     <LifecyclePanel assetId={assetId} />
   </div>;
 }

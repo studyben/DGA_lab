@@ -1,4 +1,5 @@
-import { SiteImportPanel } from './SiteImportPanel';
+import { V2ImportPanel } from './V2ImportPanel';
+import {importBatchHref} from './siteImportIntent';
 import { SiteExportButton } from './SiteExportButton';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../Auth';
@@ -28,8 +29,33 @@ const errors: Record<string, string> = {
 };
 
 export function AssetImportPage() {
-  const siteMode = new URLSearchParams(location.search).get('mode') === 'SITES';
-  return <><div className="import-mode-picker"><strong>导入内容</strong><a className="button" aria-current={!siteMode?'page':undefined} href="/assets/import">设备资料（v1）</a><a className="button" aria-current={siteMode?'page':undefined} href="/assets/import?mode=SITES">仅现场信息（v2）</a></div>{siteMode?<SiteImportPanel/>:<LegacyAssetImportPage/>}</>;
+  const params=new URLSearchParams(location.search), selected=params.get('batch');
+  const requested=params.get('format_version')==='1'?'LEGACY':params.get('mode')==='SITES'?'SITES':'ASSETS';
+  const [actual,setActual]=useState<string|null>(selected?null:requested);
+  const [failure,setFailure]=useState('');
+  const [metadataRetry,setMetadataRetry]=useState(0);
+  useEffect(()=>{
+    if(!selected)return;
+    let active=true,expired=false;
+    const controller=new AbortController();
+    const deadline=setTimeout(()=>{expired=true;controller.abort();},15000);
+    setActual(null);setFailure('');
+    async function loadMetadata(){
+      try{
+        const response=await fetch(`/api/assets/imports/${encodeURIComponent(selected!)}`,{cache:'no-store',signal:controller.signal});
+        if(!response.ok)throw new Error('无法读取批次，请检查登录与导入权限后重试。');
+        const batch=await response.json();
+        if(!active)return;
+        setActual(batch.format_version===2?batch.mode:'LEGACY');
+        history.replaceState(null,'',importBatchHref(batch));
+      }catch(error){
+        if(active)setFailure(expired?'读取批次格式超时，请重试；如会话失效请重新登录。':error instanceof Error?error.message:'无法读取批次，请重试。');
+      }finally{clearTimeout(deadline);}
+    }
+    void loadMetadata();
+    return()=>{active=false;clearTimeout(deadline);controller.abort();};
+  },[selected,metadataRetry]);
+  return <><div className="import-mode-picker"><strong>导入内容</strong><a className="button" aria-current={actual==='ASSETS'?'page':undefined} href="/assets/import">设备与物料（v2）</a><a className="button" aria-current={actual==='SITES'?'page':undefined} href="/assets/import?mode=SITES">仅现场信息（v2）</a><a className="button" aria-current={actual==='LEGACY'?'page':undefined} href="/assets/import?format_version=1">旧版设备（v1）</a></div>{failure?<p role="alert">{failure}<button onClick={()=>setMetadataRetry(n=>n+1)}>重新读取批次</button></p>:actual==='LEGACY'?<LegacyAssetImportPage/>:actual==='SITES'||actual==='ASSETS'?<V2ImportPanel mode={actual}/>:<p role="status">正在读取批次格式…</p>}</>;
 }
 
 function LegacyAssetImportPage() {
@@ -52,7 +78,7 @@ function LegacyAssetImportPage() {
   function select(id: string) {
     setSelected(id); setBatch(null); setAcknowledged(false); setError(''); setMessage(''); setFilter('');
     setRefresh(n => n + 1);
-    history.replaceState(null, '', id ? `/assets/import?batch=${encodeURIComponent(id)}` : '/assets/import');
+    history.replaceState(null, '', id ? `/assets/import?format_version=1&batch=${encodeURIComponent(id)}` : '/assets/import?format_version=1');
   }
 
   useEffect(() => {
@@ -64,8 +90,8 @@ function LegacyAssetImportPage() {
       try {
         const response = await fetch(`/api/assets/imports/${encodeURIComponent(selected)}`, { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
         if (!response.ok) throw new Error(response.status === 401 ? '登录已失效，请重新登录。' : '无法读取批次，请检查权限或稍后重试。');
-        const data: Batch & {format_version?:number} = await response.json();
-        if(data.format_version===2){location.assign(`/assets/import?mode=SITES&batch=${selected}`);return;}
+        const data: Batch & {format_version?:number;mode?:'SITES'|'ASSETS'} = await response.json();
+        if(data.format_version===2){location.assign(importBatchHref(data));return;}
         if (!active) return;
         setBatch(data); setError('');
         if (data.state === 'STAGED') timer = setTimeout(() => void load(), 2000);
@@ -82,7 +108,7 @@ function LegacyAssetImportPage() {
     lock.current = true; setBusy(true); setError(''); setMessage('');
     try {
       if (kind === 'upload' && file!.size > 2 * 1024 * 1024) throw new Error(errors.import_file_size);
-      const response = await fetch(kind === 'upload' ? `/api/assets/imports?filename=${encodeURIComponent(file!.name)}` : `/api/assets/imports/${batch!.id}/publish`, {
+      const response = await fetch(kind === 'upload' ? `/api/assets/imports?format_version=1&mode=ASSETS&filename=${encodeURIComponent(file!.name)}` : `/api/assets/imports/${batch!.id}/publish`, {
         method: 'POST', signal: AbortSignal.timeout(45000), credentials: 'same-origin',
         headers: { 'X-CSRF-Token': session.csrf_token, 'Content-Type': kind === 'upload' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/json' },
         body: kind === 'upload' ? file : JSON.stringify({ validation_revision: batch!.validation_revision, acknowledge_warnings: acknowledged }),
@@ -106,7 +132,7 @@ function LegacyAssetImportPage() {
   return <div className="asset-dashboard asset-import">
     <SiteExportButton />
     <section className="dashboard-table-panel" aria-label="上传资产文件">
-      <div className="table-toolbar"><h2>新增资产批量导入</h2><a className="button" href="/api/assets/imports/template">下载 Excel 模板与参考资料</a></div>
+      <div className="table-toolbar"><h2>新增资产批量导入</h2><a className="button" href="/api/assets/imports/template?format_version=1&mode=ASSETS">下载 Excel 模板与参考资料</a></div>
       <p>只新增资产，引用已有客户、现场和物料。不覆盖已有资产；修正文件后会保留为新批次。</p>
       <div className="dashboard-filters"><label>选择 Excel 文件<input type="file" accept=".xlsx" disabled={busy} onChange={e => { setFile(e.target.files?.[0] ?? null); select(''); }} /></label>
         <button disabled={!file || busy} onClick={() => void mutate('upload')}>{busy ? '正在处理…' : '上传并校验'}</button></div>

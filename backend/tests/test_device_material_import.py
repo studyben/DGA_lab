@@ -1086,3 +1086,137 @@ def test_concurrent_identical_revision_is_one_recovered_change(database_url):
     assert imports.revision_history(actor,preview['id'])['total']==1
     assert publish(imports,actor,results[0])['state']=='PUBLISHED'
     engine.dispose()
+
+
+
+def capacity_document(*,overflow=None):
+    token=uuid4().hex
+    note='源'*2000
+    customers=[dict(record_key=f'c-{n}',decision='NEW',customer_name=f'Capacity customer {token} {n}',source_note=note,reason='Verified new organization') for n in range(500+(overflow=='Customers'))]
+    sites=[dict(record_key=f's-{n}',decision='NEW',site_name=f'Capacity site {token} {n}',customer_ref=f'NEW:c-{n%500}',product_lines='PV',pv_power_mw='1.000001',source_note=note,reason='Verified new physical site') for n in range(500+(overflow=='Sites'))]
+    materials=[dict(record_key=f'm-{n}',decision='NEW',material_number=f'NEW:capacity/{token}/{n}',model=f'Capacity approved model {n}',asset_type='WHOLE_UNIT',source_note=note,reason='Verified material identity') for n in range(500+(overflow=='Materials'))]
+    assets=[equipment(record_key=f'a-{n}',serial_number=f'Capacity-{token}-{n}',material_ref=f'NEW:m-{n%500}',site_id=f'NEW:s-{n%500}',site_name=sites[n%500]['site_name'],source_note=note) for n in range(500+(overflow=='Assets'))]
+    return document(assets,materials=materials,sites=sites,customers=customers)
+
+
+def test_exact_500_of_each_kind_publishes_and_recovers_all_2000_targets(database_url):
+    from collections import Counter
+    from time import perf_counter
+    engine,actor,imports,_=context(database_url)
+    started=perf_counter();content=capacity_document();preview=ready(imports,actor,content)
+    assert preview['total_rows']==2000 and preview['summary']['error_count']==preview['summary']['warning_count']==0
+    assert all(preview['summary']['by_kind'][sheet]['new_rows']==500 for sheet in HEADERS)
+    before=perf_counter();key=str(uuid4());published=publish(imports,actor,preview,key=key)
+    publication_seconds=perf_counter()-before
+    targets=published['operation_result']['targets']
+    assert Counter(t['kind'] for t in targets)==dict(CUSTOMER=500,SITE=500,MATERIAL=500,ASSET=500)
+    assert len(published['operation_result']['target_ids'])==1500
+    rows=[]
+    for page in range(1,101):
+        current=imports.get(actor,preview['id'],page=page)
+        assert len(current['rows'])==20
+        rows.extend(current['rows'])
+    assert len(rows)==2000 and len({(r['sheet'],r['row']) for r in rows})==2000
+    assert all(r['original_values']['source_note']=='源'*2000 for r in rows)
+    directory=AssetDirectory(engine)
+    totals=directory.dashboard(actor,product_line='PV')
+    assert totals['site_count']==totals['customer_count']==501
+    assert AssetLifecycle(engine).catalog(actor)['total']==502
+    for row,target in zip(rows,targets):
+        assert row['values']['record_key']==target['record_key']
+        identity=target.get('target_id',target.get('target_key'))
+        source=directory.import_sources(actor,target['kind'],identity)
+        assert source['total']==1 and source['sources'][0]['source_note']=='源'*2000
+        assert source['sources'][0]['row_number']==row['row'] and source['sources'][0]['batch_id']==preview['id']
+        if target['kind']=='MATERIAL':
+            material=directory.material_detail(actor,identity)
+            assert material['material_number']==row['values']['material_number'] and material['model']==row['values']['model']
+            assert identity.startswith('NEW:capacity/')
+        elif target['kind']=='ASSET':
+            detail=directory.equipment_detail(actor,identity)
+            assert detail['equipment']['system_asset_number']==target['system_asset_number']
+            assert detail['site']['id']==UUID(row['references']['site']['site_id'])
+    assert publish(imports,actor,preview,key=key)['operation_result']==published['operation_result']
+    assert imports.operation(actor,key)==published['operation_result']
+    assert AssetLifecycle(engine).catalog(actor)['total']==502
+    assert imports.source_file(actor,preview['id'])['content']==content
+    print(f'EXACT_CAPACITY workbook_bytes={len(content)} publication_seconds={publication_seconds:.3f} complete_public_proof_seconds={perf_counter()-started:.3f}')
+    engine.dispose()
+
+
+@pytest.mark.parametrize('sheet',['Customers','Sites','Materials','Assets'])
+def test_501_in_each_sheet_and_unsafe_expansion_never_truncate(database_url,sheet):
+    engine,actor,imports,_=context(database_url)
+    content=capacity_document(overflow=sheet)
+    batch=upload(imports,actor,content)
+    assert batch['state']=='FAILED' and batch['summary']['error_count']>0
+    assert any(i['sheet']==sheet for i in batch['issues'])
+    with pytest.raises(AssetQueryError,match='import_not_validated'):
+        imports.publish(actor,batch['id'],validation_revision=1,idempotency_key=str(uuid4()),acknowledged_warning_ids=[])
+    assert AssetLifecycle(engine).catalog(actor)['total']==2
+    assert AssetDirectory(engine).dashboard(actor,product_line='PV')['site_count']==1
+    assert imports.source_file(actor,batch['id'])['content']==content
+    engine.dispose()
+
+
+@pytest.mark.parametrize('variant',['bytes','expanded','members','cells','sparse','formula','macro','external','duplicate-member','malformed'])
+def test_unsafe_assets_workbooks_never_publish_partial_business_data(database_url,variant):
+    from zipfile import ZipFile,ZIP_DEFLATED
+    engine,actor,imports,_=context(database_url)
+    content=document()
+    if variant=='bytes': content=b'x'*(10*1024*1024+1)
+    elif variant=='malformed': content=b'not a workbook'
+    elif variant=='formula':
+        book=load_workbook(BytesIO(content));book['Assets']['C2']='=1+1'
+        out=BytesIO();book.save(out);content=out.getvalue()
+    elif variant in ('sparse','cells'):
+        out=BytesIO()
+        with ZipFile(BytesIO(content)) as original,ZipFile(out,'w',ZIP_DEFLATED) as changed:
+            for entry in original.infolist():
+                payload=original.read(entry.filename)
+                if entry.filename=='xl/worksheets/sheet5.xml':
+                    cell=b'<row r="200000"/>' if variant=='sparse' else b'<row r="501"><c r="KW501" t="inlineStr"><is><t>x</t></is></c></row>'
+                    payload=payload.replace(b'</sheetData>',cell+b'</sheetData>')
+                changed.writestr(entry,payload)
+        content=out.getvalue()
+    else:
+        out=BytesIO(content)
+        with ZipFile(out,'a',ZIP_DEFLATED) as archive:
+            if variant=='expanded': archive.writestr('xl/worksheets/expanded.xml',b' '*(50*1024*1024))
+            elif variant=='members':
+                for n in range(201): archive.writestr(f'extra-{n}.xml',b'<x/>')
+            else: archive.writestr({'macro':'xl/vbaProject.bin','external':'xl/externalLinks/externalLink1.xml','duplicate-member':'xl/workbook.xml'}[variant],b'<x/>')
+        content=out.getvalue()
+    if variant=='bytes':
+        with pytest.raises(AssetQueryError) as rejected: upload(imports,actor,content)
+        assert rejected.value.status==413
+        assert imports.list_batches(actor)['total']==0
+    else:
+        batch=upload(imports,actor,content)
+        assert batch['state']=='FAILED' and batch['issues']
+        with pytest.raises(AssetQueryError,match='import_not_validated'):
+            imports.publish(actor,batch['id'],validation_revision=1,idempotency_key=str(uuid4()),acknowledged_warning_ids=[])
+        assert imports.source_file(actor,batch['id'])['content']==content
+    assert AssetLifecycle(engine).catalog(actor)['total']==2
+    assert AssetDirectory(engine).dashboard(actor,product_line='PV')['site_count']==1
+    engine.dispose()
+
+
+
+def test_material_reference_and_detail_preserve_reserved_prefix_and_slash(database_url):
+    engine,actor,imports,_=context(database_url)
+    number='NEW:material/owner/'+uuid4().hex
+    materials=[dict(record_key='m',decision='NEW',material_number=number,model='Prefix approved model',asset_type='WHOLE_UNIT',reason='Reviewed exact text material identity')]
+    first=publish(imports,actor,ready(imports,actor,document([equipment(serial_number='PREFIX-NEW-'+uuid4().hex,material_ref='NEW:m')],materials=materials)))
+    before=AssetDirectory(engine).material_detail(actor,number)
+    second=publish(imports,actor,ready(imports,actor,document([equipment(serial_number='PREFIX-REF-'+uuid4().hex,material_ref='MATERIAL:'+number)])))
+    assert [t['kind'] for t in second['operation_result']['targets']]==['ASSET']
+    target=second['operation_result']['targets'][0]['target_id']
+    detail=AssetDirectory(engine).equipment_detail(actor,target)
+    assert detail['equipment']['material_number']==number and detail['equipment']['model']=='Prefix approved model'
+    assert AssetDirectory(engine).material_detail(actor,number)==before
+    source=AssetDirectory(engine).import_sources(actor,'ASSET',target)['sources'][0]
+    assert source['original_values']['material_ref']=='MATERIAL:'+number
+    assert source['reviewed_values']['resolved_references']['material']['material_number']==number
+    assert AssetDirectory(engine).import_sources(actor,'MATERIAL',number)['sources'][0]['batch_id']==first['id']
+    engine.dispose()
