@@ -12,3 +12,7 @@
 - Residual owners:source_note后续#49/#50/#61；storageCI40skips；Excel原生上限明确failure；PR/远程CI留给下一授权gate；不证明用户磁盘save的语义已在当前UI/audit解决。
 - Preservation:原worktree仍main及既有dirty状态，未touch原验收库/卷；独立dga_test/dga_browser测试实例和忽略.cache运行时。
 - Boundaries:no push/PR/merge/Issuecomment/后续工单；previousAGENTS由用户撤销。
+
+## User steering — PR阶段已授权
+
+2026-10-29用户明确选择“继续 #48 的 PR 阶段，暂不合并”。人工验收按用户选择跳过，不记作已由用户验收通过。允许本分支push、创建draftPR、PR审查及必要修复/再次push；禁止merge、markready、后续工单。Current gate:push，完成后create draftPR→PRreview。此前禁止push的记录仅作为历史状态。外部Issue收尾评论仍待具体授权。
