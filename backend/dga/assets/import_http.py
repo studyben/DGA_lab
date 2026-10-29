@@ -10,7 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from dga.shared.auth.public import require_permission
 from .imports import AssetImports, XLSX_TYPE
 from .import_workbook import MAX_BYTES
-from .site_import_workbook import MAX_BYTES as SITE_MAX_BYTES
+from .v2_import_workbook import MAX_BYTES as SITE_MAX_BYTES
 from .lifecycle import fail
 
 
@@ -24,15 +24,15 @@ class PublishInput(BaseModel):
 
 class RevisionChange(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    sheet: Literal['Customers','Sites']
+    sheet: Literal['Customers','Sites','Materials','Assets']
     row: StrictInt = Field(ge=2)
-    values: dict = Field(max_length=15)
+    values: dict = Field(max_length=20)
 
 
 class RevisionInput(BaseModel):
     model_config = ConfigDict(extra='forbid')
     expected_revision: StrictInt = Field(ge=0)
-    changes: list[RevisionChange] = Field(min_length=1,max_length=1000)
+    changes: list[RevisionChange] = Field(min_length=1,max_length=2000)
     reason: str = Field(min_length=1,max_length=1000)
     idempotency_key: str = Field(min_length=36,max_length=36)
 
@@ -49,9 +49,9 @@ def import_router(imports: AssetImports, actor_dependency, mutation_actor):
     router = APIRouter(prefix='/api/assets/imports', dependencies=[Depends(no_store)])
 
     @router.get('/template')
-    def template(format_version: int = Query(default=1,ge=1,le=2), mode: Literal['ASSETS','SITES'] = 'ASSETS', actor=Depends(actor_dependency)):
+    def template(format_version: int = Query(default=2,ge=1,le=2), mode: Literal['ASSETS','SITES'] = 'ASSETS', actor=Depends(actor_dependency)):
         return Response(read_call(imports.template,actor,format_version=format_version,mode=mode), media_type=XLSX_TYPE,
-                        headers={'Content-Disposition': f'attachment; filename="asset-import-v{format_version}.xlsx"', 'Cache-Control': 'no-store'})
+                        headers={'Content-Disposition': f'attachment; filename="asset-import-v{format_version}-{mode.lower()}.xlsx"', 'Cache-Control': 'no-store'})
 
     @router.get('')
     def batches(query: str = Query(default='', max_length=200), page: int = Query(default=1, ge=1, le=100000), actor=Depends(actor_dependency)):
@@ -95,8 +95,8 @@ def import_router(imports: AssetImports, actor_dependency, mutation_actor):
             fail('import_revision_unavailable',503)
 
     @router.get('/{batch_id}')
-    def preview(batch_id: UUID, page: int = Query(default=1,ge=1,le=100000), actor=Depends(actor_dependency)):
-        return read_call(imports.get,actor,batch_id,page=page)
+    def preview(batch_id: UUID, page: int = Query(default=1,ge=1,le=100000), duplicate_page: int = Query(default=1,ge=1,le=100000), actor=Depends(actor_dependency)):
+        return read_call(imports.get,actor,batch_id,page=page,duplicate_page=duplicate_page)
 
     @router.post('/{batch_id}/publish')
     def publish(batch_id: UUID, body: PublishInput, actor=Depends(mutation_actor)):

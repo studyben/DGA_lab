@@ -9,10 +9,13 @@ from dga.shared.auth.public import IdentityService, AuditTrail, require_permissi
 from dga.shared.files import ObjectStorageError
 from .lifecycle import fail
 from .import_workbook import WorkbookError
-from . import site_import_workbook as workbook
+from . import v2_import_workbook as workbook
 from .site_import_validation import validate, digest
 
 class SiteImportAction(StrEnum):
+    ASSET_UPLOAD='ASSET_IMPORT_SUBMIT'
+    ASSET_REVISE='ASSET_IMPORT_REVISE'
+    ASSET_SOURCE='ASSET_IMPORT_SOURCE_DOWNLOAD'
     UPLOAD='SITE_IMPORT_UPLOAD'
     PUBLISH='SITE_IMPORT_PUBLISH'
     REVISE='SITE_IMPORT_REVISE'
@@ -21,10 +24,13 @@ class SiteImportAction(StrEnum):
 
 def dumped(value): return json.dumps(value,ensure_ascii=False,default=str)
 
-class SiteImports:
+class V2Imports:
     def __init__(self,engine,files,clock):
         self.engine,self.files,self.clock=engine,files,clock
         self.identity=IdentityService(engine); self.audit=AuditTrail(clock=clock)
+
+    def supported(self,batch):
+        if batch['format_version']!=2 or batch['mode'] not in ('SITES','ASSETS'): fail('unsupported_import_format',503)
 
     def authorize(self,c,actor):
         return self.identity.authorize_current(c,actor,'assets.import')
@@ -43,35 +49,47 @@ class SiteImports:
         c.execute(text("""INSERT INTO asset_import_operations(actor_id,operation_key,action,request_digest,batch_id,result)
             VALUES (:actor,:key,:action,:digest,:batch,CAST(:result AS jsonb))"""),dict(actor=actor.user_id,key=key,action=action,digest=request_digest,batch=batch_id,result=dumped(result)))
 
-    def submit(self,actor,*,filename,content,idempotency_key):
+    def submit(self,actor,*,filename,content,idempotency_key,mode='SITES'):
         require_permission(actor,'assets.import')
         if not isinstance(filename,str) or not filename.lower().endswith('.xlsx') or not 1<=len(filename)<=200 or any(ord(ch)<32 or ch in '/\\' for ch in filename): fail('invalid_import_filename',422)
         if not isinstance(content,bytes) or not 0<len(content)<=workbook.MAX_BYTES: fail('import_file_size',413)
         sha=hashlib.sha256(content).hexdigest()
         with self.engine.begin() as c:
-            key,request_digest,old=self.lock(c,actor,idempotency_key,'UPLOAD',[filename,sha,2,'SITES'])
+            key,request_digest,old=self.lock(c,actor,idempotency_key,'UPLOAD',[filename,sha,2,mode])
             if old: batch_id=old['batch_id']
             else:
                 batch_id=uuid4(); state='STAGED'; issues=[]
-                try: rows=workbook.parse(content)
+                try: rows=workbook.parse(content,mode=mode)
                 except WorkbookError as error: rows=[]; issues=error.issues; state='FAILED'
                 object_key=f'asset-imports/{batch_id}/source.xlsx'
                 # No deletion after uncertain COMMIT: retained evidence wins over cleanup.
                 self.files.put(object_key=object_key,content=content,content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
                 c.execute(text("""INSERT INTO asset_import_batches
                     (id,filename,sha256,object_key,byte_size,state,source_rows,issues,summary,created_by,created_at,format_version,mode)
-                    VALUES (:id,:name,:sha,:object,:size,:state,CAST(:rows AS jsonb),CAST(:issues AS jsonb),CAST(:summary AS jsonb),:actor,:at,2,'SITES')"""),
-                    dict(id=batch_id,name=filename,sha=sha,object=object_key,size=len(content),state=state,rows=dumped(rows),issues=dumped(issues),summary=dumped(dict(total_rows=len(rows),error_count=len(issues),warning_count=0,valid_rows=0,error_rows=len(issues),warning_rows=0)),actor=actor.user_id,at=self.clock()))
+                    VALUES (:id,:name,:sha,:object,:size,:state,CAST(:rows AS jsonb),CAST(:issues AS jsonb),CAST(:summary AS jsonb),:actor,:at,2,:mode)"""),
+                    dict(mode=mode,id=batch_id,name=filename,sha=sha,object=object_key,size=len(content),state=state,rows=dumped(rows),issues=dumped(issues),summary=dumped(dict(total_rows=len(rows),error_count=len(issues),warning_count=0,valid_rows=0,error_rows=len(issues),warning_rows=0)),actor=actor.user_id,at=self.clock()))
                 self.complete(c,actor,key,'UPLOAD',request_digest,batch_id,dict(outcome='STAGED' if state=='STAGED' else 'FAILED',batch_id=str(batch_id)))
-                self.audit.append(c,actor,SiteImportAction.UPLOAD,entity_id=batch_id)
-        return self.get(actor,batch_id)
+                self.audit.append(c,actor,SiteImportAction.ASSET_UPLOAD if mode=='ASSETS' else SiteImportAction.UPLOAD,entity_id=batch_id)
+        result=self.get(actor,batch_id)
+        result['operation_result']=self.operation(actor,key)
+        return result
 
     def duplicates(self,c,batch):
+        if batch['mode']=='ASSETS':
+            return [dict(r) for r in c.execute(text("""SELECT id::text AS id,filename,state,format_version,mode,published_at
+                FROM asset_import_batches WHERE sha256=:sha AND id<>:id
+                ORDER BY (state='PUBLISHED') DESC,created_at,id"""),dict(sha=batch['sha256'],id=batch['id'])).mappings()]
         return [dict(r) for r in c.execute(text("""SELECT id::text AS id,filename,state FROM asset_import_batches
             WHERE sha256=:sha AND format_version=2 AND id<>:id ORDER BY created_at,id LIMIT 20"""),dict(sha=batch['sha256'],id=batch['id'])).mappings()]
 
     def preview(self,c,batch):
-        rows,issues,counts,fingerprint=validate(c,batch['working_rows'] if batch['working_rows'] is not None else batch['source_rows'])
+        self.supported(batch)
+        source=batch['working_rows'] if batch['working_rows'] is not None else batch['source_rows']
+        if batch['mode']=='ASSETS':
+            from .asset_import_validation_v2 import validate as validate_assets
+            rows,issues,counts,fingerprint=validate_assets(c,source,self.clock())
+        else:
+            rows,issues,counts,fingerprint=validate(c,source)
         duplicates=self.duplicates(c,batch)
         if duplicates:
             warning=dict(id=digest(['duplicate_file',duplicates])[:24],code='duplicate_file',severity='WARNING',sheet='Format',row=0,field='file',message='相同原文件已上传；请先查看已有批次结果，确属另一个批次才确认继续。')
@@ -81,33 +99,37 @@ class SiteImports:
     def validate_batch(self,c,batch):
         rows,issues,counts,fingerprint=self.preview(c,batch)
         c.execute(text("""UPDATE asset_import_batches SET rows=CAST(:rows AS jsonb),issues=CAST(:issues AS jsonb),
-            summary=CAST(:summary AS jsonb),catalog_digest=:digest,state='VALIDATED',validation_revision=validation_revision+1 WHERE id=:id"""),
+            summary=CAST(:summary AS jsonb),catalog_digest=:digest,state='VALIDATED',failure_code=NULL,validation_revision=validation_revision+1 WHERE id=:id"""),
             dict(id=batch['id'],rows=dumped(rows),issues=dumped(issues),summary=dumped(counts),digest=fingerprint))
         return rows,issues,counts,fingerprint
 
-    def get(self,actor,batch_id,page=1):
-        if type(page) is not int or not 1<=page<=100000: fail('invalid_import_search',422)
+    def get(self,actor,batch_id,page=1,duplicate_page=1):
+        if any(type(n) is not int or not 1<=n<=100000 for n in (page,duplicate_page)): fail('invalid_import_search',422)
         with self.engine.begin() as c:
             self.authorize(c,actor)
             batch=c.execute(text('SELECT * FROM asset_import_batches WHERE id=:id'),{'id':batch_id}).mappings().first()
             if not batch: fail('import_not_found',404)
+            self.supported(batch)
             result={k:v for k,v in batch.items() if k not in ('source_rows','working_rows','object_key','catalog_digest')}
             originals={(r['sheet'],r['row']):r['values'] for r in batch['source_rows']} if batch['format_version']==2 else {}
             all_rows=batch['rows']; result['total_rows']=len(all_rows); result['page']=page
-            result['duplicate_batches']=self.duplicates(c,batch)
+            duplicates=self.duplicates(c,batch)
+            result['duplicate_total']=len(duplicates); result['duplicate_page']=duplicate_page
+            result['duplicate_batches']=duplicates[(duplicate_page-1)*20:duplicate_page*20]
             result['rows']=[dict(r,original_values=originals.get((r['sheet'],r['row']))) for r in all_rows[(page-1)*20:page*20]] if batch['format_version']==2 else all_rows
             visible={(r['sheet'],r['row']) for r in result['rows']}
             result['issues']=[i for i in batch['issues'] if batch['state']=='FAILED' or i.get('row',0)==0 or (i.get('sheet'),i['row']) in visible]
             return result
 
     def revise(self,actor,batch_id,*,expected_revision,changes,reason,idempotency_key):
-        if type(expected_revision) is not int or expected_revision<0 or not isinstance(changes,list) or not 1<=len(changes)<=1000 or not isinstance(reason,str) or not 1<=len(reason.strip())<=1000:
+        if type(expected_revision) is not int or expected_revision<0 or not isinstance(changes,list) or not 1<=len(changes)<=2000 or not isinstance(reason,str) or not 1<=len(reason.strip())<=1000:
             fail('invalid_import_revision',422)
         with self.engine.begin() as c:
             key,request_digest,old=self.lock(c,actor,idempotency_key,'REVISE',[str(batch_id),expected_revision,changes,reason])
             if not old:
                 batch=c.execute(text('SELECT * FROM asset_import_batches WHERE id=:id FOR UPDATE'),{'id':batch_id}).mappings().first()
                 if not batch or batch['format_version']!=2: fail('import_not_found',404)
+                self.supported(batch)
                 if batch['state']=='PUBLISHED': fail('import_already_published',409)
                 if batch['validation_revision']!=expected_revision: fail('import_stale_validation',409)
                 working=json.loads(dumped(batch['working_rows'] if batch['working_rows'] is not None else batch['source_rows']))
@@ -127,9 +149,11 @@ class SiteImports:
                 revision=batch['validation_revision']+1
                 c.execute(text("""INSERT INTO asset_import_revisions(id,batch_id,revision,actor_id,occurred_at,reason,before_value,after_value)
                     VALUES (:id,:batch,:revision,:actor,:at,:reason,CAST(:before AS jsonb),CAST(:after AS jsonb))"""),dict(id=uuid4(),batch=batch_id,revision=revision,actor=actor.user_id,at=self.clock(),reason=reason,before=dumped(batch['working_rows'] if batch['working_rows'] is not None else batch['source_rows']),after=dumped(working)))
-                self.audit.append(c,actor,SiteImportAction.REVISE,entity_id=batch_id,details=dict(revision=revision,reason=reason))
+                self.audit.append(c,actor,SiteImportAction.ASSET_REVISE if batch['mode']=='ASSETS' else SiteImportAction.REVISE,entity_id=batch_id,details=dict(revision=revision,reason=reason))
                 self.complete(c,actor,key,'REVISE',request_digest,batch_id,dict(outcome='REVISED',batch_id=str(batch_id),revision=revision))
-        return self.get(actor,batch_id)
+        result=self.get(actor,batch_id)
+        result['operation_result']=self.operation(actor,key)
+        return result
 
     def publish(self,actor,batch_id,*,validation_revision,idempotency_key,acknowledged_warning_ids):
         if type(validation_revision) is not int or validation_revision<1 or not isinstance(acknowledged_warning_ids,list) or any(not isinstance(i,str) for i in acknowledged_warning_ids): fail('invalid_import_request',422)
@@ -138,6 +162,8 @@ class SiteImports:
             if not old:
                 batch=c.execute(text('SELECT * FROM asset_import_batches WHERE id=:id FOR UPDATE'),{'id':batch_id}).mappings().first()
                 if not batch or batch['format_version']!=2: fail('import_not_found',404)
+                self.supported(batch)
+                if batch['mode']=='ASSETS': fail('import_mode_not_publishable',409)
                 if batch['state']=='PUBLISHED': outcome='PUBLISHED'
                 else:
                     if batch['state']!='VALIDATED': fail('import_not_validated',409)
@@ -219,5 +245,5 @@ class SiteImports:
             batch=c.execute(text('SELECT * FROM asset_import_batches WHERE id=:id'),{'id':batch_id}).mappings().first()
             if not batch: fail('import_not_found',404)
             content=self._content(batch)
-            self.audit.append(c,actor,SiteImportAction.SOURCE,entity_id=batch_id)
+            self.audit.append(c,actor,SiteImportAction.ASSET_SOURCE if batch['format_version']==2 and batch['mode']=='ASSETS' else SiteImportAction.SOURCE,entity_id=batch_id)
             return dict(content=content,filename=batch['filename'])
