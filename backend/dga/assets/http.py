@@ -3,7 +3,8 @@ from datetime import datetime
 from typing import Callable, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import StreamingResponse
 from starlette.types import Receive, Scope, Send
@@ -69,6 +70,27 @@ class CorrectionInput(BaseModel):
 
 def assets_router(directory: AssetDirectory, actor_dependency: Callable, lifecycle: AssetLifecycle, mutation_actor: Callable, site_basics: SiteBasics):
     router = APIRouter(prefix='/api/assets')
+
+    def no_store(response: Response):
+        response.headers['Cache-Control']='no-store'
+
+    def source_read(command,*args,**kwargs):
+        try: return command(*args,**kwargs)
+        except SQLAlchemyError:
+            from .public import AssetQueryError
+            raise AssetQueryError('source_read_unavailable',503)
+
+    @router.get('/materials/detail',dependencies=[Depends(no_store)])
+    def material_detail(material_number: str = Query(min_length=1,max_length=120),actor=Depends(actor_dependency)):
+        return source_read(directory.material_detail,actor,material_number)
+
+    @router.get('/materials/sources',dependencies=[Depends(no_store)])
+    def material_sources(material_number: str = Query(min_length=1,max_length=120),page: int = Query(default=1,ge=1,le=100000),actor=Depends(actor_dependency)):
+        return source_read(directory.import_sources,actor,'MATERIAL',material_number,page=page)
+
+    @router.get('/equipment/{asset_id}/sources',dependencies=[Depends(no_store)])
+    def equipment_sources(asset_id: UUID,page: int = Query(default=1,ge=1,le=100000),actor=Depends(actor_dependency)):
+        return source_read(directory.import_sources,actor,'ASSET',asset_id,page=page)
 
     @router.put('/sites/{site_id}/basics')
     def edit_site(site_id: UUID, body: SiteBasicsInput, actor=Depends(mutation_actor)):

@@ -19,7 +19,7 @@ class PublishInput(BaseModel):
     validation_revision: StrictInt = Field(ge=1)
     acknowledge_warnings: StrictBool = False
     idempotency_key: str | None = Field(default=None,min_length=36,max_length=36)
-    acknowledged_warning_ids: list[str] = Field(default_factory=list,max_length=3000)
+    acknowledged_warning_ids: list[str] = Field(default_factory=list,max_length=12000)
 
 
 class RevisionChange(BaseModel):

@@ -7,7 +7,8 @@ from uuid import uuid4, UUID
 from sqlalchemy import text
 from dga.shared.auth.public import IdentityService, AuditTrail, require_permission
 from dga.shared.files import ObjectStorageError
-from .lifecycle import fail
+from .lifecycle import fail, validate_graph
+from .import_persistence_v2 import create_batch, targets
 from .import_workbook import WorkbookError
 from . import v2_import_workbook as workbook
 from .site_import_validation import validate, digest
@@ -16,6 +17,7 @@ class SiteImportAction(StrEnum):
     ASSET_UPLOAD='ASSET_IMPORT_SUBMIT'
     ASSET_REVISE='ASSET_IMPORT_REVISE'
     ASSET_SOURCE='ASSET_IMPORT_SOURCE_DOWNLOAD'
+    ASSET_PUBLISH='ASSET_IMPORT_PUBLISH'
     UPLOAD='SITE_IMPORT_UPLOAD'
     PUBLISH='SITE_IMPORT_PUBLISH'
     REVISE='SITE_IMPORT_REVISE'
@@ -159,53 +161,44 @@ class V2Imports:
         if type(validation_revision) is not int or validation_revision<1 or not isinstance(acknowledged_warning_ids,list) or any(not isinstance(i,str) for i in acknowledged_warning_ids): fail('invalid_import_request',422)
         with self.engine.begin() as c:
             key,request_digest,old=self.lock(c,actor,idempotency_key,'PUBLISH',[str(batch_id),validation_revision,sorted(acknowledged_warning_ids)])
-            if not old:
+            if old: operation=old['result']
+            else:
                 batch=c.execute(text('SELECT * FROM asset_import_batches WHERE id=:id FOR UPDATE'),{'id':batch_id}).mappings().first()
                 if not batch or batch['format_version']!=2: fail('import_not_found',404)
                 self.supported(batch)
-                if batch['mode']=='ASSETS': fail('import_mode_not_publishable',409)
+                if batch['mode']=='ASSETS' and (len(acknowledged_warning_ids)>12000 or len(set(acknowledged_warning_ids))!=len(acknowledged_warning_ids) or any(len(i)!=24 or any(ch not in '0123456789abcdef' for ch in i) for i in acknowledged_warning_ids)):
+                    fail('invalid_import_request',422)
                 if batch['state']=='PUBLISHED': outcome='PUBLISHED'
                 else:
                     if batch['state']!='VALIDATED': fail('import_not_validated',409)
                     if validation_revision!=batch['validation_revision']: fail('import_stale_validation',409)
+                    c.execute(text('LOCK TABLE asset_materials,customers,sites,site_product_lines IN SHARE ROW EXCLUSIVE MODE'))
                     self._content(batch)
-                    c.execute(text('LOCK TABLE customers,sites,site_product_lines IN SHARE ROW EXCLUSIVE MODE'))
                     rows,issues,counts,fingerprint=self.preview(c,batch)
                     if fingerprint!=batch['catalog_digest'] or rows!=batch['rows'] or issues!=batch['issues']:
                         self.validate_batch(c,batch); outcome='REFRESHED'
                     else:
                         if counts['error_count']: fail('import_has_errors',409)
-                        if not {i['id'] for i in issues if i['severity']=='WARNING'}<=set(acknowledged_warning_ids): fail('import_warnings_unacknowledged',409)
-                        self._create(c,actor,batch,rows)
+                        required={i['id'] for i in issues if i['severity']=='WARNING'}
+                        acknowledged=set(acknowledged_warning_ids)
+                        if (required!=acknowledged if batch['mode']=='ASSETS' else not required<=acknowledged):
+                            fail('import_warnings_unacknowledged',409)
+                        self._create(c,actor,batch,rows,acknowledged_warning_ids)
                         outcome='PUBLISHED'
                 saved=c.execute(text('SELECT rows,validation_revision FROM asset_import_batches WHERE id=:id'),{'id':batch_id}).mappings().one()
-                result=dict(outcome=outcome,batch_id=str(batch_id),revision=saved['validation_revision'],target_ids=[r['target_id'] for r in saved['rows'] if r.get('target_id')] if outcome=='PUBLISHED' else [])
-                self.complete(c,actor,key,'PUBLISH',request_digest,batch_id,result)
-        return self.get(actor,batch_id)
+                operation=dict(outcome=outcome,batch_id=str(batch_id),revision=saved['validation_revision'],target_ids=[r['target_id'] for r in saved['rows'] if r.get('target_id')] if outcome=='PUBLISHED' else [])
+                if batch['mode']=='ASSETS': operation['targets']=targets(saved['rows']) if outcome=='PUBLISHED' else []
+                self.complete(c,actor,key,'PUBLISH',request_digest,batch_id,operation)
+        result=self.get(actor,batch_id)
+        result['operation_result']=operation
+        return result
 
-    def _create(self,c,actor,batch,rows):
-        customer_ids={}
-        originals={(r['sheet'],r['row']):r['values'] for r in batch['source_rows']}
-        for row in sorted(rows,key=lambda r:r['sheet']):
-            v=row['values']; kind='CUSTOMER' if row['sheet']=='Customers' else 'SITE'
-            target=UUID(row['target_id']) if v['decision']=='REFERENCE' else uuid4()
-            row['target_id']=str(target)
-            if kind=='CUSTOMER':
-                customer_ids[v['record_key']]=target
-                if v['decision']=='NEW': c.execute(text('INSERT INTO customers(id,customer_name) VALUES (:id,:name)'),dict(id=target,name=v['customer_name']))
-            elif v['decision']=='NEW':
-                ref=v['customer_ref']; customer=customer_ids[ref[4:]] if ref.startswith('NEW:') else UUID(ref)
-                c.execute(text("""INSERT INTO sites(id,customer_id,site_name,location_text,commissioning_date,grid_status,operation_status,source_note)
-                    VALUES (:id,:customer,:name,:location,:date,:grid,:operation,:note)"""),
-                    dict(id=target,customer=customer,name=v['site_name'],location=v.get('location_text') or None,date=v.get('commissioning_date') or None,grid=v.get('grid_status') or None,operation=v.get('operation_status') or None,note=v.get('source_note') or None))
-                for line in v['product_lines'].split(';'):
-                    c.execute(text('INSERT INTO site_product_lines(site_id,product_line,power_mw,energy_mwh) VALUES (:id,:line,:power,:energy)'),dict(id=target,line=line,power=v.get('pv_power_mw' if line=='PV' else 'ess_power_mw'),energy=v.get('ess_energy_mwh') if line=='ESS' else None))
-            original=originals[(row['sheet'],row['row'])]
-            c.execute(text("""INSERT INTO asset_import_sources(id,batch_id,kind,target_id,sheet,row_number,source_note,original_values,reviewed_values,actor_id,occurred_at,revision,reason)
-                VALUES (:id,:batch,:kind,:target,:sheet,:row,:note,CAST(:original AS jsonb),CAST(:reviewed AS jsonb),:actor,:at,:revision,:reason)"""),
-                dict(id=uuid4(),batch=batch['id'],kind=kind,target=target,sheet=row['sheet'],row=row['row'],note=v.get('source_note'),original=dumped(original),reviewed=dumped(v),actor=actor.user_id,at=self.clock(),revision=batch['validation_revision'],reason=v['reason']))
-        c.execute(text("""UPDATE asset_import_batches SET state='PUBLISHED',rows=CAST(:rows AS jsonb),published_by=:actor,published_at=:at WHERE id=:id"""),dict(id=batch['id'],rows=dumped(rows),actor=actor.user_id,at=self.clock()))
-        self.audit.append(c,actor,SiteImportAction.PUBLISH,entity_id=batch['id'])
+    def _create(self,c,actor,batch,rows,acknowledged_warning_ids):
+        create_batch(c,actor,batch,rows,now=self.clock(),acknowledged_warning_ids=acknowledged_warning_ids)
+        if batch['mode']=='ASSETS': validate_graph(c)
+        c.execute(text("UPDATE asset_import_batches SET state='PUBLISHED',rows=CAST(:rows AS jsonb),published_by=:actor,published_at=:at WHERE id=:id"),dict(id=batch['id'],rows=dumped(rows),actor=actor.user_id,at=self.clock()))
+        self.audit.append(c,actor,SiteImportAction.ASSET_PUBLISH if batch['mode']=='ASSETS' else SiteImportAction.PUBLISH,entity_id=batch['id'],
+                          details=dict(revision=batch['validation_revision'],acknowledged_warning_ids=acknowledged_warning_ids,targets=targets(rows)))
 
     def revision_history(self,actor,batch_id,page=1):
         if type(page) is not int or not 1<=page<=100000: fail('invalid_import_search',422)

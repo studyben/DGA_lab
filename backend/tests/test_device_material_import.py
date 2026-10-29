@@ -1,7 +1,7 @@
 """v2 equipment staging behavior through AssetImports and real PostgreSQL."""
 from datetime import datetime, timezone
 from io import BytesIO
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from openpyxl import Workbook, load_workbook
@@ -81,9 +81,6 @@ def test_v2_assets_template_and_staging_preserve_original_without_business_write
     assert preview['rows'][0]['references']['site'] == {'kind': 'EXISTING', 'site_id': str(SITE_ID)}
     assert preview['rows'][0]['values']['serial_number'] == '00001'
     assert imports.source_file(actor, batch['id'])['content'] == content
-    with pytest.raises(AssetQueryError, match='import_mode_not_publishable'):
-        imports.publish(actor, batch['id'], validation_revision=preview['validation_revision'],
-                        idempotency_key=str(uuid4()), acknowledged_warning_ids=[])
     assert AssetLifecycle(engine).catalog(actor)['total'] == before
     engine.dispose()
 
@@ -652,4 +649,440 @@ def test_worker_database_contention_rolls_back_claim_and_retries_without_failed_
     assert imports.validate_next()
     completed = imports.get(actor, before['id'])
     assert completed['state'] == 'VALIDATED' and completed['summary']['error_count'] == 0
+    engine.dispose()
+
+
+def publication_document():
+    from tests.test_sample_reception import CUSTOMER_ID
+    token = uuid4().hex[:12]
+    material_number = 'NEW:S2/' + token
+    owner = 'S2 owner ' + token
+    site = 'S2 dual-line project ' + token
+    content = document([
+        equipment(record_key='grand', serial_number='S2-grand-' + token, location_kind='PARENT', parent_record_key='child', site_id=None, site_name=None),
+        equipment(record_key='child', serial_number='S2-child-' + token, material_ref='NEW:mat-existing', machine_type='TRANSFORMER', location_kind='PARENT', parent_record_key='root', site_id=None, site_name=None),
+        equipment(record_key='root', serial_number='S2-root-' + token, material_ref='NEW:mat-new', site_id='NEW:site-new', site_name=site),
+        equipment(record_key='repair', serial_number='S2-repair-' + token, material_ref='MATERIAL:IMPORT-TX', machine_type='TRANSFORMER', location_kind='REPAIR_CENTER', status='SPARE', site_id=None, site_name=None),
+        equipment(record_key='existing-root', serial_number='S2-existing-' + token, site_id='NEW:site-existing'),
+    ], customers=[dict(record_key='customer-new', decision='NEW', customer_name=owner, source_note='Customer contract', reason='Verified independent owner')],
+       sites=[dict(record_key='site-new', decision='NEW', site_name=site, customer_ref='NEW:customer-new', product_lines='PV;ESS', pv_power_mw='3.5', ess_power_mw='2', ess_energy_mwh='7', source_note='Site authorization', reason='Verified new project'),
+              dict(record_key='site-existing', decision='REFERENCE', site_id=str(SITE_ID), site_name='Prairie Sun', customer_ref=str(CUSTOMER_ID), product_lines='PV', source_note='This batch references the current site', reason='Verified existing identity')],
+       materials=[dict(record_key='mat-new', decision='NEW', material_number=material_number, model='S2 approved unit', asset_type='WHOLE_UNIT', source_note='Approved material evidence', reason='Verified catalog addition'),
+                  dict(record_key='mat-existing', decision='REFERENCE', material_number='IMPORT-TX', model='TX-4400', asset_type='TRANSFORMER', source_note='Referenced catalog evidence', reason='Verified existing material')])
+    return content, material_number, site, owner
+
+
+def publish(imports, actor, preview, *, key=None, warnings=None):
+    return imports.publish(actor, preview['id'], validation_revision=preview['validation_revision'],
+                           idempotency_key=key or str(uuid4()), acknowledged_warning_ids=warnings if warnings is not None else [i['id'] for i in preview['issues'] if i['severity'] == 'WARNING'])
+
+
+def test_atomic_mixed_batch_is_queryable_with_material_and_equipment_provenance(database_url):
+    from tests.test_sample_reception import TRANSFORMER_ID
+    engine, actor, imports, _ = context(database_url)
+    directory = AssetDirectory(engine)
+    old_site = directory.site_detail(actor, SITE_ID, product_line='PV')['site']
+    old_equipment = directory.equipment_detail(actor, TRANSFORMER_ID)
+    content, material_number, site_name, owner = publication_document()
+    preview = ready(imports, actor, content)
+    assert preview['summary']['error_count'] == preview['summary']['warning_count'] == 0, preview['issues']
+    key = str(uuid4())
+    result = publish(imports, actor, preview, key=key)
+    assert result['state'] == 'PUBLISHED'
+    operation = result['operation_result']
+    assert operation['outcome'] == 'PUBLISHED' and len(operation['targets']) == 10
+    targets = {r['record_key']: r for r in operation['targets']}
+    root = directory.equipment_detail(actor, targets['root']['target_id'])
+    grand = directory.equipment_detail(actor, targets['grand']['target_id'])
+    assert root['site']['site_name'] == site_name and root['site']['customer_name'] == owner
+    assert [p['id'] for p in grand['path']] == [UUID(targets[k]['target_id']) for k in ('root','child','grand')]
+    assert grand['site']['id'] == UUID(targets['site-new']['target_id'])
+    assert directory.equipment_detail(actor, targets['repair']['target_id'])['location']['kind'] == 'REPAIR_CENTER'
+    assert directory.material_detail(actor, material_number) == dict(material_number=material_number, model='S2 approved unit', asset_type='WHOLE_UNIT')
+    assert targets['mat-new']['target_key'] == material_number and 'target_id' not in targets['mat-new']
+    material_source = directory.import_sources(actor, 'MATERIAL', material_number)['sources'][0]
+    assert material_source['source_note'] == 'Approved material evidence'
+    asset_source = directory.import_sources(actor, 'ASSET', targets['root']['target_id'])['sources'][0]
+    assert asset_source['original_values']['site_id'] == 'NEW:site-new'
+    assert asset_source['reviewed_values']['resolved_references']['site']['site_id'] == targets['site-new']['target_id']
+    assert asset_source['format_version'] == 2 and asset_source['mode'] == 'ASSETS'
+    assert directory.import_sources(actor, 'SITE', SITE_ID)['sources'][0]['source_note'] == 'This batch references the current site'
+    assert directory.site_detail(actor, SITE_ID, product_line='PV')['site'] == old_site
+    assert directory.equipment_detail(actor, TRANSFORMER_ID) == old_equipment
+    assert imports.operation(actor, key) == operation
+    assert publish(imports, actor, preview, key=key)['operation_result'] == operation
+    assert imports.source_file(actor, preview['id'])['content'] == content
+    engine.dispose()
+
+
+def test_duplicate_serial_and_file_require_specific_current_confirmations(database_url):
+    from tests.test_sample_reception import WHOLE_UNIT_ID
+    engine, actor, imports, _ = context(database_url)
+    content = document([equipment(serial_number='INV-UNIT-7788')])
+    first = ready(imports, actor, content)
+    with pytest.raises(AssetQueryError, match='import_warnings_unacknowledged'):
+        publish(imports, actor, first, warnings=[])
+    with pytest.raises(AssetQueryError, match='import_warnings_unacknowledged'):
+        imports.publish(actor, first['id'], validation_revision=first['validation_revision'], acknowledge_warnings=True, idempotency_key=str(uuid4()), acknowledged_warning_ids=[])
+    with pytest.raises(AssetQueryError, match='import_warnings_unacknowledged'):
+        publish(imports, actor, first, warnings=[i['id'] for i in first['issues']] + ['0' * 24])
+    written = publish(imports, actor, first)
+    target = written['operation_result']['targets'][0]['target_id']
+    assert target != str(WHOLE_UNIT_ID)
+    source = AssetDirectory(engine).import_sources(actor, 'ASSET', target)['sources'][0]
+    assert source['confirmed_warning_ids'] == [i['id'] for i in first['issues'] if i['severity'] == 'WARNING']
+    repeated = ready(imports, actor, content)
+    assert repeated['duplicate_batches'][0]['id'] == str(first['id'])
+    assert {i['code'] for i in repeated['issues']} >= {'duplicate_serial', 'duplicate_file'}
+    with pytest.raises(AssetQueryError, match='import_warnings_unacknowledged'):
+        publish(imports, actor, repeated, warnings=[i['id'] for i in repeated['issues'] if i['code'] == 'duplicate_serial'])
+    other = publish(imports, actor, repeated)
+    other_target = other['operation_result']['targets'][0]['target_id']
+    assert other_target != target
+    assert AssetLifecycle(engine).catalog(actor)['total'] == 4
+    assert len(AssetDirectory(engine).import_sources(actor, 'ASSET', other_target)['sources'][0]['confirmed_warning_ids']) == 2
+    engine.dispose()
+
+
+def test_refreshed_intent_remains_refreshed_after_later_publication(database_url):
+    from sqlalchemy import text
+    engine, actor, imports, _ = context(database_url)
+    first = ready(imports, actor)
+    key = str(uuid4())
+    with engine.begin() as c:
+        c.execute(text("UPDATE asset_materials SET model='Current approved unit' WHERE material_number='IMPORT-UNIT'"))
+    refreshed = publish(imports, actor, first, key=key)
+    operation = refreshed['operation_result']
+    assert operation['outcome'] == 'REFRESHED' and operation['targets'] == operation['target_ids'] == []
+    assert refreshed['state'] == 'VALIDATED' and refreshed['validation_revision'] == first['validation_revision'] + 1
+    assert refreshed['rows'][0]['values']['model'] == 'Current approved unit'
+    assert AssetLifecycle(engine).catalog(actor)['total'] == 2
+    with pytest.raises(AssetQueryError, match='import_stale_validation'):
+        publish(imports, actor, first)
+    written = publish(imports, actor, refreshed)
+    replay = publish(imports, actor, first, key=key)
+    assert replay['state'] == 'PUBLISHED' and replay['operation_result'] == operation
+    assert imports.operation(actor, key) == operation
+    assert written['operation_result']['targets'][0]['target_id'] in written['operation_result']['target_ids']
+    with pytest.raises(AssetQueryError, match='import_operation_conflict'):
+        publish(imports, actor, refreshed, key=key)
+    engine.dispose()
+
+
+@pytest.mark.parametrize('stage', ['masters', 'equipment', 'installation', 'source', 'audit', 'operation'])
+def test_late_publication_failure_rolls_back_every_business_fact_and_success(database_url, stage):
+    from sqlalchemy import event
+    engine, actor, imports, _ = context(database_url)
+    directory = AssetDirectory(engine)
+    content, number, _, _ = publication_document()
+    preview = ready(imports, actor, content)
+    before = directory.dashboard(actor, product_line='PV')
+    key = str(uuid4())
+    hits = 0
+    def fail_transport(connection, cursor, statement, parameters, execution_context, many):
+        nonlocal hits
+        marker = {'masters': 'INSERT INTO asset_materials', 'equipment': 'INSERT INTO formal_assets', 'installation': 'INSERT INTO asset_installations', 'source': 'INSERT INTO asset_import_sources', 'audit': 'INSERT INTO audit_logs', 'operation': 'INSERT INTO asset_import_operations'}[stage]
+        if marker in statement and (stage not in ('audit', 'operation') or 'PUBLISH' in str(parameters)):
+            hits += 1
+            if hits == (2 if stage in ('equipment', 'installation', 'source') else 1):
+                raise RuntimeError('Injected late database transport failure: ' + stage)
+    event.listen(engine, 'before_cursor_execute', fail_transport)
+    try:
+        with pytest.raises(RuntimeError, match='Injected late database'):
+            publish(imports, actor, preview, key=key)
+    finally:
+        event.remove(engine, 'before_cursor_execute', fail_transport)
+    assert hits > 0
+    after = directory.dashboard(actor, product_line='PV')
+    assert (after['site_count'], after['customer_count']) == (before['site_count'], before['customer_count'])
+    assert AssetLifecycle(engine).catalog(actor)['total'] == 2
+    with pytest.raises(AssetQueryError, match='material_not_found'): directory.material_detail(actor, number)
+    with pytest.raises(AssetQueryError, match='import_operation_not_found'): imports.operation(actor, key)
+    assert imports.get(actor, preview['id'])['state'] == 'VALIDATED'
+    assert imports.source_file(actor, preview['id'])['content'] == content
+    recovered = publish(imports, actor, preview, key=key)
+    assert recovered['state'] == 'PUBLISHED' and len(recovered['operation_result']['targets']) == 10
+    engine.dispose()
+
+
+@pytest.mark.parametrize('variant', ['missing', 'corrupt', 'same-length-corrupt', 'unavailable'])
+def test_source_integrity_failure_prevents_all_publication_and_same_intent_recovers(database_url, variant):
+    from dga.shared.files import ObjectStorageError
+    engine, actor, imports, files = context(database_url)
+    content, number, _, _ = publication_document()
+    preview = ready(imports, actor, content)
+    original = dict(files.files)
+    if variant == 'missing': files.files.clear()
+    elif variant == 'corrupt': files.files = {key: b'corrupt' for key in original}
+    elif variant == 'same-length-corrupt': files.files = {key: bytes([value[0] ^ 1]) + value[1:] for key,value in original.items()}
+    else:
+        def unavailable(*, object_key): raise ObjectStorageError('isolated_file_unavailable')
+        files.get = unavailable
+    key = str(uuid4())
+    try:
+        with pytest.raises(ObjectStorageError): publish(imports, actor, preview, key=key)
+    finally:
+        files.files = original
+        if variant == 'unavailable': del files.get
+    assert imports.get(actor, preview['id'])['state'] == 'VALIDATED'
+    assert AssetLifecycle(engine).catalog(actor)['total'] == 2
+    with pytest.raises(AssetQueryError, match='material_not_found'): AssetDirectory(engine).material_detail(actor, number)
+    assert publish(imports, actor, preview, key=key)['state'] == 'PUBLISHED'
+    assert imports.source_file(actor, preview['id'])['content'] == content
+    engine.dispose()
+
+
+def test_lost_publication_commit_response_recovers_exact_targets_without_duplicate_sources(database_url):
+    from contextlib import contextmanager
+    engine, actor, imports, files = context(database_url)
+    content, _, _, _ = publication_document()
+    preview = ready(imports, actor, content)
+    class LostResponse:
+        def connect(self): return engine.connect()
+        @contextmanager
+        def begin(self):
+            with engine.begin() as c: yield c
+            raise ConnectionError('Response lost after durable publication commit')
+    failed = AssetImports(LostResponse(), files, clock=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
+    key = str(uuid4())
+    with pytest.raises(ConnectionError): publish(failed, actor, preview, key=key)
+    operation = imports.operation(actor, key)
+    assert operation['outcome'] == 'PUBLISHED' and len(operation['targets']) == 10
+    replay = publish(imports, actor, preview, key=key)
+    assert replay['operation_result'] == operation
+    for target in operation['targets']:
+        identity = target.get('target_id', target.get('target_key'))
+        assert AssetDirectory(engine).import_sources(actor, target['kind'], identity)['total'] == 1
+    assert imports.source_file(actor, preview['id'])['content'] == content
+    engine.dispose()
+
+
+@pytest.mark.parametrize('change,code', [('site-name','site_name_difference'),('site-line','site_product_line_missing'),('site-revision',None),('material-type','invalid_value'),('serial-candidate','duplicate_serial'),('same-name-site','same_name'),('same-name-customer','same_name'),('duplicate-file','duplicate_file')])
+def test_publication_refreshes_every_changed_catalog_or_candidate_without_business_writes(database_url, change, code):
+    from sqlalchemy import text
+    from tests.test_site_import import document as site_document, new_site
+    engine, actor, imports, _ = context(database_url)
+    if change in ('same-name-site', 'same-name-customer'):
+        content, _, name, owner = publication_document()
+    else: content = document()
+    preview = ready(imports, actor, content)
+    if change.startswith('site-'):
+        sql = {'site-name': "UPDATE sites SET site_name='Changed authoritative name' WHERE id=:id", 'site-line': "DELETE FROM site_product_lines WHERE site_id=:id AND product_line='PV'", 'site-revision': 'UPDATE sites SET revision=revision+1 WHERE id=:id'}[change]
+        with engine.begin() as c: c.execute(text(sql), dict(id=SITE_ID))
+    elif change == 'material-type':
+        with engine.begin() as c: c.execute(text("UPDATE asset_materials SET asset_type='TRANSFORMER' WHERE material_number='IMPORT-UNIT'"))
+    elif change == 'serial-candidate':
+        publish(imports, actor, ready(imports, actor, document([equipment(source_note='Another physical entity')])) )
+    elif change in ('same-name-site', 'same-name-customer'):
+        customer = [dict(record_key='other-owner', decision='NEW', customer_name=owner, reason='Verified separate organization')] if change == 'same-name-customer' else []
+        site = new_site(site_name=name if change == 'same-name-site' else 'Candidate project ' + uuid4().hex,
+                        **(dict(customer_ref='NEW:other-owner') if customer else {}))
+        staged = imports.submit(actor, filename='candidate-sites.xlsx', content=site_document([site], customer), format_version=2, mode='SITES', idempotency_key=str(uuid4()))
+        imports.validate_next(); candidate = imports.get(actor, staged['id'])
+        publish(imports, actor, candidate)
+    else: upload(imports, actor, content)
+    before_count = AssetLifecycle(engine).catalog(actor)['total']
+    before_sites = AssetDirectory(engine).dashboard(actor, product_line='PV')['site_count']
+    refreshed = publish(imports, actor, preview)
+    assert refreshed['operation_result']['outcome'] == 'REFRESHED'
+    assert refreshed['operation_result']['targets'] == [] and refreshed['state'] == 'VALIDATED'
+    assert refreshed['validation_revision'] == preview['validation_revision'] + 1
+    if code: assert any(i['code'] == code for i in refreshed['issues']), refreshed['issues']
+    assert AssetLifecycle(engine).catalog(actor)['total'] == before_count
+    assert AssetDirectory(engine).dashboard(actor, product_line='PV')['site_count'] == before_sites
+    assert imports.source_file(actor, preview['id'])['content'] == content
+    engine.dispose()
+
+
+@pytest.mark.parametrize('same_key', [True, False])
+def test_concurrent_upload_and_publication_intents_share_full_targets(database_url, same_key):
+    from concurrent.futures import ThreadPoolExecutor
+    engine, actor, imports, _ = context(database_url)
+    content, _, _, _ = publication_document()
+    upload_key = str(uuid4())
+    def submit(): return imports.submit(actor, filename='concurrent.xlsx', content=content, format_version=2, mode='ASSETS', idempotency_key=upload_key)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        uploads = [f.result(timeout=15) for f in [pool.submit(submit), pool.submit(submit)]]
+    assert uploads[0]['id'] == uploads[1]['id'] and imports.list_batches(actor)['total'] == 1
+    imports.validate_next(); preview = imports.get(actor, uploads[0]['id'])
+    key = str(uuid4())
+    keys = [key, key if same_key else str(uuid4())]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = [f.result(timeout=15) for f in [pool.submit(publish, imports, actor, preview, key=k) for k in keys]]
+    assert results[0]['operation_result'] == results[1]['operation_result']
+    assert len(results[0]['operation_result']['targets']) == 10
+    assert AssetLifecycle(engine).catalog(actor)['total'] == 7
+    for target in results[0]['operation_result']['targets']:
+        assert AssetDirectory(engine).import_sources(actor, target['kind'], target.get('target_id',target.get('target_key')))['total'] == 1
+    engine.dispose()
+
+
+def test_competing_new_material_batches_never_upsert_or_partially_publish(database_url):
+    from concurrent.futures import ThreadPoolExecutor
+    engine, actor, imports, _ = context(database_url)
+    number = 'S2-competing-' + uuid4().hex
+    previews = []
+    for _ in range(2):
+        content, _, _, _ = publication_document()
+        book = load_workbook(BytesIO(content)); book['Materials']['C2'] = number
+        out = BytesIO(); book.save(out)
+        previews.append(ready(imports, actor, out.getvalue()))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = [f.result(timeout=15) for f in [pool.submit(publish, imports, actor, p) for p in previews]]
+    assert {r['operation_result']['outcome'] for r in results} == {'PUBLISHED', 'REFRESHED'}
+    refreshed = next(r for r in results if r['state'] != 'PUBLISHED')
+    assert any(i['code'] == 'material_exists_choose_reference' for i in refreshed['issues'])
+    assert refreshed['operation_result']['targets'] == []
+    assert AssetLifecycle(engine).catalog(actor)['total'] == 7
+    facts = AssetDirectory(engine).dashboard(actor, product_line='PV')
+    assert facts['site_count'] == facts['customer_count'] == 2
+    assert AssetDirectory(engine).material_detail(actor, number)['model'] == 'S2 approved unit'
+    engine.dispose()
+
+
+@pytest.mark.parametrize('change', ['revoked', 'disabled'])
+def test_publication_rechecks_current_grants_without_writes(database_url, change):
+    from dga.shared.auth.public import IdentityService, IdentityError
+    from tests.identity_seed import seed_legacy_user
+    from tests.test_sample_reception import INITIAL_PASSWORD, CHANGED_PASSWORD
+    engine, admin, imports, _ = context(database_url)
+    identity = IdentityService(engine)
+    user = seed_legacy_user(database_url, 's2-manager', 'Manager', INITIAL_PASSWORD, ['lab_admin'])
+    first = identity.login('s2-manager', INITIAL_PASSWORD)
+    actor = identity.change_password(first.token, INITIAL_PASSWORD, CHANGED_PASSWORD).actor
+    preview = ready(imports, actor, publication_document()[0])
+    if change == 'revoked':
+        identity.change_roles(admin, user, add=['field_engineer'], remove=['lab_admin'], expected_revision=0)
+    else:
+        identity.set_status(admin, user, 'DISABLED', expected_revision=0)
+    with pytest.raises(IdentityError): publish(imports, actor, preview)
+    assert imports.get(admin, preview['id'])['state'] == 'VALIDATED'
+    assert AssetLifecycle(engine).catalog(admin)['total'] == 2
+    engine.dispose()
+
+
+def test_concurrent_revoke_waits_for_current_authorized_publication_commit(database_url):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from dga.shared.auth.public import IdentityService, IdentityError
+    from tests.identity_seed import seed_legacy_user
+    from tests.test_sample_reception import INITIAL_PASSWORD, CHANGED_PASSWORD
+    engine, admin, imports, files = context(database_url)
+    identity = IdentityService(engine)
+    user = seed_legacy_user(database_url, 's2-race-manager', 'Manager', INITIAL_PASSWORD, ['lab_admin'])
+    first = identity.login('s2-race-manager', INITIAL_PASSWORD)
+    actor = identity.change_password(first.token, INITIAL_PASSWORD, CHANGED_PASSWORD).actor
+    preview = ready(imports, actor, publication_document()[0]); key = str(uuid4())
+    entered, release, revoke_started, revoked = Event(), Event(), Event(), Event()
+    get = files.get
+    def paused_get(**kwargs):
+        entered.set()
+        assert release.wait(10)
+        return get(**kwargs)
+    files.get = paused_get
+    def revoke():
+        revoke_started.set()
+        result = identity.change_roles(admin, user, add=['field_engineer'], remove=['lab_admin'], expected_revision=0)
+        revoked.set()
+        return result
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        publication = pool.submit(publish, imports, actor, preview, key=key)
+        assert entered.wait(10)
+        revocation = pool.submit(revoke)
+        assert revoke_started.wait(5) and not revoked.wait(.2)
+        release.set()
+        try: result = publication.result(timeout=15)
+        except IdentityError: result = None  # A post-commit read may observe the completed revocation.
+        revocation.result(timeout=15)
+    files.get = get
+    persisted = imports.get(admin, preview['id'])
+    assert persisted['state'] == 'PUBLISHED' and AssetLifecycle(engine).catalog(admin)['total'] == 7
+    with pytest.raises(AssetQueryError, match='import_operation_not_found'): imports.operation(admin, key)
+    identity.change_roles(admin, user, add=['lab_admin'], remove=['field_engineer'], expected_revision=1)
+    assert imports.operation(actor, key)['outcome'] == 'PUBLISHED'
+    if result: assert len(result['operation_result']['targets']) == 10
+    engine.dispose()
+
+
+def test_import_preserves_existing_asset_and_finalized_laboratory_history(database_url):
+    from dga.laboratory.public import SampleRegistry, ReceiveSample, SampleIdentityStatus, LaboratoryReports
+    from dga.laboratory.report_worker import ReportWorker
+    from dga.shared.auth.public import AuditTrail
+    from tests.test_sample_reception import TRANSFORMER_ID
+    from tests.test_laboratory_workbench import make_workbench, _dga, TestType
+    engine, actor, imports, files = context(database_url)
+    registry = SampleRegistry(engine, AssetDirectory(engine), AuditTrail())
+    sample = registry.receive(actor, ReceiveSample(sampled_at=datetime(2026,8,1,tzinfo=timezone.utc),
+        received_at=datetime(2026,8,2,tzinfo=timezone.utc), site_name='ignored', equipment_serial='ignored',
+        notes='Frozen before equipment import', container_count=1,
+        identity_status=SampleIdentityStatus.ASSOCIATED, formal_asset_id=TRANSFORMER_ID))
+    workbench = make_workbench(engine, files)
+    method = next(m for m in workbench.load(actor, sample.barcode_value).methods if m.test_type == TestType.DGA)
+    workbench.add_test(actor, sample.barcode_value, _dga(method.id))
+    before = workbench.finalize(actor, sample.barcode_value)
+    reports = LaboratoryReports(engine, AuditTrail(), files)
+    assert ReportWorker(reports, files, renderer=lambda snapshot, at: b'%PDF-1.4 frozen S2 boundary fixture').process_one('s2-worker')
+    report = reports.get_report_by_barcode(actor, sample.barcode_value)
+    content = reports.read_report_file(actor, sample.barcode_value).content
+    asset = AssetDirectory(engine).equipment_detail(actor, TRANSFORMER_ID)
+    history = AssetLifecycle(engine).history(actor, TRANSFORMER_ID)
+    published = publish(imports, actor, ready(imports, actor, publication_document()[0]))
+    assert published['state'] == 'PUBLISHED'
+    assert workbench.load(actor, sample.barcode_value) == before
+    assert reports.get_report_by_barcode(actor, sample.barcode_value) == report
+    assert reports.read_report_file(actor, sample.barcode_value).content == content
+    assert AssetDirectory(engine).equipment_detail(actor, TRANSFORMER_ID) == asset
+    assert AssetLifecycle(engine).history(actor, TRANSFORMER_ID) == history
+    assert workbench.load(actor, sample.barcode_value).sample.asset_snapshot == sample.asset_snapshot
+    engine.dispose()
+
+
+def test_assets_mode_publishes_material_and_zero_equipment_site(database_url):
+    from tests.test_sample_reception import CUSTOMER_ID
+    engine,actor,imports,_=context(database_url)
+    number='S2-standalone-'+uuid4().hex
+    materials=[dict(record_key='m',decision='NEW',material_number=number,model='Standalone unit',asset_type='WHOLE_UNIT',reason='Reviewed standalone master')]
+    sites=[dict(record_key='s',decision='NEW',site_name='Zero equipment '+uuid4().hex,customer_ref=str(CUSTOMER_ID),product_lines='ESS',ess_power_mw='4.5',ess_energy_mwh='9',reason='Reviewed zero equipment site')]
+    result=publish(imports,actor,ready(imports,actor,document([],materials=materials,sites=sites)))
+    assert result['state']=='PUBLISHED'
+    assert AssetLifecycle(engine).catalog(actor)['total']==2
+    assert AssetDirectory(engine).material_detail(actor,number)['model']=='Standalone unit'
+    assert len(result['operation_result']['targets'])==len(materials)+len(sites)
+    if sites:
+        target=next(t for t in result['operation_result']['targets'] if t['kind']=='SITE')
+        assert AssetDirectory(engine).site_detail(actor,UUID(target['target_id']),product_line='ESS')['site']['site_name']==sites[0]['site_name']
+    engine.dispose()
+
+
+def test_same_batch_duplicate_physical_review_creates_distinct_full_paged_targets(database_url):
+    engine,actor,imports,_=context(database_url)
+    assets=[equipment(record_key=f'device-{n}',serial_number='Same physical label') for n in range(21)]
+    preview=ready(imports,actor,document(assets))
+    current=[]
+    for page in (1,2):
+        current.extend(i['id'] for i in imports.get(actor,preview['id'],page=page)['issues'] if i['severity']=='WARNING')
+    assert len(set(current))==21
+    with pytest.raises(AssetQueryError,match='import_warnings_unacknowledged'): publish(imports,actor,preview)
+    result=publish(imports,actor,preview,warnings=current)
+    targets=result['operation_result']['targets']
+    assert len(targets)==21 and len({t['target_id'] for t in targets})==21
+    assert len({t['system_asset_number'] for t in targets})==21
+    assert imports.get(actor,preview['id'],page=2)['rows'][0]['target_id']==targets[-1]['target_id']
+    assert AssetLifecycle(engine).catalog(actor)['total']==23
+    engine.dispose()
+
+
+def test_concurrent_identical_revision_is_one_recovered_change(database_url):
+    from concurrent.futures import ThreadPoolExecutor
+    engine,actor,imports,_=context(database_url)
+    preview=ready(imports,actor)
+    key=str(uuid4())
+    def revise():
+        return imports.revise(actor,preview['id'],expected_revision=preview['validation_revision'],changes=[dict(sheet='Assets',row=2,values=dict(source_note='Concurrent reviewed note'))],reason='One review intent',idempotency_key=key)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results=[f.result(timeout=15) for f in [pool.submit(revise),pool.submit(revise)]]
+    assert results[0]['operation_result']==results[1]['operation_result']
+    assert results[0]['validation_revision']==preview['validation_revision']+1
+    assert imports.revision_history(actor,preview['id'])['total']==1
+    assert publish(imports,actor,results[0])['state']=='PUBLISHED'
     engine.dispose()

@@ -55,9 +55,43 @@ def test_v2_assets_http_upload_revision_and_recovery_require_current_permission_
             expected_revision=revised.json()['validation_revision'], changes=[dict(sheet='Assets', row=2, values=dict(customer_id=str(uuid4())))], reason='Forbidden', idempotency_key=str(uuid4())))
         assert bad.status_code == 422
         published = client.post(route + '/' + batch['id'] + '/publish', headers=headers, json=dict(validation_revision=revised.json()['validation_revision'], idempotency_key=str(uuid4()), acknowledged_warning_ids=[]))
-        assert published.status_code == 409 and published.json() == {'code': 'import_mode_not_publishable'}
+        assert published.status_code == 200 and published.json()['operation_result']['outcome'] == 'PUBLISHED'
         original = client.get(route + '/' + batch['id'] + '/source')
         assert original.content == content and original.headers['cache-control'] == 'no-store'
         assert client.get(route + '/' + batch['id'] + '?duplicate_page=0').status_code == 422
         assert 'object_key' not in uploaded.text and 'catalog_digest' not in uploaded.text
+    engine.dispose()
+
+
+def test_formal_material_and_asset_sources_do_not_grant_private_import_access(database_url):
+    from tests.test_device_material_import import publication_document, ready, publish
+    from tests.identity_seed import seed_legacy_user
+    from tests.test_sample_reception import INITIAL_PASSWORD
+    from dga.shared.auth.public import IdentityService
+    engine, admin, imports, files = context(database_url)
+    content, number, _, _ = publication_document()
+    result = publish(imports, admin, ready(imports, admin, content))
+    targets = {r['record_key']: r for r in result['operation_result']['targets']}
+    seed_legacy_user(database_url, 'material-reader', 'Reader', INITIAL_PASSWORD, ['field_engineer'])
+    identity = IdentityService(engine)
+    first = identity.login('material-reader', INITIAL_PASSWORD)
+    identity.change_password(first.token, INITIAL_PASSWORD, CHANGED_PASSWORD)
+    app = create_app(Settings(database_url=database_url, cookie_secure=False, auth_allowed_origins='http://testserver'), file_store=files)
+    with TestClient(app) as client:
+        path = '/api/assets/equipment/' + targets['root']['target_id'] + '/sources'
+        assert client.get(path).status_code == 401
+        client.post('/api/auth/login', headers={'Origin': 'http://testserver'}, json=dict(username='material-reader', password=CHANGED_PASSWORD))
+        material = client.get('/api/assets/materials/detail', params=dict(material_number=number))
+        assert material.status_code == 200 and material.json()['material_number'] == number
+        assert material.headers['cache-control'] == 'no-store'
+        source = client.get('/api/assets/materials/sources', params=dict(material_number=number))
+        assert source.status_code == 200 and source.json()['sources'][0]['source_note'] == 'Approved material evidence'
+        assert source.headers['cache-control'] == 'no-store'
+        equipment = client.get(path)
+        assert equipment.status_code == 200 and equipment.json()['sources'][0]['mode'] == 'ASSETS'
+        assert 'object_key' not in source.text + equipment.text
+        batch_path = '/api/assets/imports/' + str(result['id'])
+        assert client.get(batch_path).status_code == client.get(batch_path + '/source').status_code == 403
+        assert client.get('/api/assets/materials/detail', params=dict(material_number='missing')).status_code == 404
+        assert client.get('/api/assets/materials/sources', params=dict(material_number=number, page=0)).status_code == 422
     engine.dispose()
