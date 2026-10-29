@@ -144,6 +144,25 @@ class AssetDirectory:
         self._engine = engine
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
+    def import_sources(self, actor: ActorContext, kind: str, target_id, *, page: int = 1) -> dict:
+        require_permission(actor,'assets.read')
+        if kind not in ('SITE','CUSTOMER') or type(page) is not int or not 1 <= page <= 100000:
+            raise AssetQueryError('invalid_source_query',422)
+        try:
+            target_id=UUID(str(target_id))
+        except (ValueError,TypeError,AttributeError) as error:
+            raise AssetQueryError('invalid_source_query',422) from error
+        with self._engine.connect().execution_options(isolation_level='REPEATABLE READ') as connection:
+            table = 'sites' if kind == 'SITE' else 'customers'
+            if connection.execute(text(f'SELECT id FROM {table} WHERE id=:id'),{'id':target_id}).scalar() is None:
+                raise AssetQueryError('source_target_not_found',404)
+            params=dict(kind=kind,id=target_id,offset=(page-1)*20)
+            total=connection.execute(text('SELECT count(*) FROM asset_import_sources WHERE kind=:kind AND target_id=:id'),params).scalar_one()
+            rows=connection.execute(text("""SELECT s.*,b.filename,u.display_name FROM asset_import_sources s
+                JOIN asset_import_batches b ON b.id=s.batch_id JOIN users u ON u.id=s.actor_id
+                WHERE s.kind=:kind AND s.target_id=:id ORDER BY s.occurred_at DESC,s.id LIMIT 20 OFFSET :offset"""),params).mappings().all()
+            return dict(sources=[dict(r) for r in rows],total=total,page=page)
+
     def export_sites(self, actor: ActorContext) -> 'SiteExportFile':
         """Return a complete readable-site workbook; caller must close its file."""
         require_permission(actor, 'assets.read')

@@ -1,3 +1,5 @@
+import { ImportSourcesPanel } from './ImportSourcesPanel';
+import './siteImport.css';
 import { useState, type ReactNode } from 'react';
 import { SiteBasicsEditor } from './SiteBasicsEditor';
 import { SiteExportButton } from './SiteExportButton';
@@ -84,6 +86,8 @@ export function SiteDetailPage({ siteId }: { siteId: string }) {
     {savedNotice && <p role="status">{savedNotice}</p>}
     {error ? <p role="alert">{error} <button onClick={retry}>重试</button></p> : !data ? <p role="status">正在加载现场资料…</p> : <section className="site-facts" aria-label="现场资料"><h2>{data.site.site_name}</h2><dl>{siteColumns(ess).slice(1).map(c => <div key={c.key}><dt>{c.label}</dt><dd>{c.render ? c.render(data.site) : data.site[c.key] ?? '未提供'}</dd></div>)}</dl></section>}
     <SiteBasicsEditor key={`${siteId}:${ess ? 'ESS' : 'PV'}`} site={data?.site} saved={() => { setSavedNotice('现场资料已保存。若刷新失败，请重试读取，不要重复提交。'); retry(); }} />
+    {data&&<><ImportSourcesPanel key={`site:${siteId}`} kind="sites" id={siteId}/><ImportSourcesPanel key={`customer:${data.site.customer_id}`} kind="customers" id={data.site.customer_id}/></>}
+    {data&&data.equipment_count===0&&<p>{equipmentFields.some(f=>query[f.key])?'暂无符合条件的设备。':'暂无设备。'}</p>}
     <Filters fields={equipmentFields} query={query} update={(patch, reset) => update(reset ? { ...patch, return_to: query.return_to ?? '' } : patch, reset)} />
     {data && <DataTable name="一级设备清单" rows={data.equipment} total={data.equipment_count} columns={columns} query={query} update={update} href={row => `/assets/equipment/${row.id}?return_to=${encodeURIComponent(location.pathname + location.search)}`} />}
   </div>;

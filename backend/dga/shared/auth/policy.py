@@ -4,7 +4,7 @@ POLICY = {
     'system_admin': READ | {'assets.write', 'assets.site.edit', 'assets.history.correct', 'assets.import',
         'laboratory.write', 'laboratory.finalize', 'laboratory.configure', 'analysis.write',
         'analysis.acknowledge', 'identity.manage', 'identity.ordinary.manage', 'identity.am.manage', 'audit.read'},
-    'lab_admin': READ | {'assets.write', 'assets.site.edit', 'assets.history.correct',
+    'lab_admin': READ | {'assets.import', 'assets.write', 'assets.site.edit', 'assets.history.correct',
         'laboratory.write', 'laboratory.finalize', 'laboratory.configure', 'analysis.write',
         'analysis.acknowledge', 'identity.ordinary.manage', 'audit.read'},
     'analyst': READ | {'laboratory.write', 'laboratory.finalize', 'analysis.acknowledge'},

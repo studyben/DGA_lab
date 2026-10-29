@@ -1,3 +1,4 @@
+import { SiteImportPanel } from './SiteImportPanel';
 import { SiteExportButton } from './SiteExportButton';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../Auth';
@@ -27,6 +28,11 @@ const errors: Record<string, string> = {
 };
 
 export function AssetImportPage() {
+  const siteMode = new URLSearchParams(location.search).get('mode') === 'SITES';
+  return <><div className="import-mode-picker"><strong>导入内容</strong><a className="button" aria-current={!siteMode?'page':undefined} href="/assets/import">设备资料（v1）</a><a className="button" aria-current={siteMode?'page':undefined} href="/assets/import?mode=SITES">仅现场信息（v2）</a></div>{siteMode?<SiteImportPanel/>:<LegacyAssetImportPage/>}</>;
+}
+
+function LegacyAssetImportPage() {
   const { session } = useAuth();
   const [selected, setSelected] = useState(() => new URLSearchParams(location.search).get('batch') ?? '');
   const [batch, setBatch] = useState<Batch | null>(null);
@@ -58,7 +64,8 @@ export function AssetImportPage() {
       try {
         const response = await fetch(`/api/assets/imports/${encodeURIComponent(selected)}`, { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
         if (!response.ok) throw new Error(response.status === 401 ? '登录已失效，请重新登录。' : '无法读取批次，请检查权限或稍后重试。');
-        const data: Batch = await response.json();
+        const data: Batch & {format_version?:number} = await response.json();
+        if(data.format_version===2){location.assign(`/assets/import?mode=SITES&batch=${selected}`);return;}
         if (!active) return;
         setBatch(data); setError('');
         if (data.state === 'STAGED') timer = setTimeout(() => void load(), 2000);

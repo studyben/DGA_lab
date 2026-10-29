@@ -241,6 +241,21 @@ class IdentityService:
                 FROM audit_logs ORDER BY occurred_at,id LIMIT :limit'''),
                 {'limit': limit}).mappings()]
 
+    def authorize_current(self, connection, actor: ActorContext, permission: str) -> ActorContext:
+        """Authorize current account/grants inside a caller-owned transaction.
+
+        Take this guard before domain locks. Role/status mutations serialize on
+        the same identity lock, so authorization remains valid through commit.
+        """
+        connection.execute(text('SELECT pg_advisory_xact_lock_shared(30003)'))
+        user = connection.execute(text("SELECT * FROM users WHERE id=:id AND user_status='ACTIVE' FOR SHARE"),
+                                  {'id': actor.user_id}).mappings().first()
+        if user is None:
+            raise IdentityError('permission_denied', 403)
+        current = self._actor(connection, user)
+        require_permission(current, permission)
+        return current
+
     def _authorized(self, c, actor, permission):
         user = c.execute(text('SELECT * FROM users WHERE id=:id AND user_status=\'ACTIVE\' FOR UPDATE'), {'id': actor.user_id}).mappings().first()
         if not user:
