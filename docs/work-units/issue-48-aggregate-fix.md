@@ -1,0 +1,9 @@
+# Issue48 aggregate fix
+
+AG-R1 accepted→已修复：ExcelWriter由资产私有适配器在显式ZipFilecontext内写入，异常时ZIP先close，再关闭spooledoutput；仍结束worksheetgenerator并移除tempXML。RED故障为ZipFile.__del__访问已关闭文件；GREEN强制落盘/写失败/非法XML/HTTP中断均通过，strictwarning不再触发。
+
+AG-R2 accepted→已修复：Instructions保留机器枚举，增加与既有UI一致中文值对照，公开workbook断言及实际browserdownload复验。
+
+补充隔离migrationdowngrade保护测试：非空auditmetadata拒绝降级，公开audit查询前后相等，后续导出仍工作；从未操作验收库。新增browserdeadline/sessionexpiryunmount行为测试。
+
+Validation: fullbackend303passed/40skip(既有storageCase环境门控)/2既有弃用warning；productionbuildpass；10browserpass，最新API重启后真实下载再1pass。无未来票/云服务/凭据/存储变更。Residual均见aggregate re-reviewartifact分类，无阻塞。Next accepteddeepreviewcommit→ready-to-open-draft-PR。

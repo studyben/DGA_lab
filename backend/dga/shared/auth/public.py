@@ -1,4 +1,5 @@
 """Public identity application interface. HTTP and trusted operator tools use this seam."""
+import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
@@ -48,23 +49,18 @@ def _append_audit(
     actor_user_id: UUID | None = None,
     claimed_username: str | None = None,
     entity_id: UUID | None = None,
+    details: dict | None = None,
 ) -> None:
-    connection.execute(
-        text(
-            """INSERT INTO audit_logs
-            (id,actor_user_id,claimed_username,action_code,result,occurred_at,entity_id)
-            VALUES (:id,:actor,:claimed,:action,:result,:time,:entity)"""
-        ),
-        {
-            'id': uuid4(),
-            'actor': actor_user_id,
-            'claimed': claimed_username,
-            'action': action_code,
-            'result': result,
-            'time': occurred_at,
-            'entity': entity_id,
-        },
-    )
+    columns = 'id,actor_user_id,claimed_username,action_code,result,occurred_at,entity_id'
+    values = ':id,:actor,:claimed,:action,:result,:time,:entity'
+    parameters = {'id': uuid4(), 'actor': actor_user_id, 'claimed': claimed_username,
+                  'action': action_code, 'result': result, 'time': occurred_at, 'entity': entity_id}
+    if details is not None:
+        columns += ',details'
+        values += ',CAST(:details AS jsonb)'
+        parameters['details'] = json.dumps(details, allow_nan=False)
+    connection.execute(text(f'INSERT INTO audit_logs ({columns}) VALUES ({values})'), parameters)
+
 
 
 class AuditTrail:
@@ -81,6 +77,7 @@ class AuditTrail:
         *,
         entity_id: UUID,
         result: str = 'SUCCESS',
+        details: dict | None = None,
     ) -> None:
         if result not in {'SUCCESS', 'FAILURE'}:
             raise ValueError('invalid_audit_result')
@@ -91,6 +88,7 @@ class AuditTrail:
             result=result,
             actor_user_id=actor.user_id,
             entity_id=entity_id,
+            details=details,
         )
 
 
@@ -234,7 +232,7 @@ class IdentityService:
         with self._engine.begin() as c:
             self._authorized(c, actor, 'audit.read')
             return [dict(row) for row in c.execute(text('''SELECT id,actor_user_id,claimed_username,
-                action_code,result,occurred_at,entity_id FROM audit_logs ORDER BY occurred_at,id LIMIT :limit'''),
+                action_code,result,occurred_at,entity_id,details FROM audit_logs ORDER BY occurred_at,id LIMIT :limit'''),
                 {'limit': limit}).mappings()]
 
     def _authorized(self, c, actor, permission):

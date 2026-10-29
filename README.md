@@ -188,3 +188,11 @@ docker compose run --rm migrate alembic upgrade head
 当前隔离开发验收：Compose项目 `dga-issue13-browser`，端口18097，配置 `compose.browser.yaml` + `compose.import-browser.yaml`（临时数据库和对象存储）。管理员 `browser-admin`、只读 `operations-reader`，测试密码均为 `Browser changed passphrase 84!`。仅测试夹具账号，不用于生产。原18093验收环境及其数据不受影响。
 
 #2 工程基础 → #3 登录/权限/审计身份 → #4 资产搜索/采样上下文 → #5 收样条码 → #6 检测录入 → #7 整体定稿 → #8 条码报告。随后按依赖补全 #9–#19，#20 完成部署和恢复验收。服务工单、ASTM 编号、正式阈值和 PDF 品牌细节不在本票范围。
+
+## 当前现场汇总下载（Issue #48）
+
+在资产现场列表和资产导入页点击“下载当前现场汇总”，会生成 XLSX，包含全部有权读取的当前现场（包括没有设备或未配置产品线的现场），不受页面筛选、分页或光伏/储能切换影响。每个物理现场一行；双产品线现场分别列出 PV MW、ESS MW/MWh。已有现场及客户 UUID 作为稳定文本编号，未知值保持空白，容量以十进制文本保留精度。
+
+`Sites` 使用固定机器列名，`Instructions` 包含中文字段说明、生成时间、导出范围和现场数量。当前主线尚无来源备注维护入口，因此 `source_note` 保持空白；后续导入工单负责接入。此下载不创建或覆盖任何资产、客户、现场。后端公开应用入口 `AssetDirectory.export_sites(actor)` 和 HTTP `GET /api/assets/sites/export` 均要求 `assets.read`，不要求导入/写权限。调用方负责关闭公开接口返回的文件；HTTP 响应自动在完成或断开时关闭。
+
+生成完成并写入审计后才提供下载。审计记录发起人、时间、范围和现场数量，含义是文件已准备并提供下载，不保证用户已经保存到磁盘。失败时页面提供重试提示，不下载错误响应。超过 Excel 单表行数上限时明确失败，不截断数据。

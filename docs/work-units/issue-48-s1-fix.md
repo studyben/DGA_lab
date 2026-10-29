@@ -1,0 +1,2 @@
+# Issue48 S1 fix
+Gate: fix. Finding S1-R1 accepted; final status已修复 after re-review. Changed private workbook cleanup to finish worksheet generator before writer close/removal; owner-provided schema version used by audit; shared module docstring preserved. Validation40 focused real-DB tests including strict unraisable warning pass. Residual risks: S2/S3/future provenance as listed in S1. No scope expansion.

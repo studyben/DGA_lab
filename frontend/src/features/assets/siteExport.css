@@ -1,0 +1,5 @@
+.site-export { margin: 16px 0; }
+.site-export > div { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.site-export-note { color: #667085; font-size: 12px; line-height: 1.6; }
+.site-export p { margin: 8px 0; font-size: 13px; }
+.site-export [role=alert] { color: #b42318; }

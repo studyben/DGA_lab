@@ -10,7 +10,7 @@ from sqlalchemy.engine import make_url
 from dga.assets.public import AssetDirectory
 from dga.laboratory.public import ReceiveSample, SampleIdentityStatus, SampleRegistry, LaboratoryReports, ReportState, LaboratoryOperations
 from dga.laboratory.report_worker import ReportWorker
-from dga.shared.auth.public import AuditTrail
+from dga.shared.auth.public import AuditTrail, IdentityService
 from tests.test_asset_import import import_context, new_rows, workbook
 from tests.test_laboratory_reports import MemoryFileStore
 from tests.test_laboratory_reports import _queue_one
@@ -45,6 +45,8 @@ def test_populated_main_upgrade_preserves_assets_samples_imports_and_enables_rep
         directory = AssetDirectory(engine)
         asset_before = directory.equipment_detail(actor, TRANSFORMER_ID)
         command.upgrade(config, 'head')
+        old_audit = IdentityService(engine).audit_events(actor)
+        assert old_audit and all(event['details'] == {} for event in old_audit)
         assert registry.find_by_barcode(actor, sample.barcode_value) == sample
         operations = LaboratoryOperations(engine,registry,directory,AuditTrail()).sample_operations(actor,sample.barcode_value)
         assert operations['sample'] == sample
