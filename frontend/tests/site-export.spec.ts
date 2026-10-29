@@ -22,8 +22,9 @@ test('只读账号从筛选现场列表下载全部现场，管理员从导入�
   expect(file.subarray(0, 2).toString()).toBe('PK');
   expect(file.length).toBeGreaterThan(3000);
   await expect(page.getByRole('status').filter({ hasText: '已生成现场汇总' })).toBeVisible();
-  // Verify the same public HTTP file independently of current UI filters.
-  expect(await response.headerValue('cache-control')).toBe('no-store');
+  // API and gateway may contribute duplicate Cache-Control directives.
+  const cacheDirectives = (await response.headerValue('cache-control') ?? '').split(',').map(value => value.trim().toLowerCase());
+  expect(cacheDirectives).toContain('no-store');
   await page.request.post('/api/auth/login', {
     headers: { Origin: new URL(baseURL!).origin },
     data: { username: 'browser-admin', password: 'Browser changed passphrase 84!' },
