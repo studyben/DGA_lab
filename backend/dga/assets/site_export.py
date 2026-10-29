@@ -6,9 +6,11 @@ from pathlib import Path
 from tempfile import SpooledTemporaryFile
 from typing import BinaryIO
 from uuid import UUID, uuid4
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from openpyxl import Workbook
 from openpyxl.cell import WriteOnlyCell
+from openpyxl.writer.excel import ExcelWriter
 from sqlalchemy import text
 
 XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -24,8 +26,8 @@ COLUMNS = (
     ('ess_power_mw', '储能装机功率，MW；十进制文本保留精度'),
     ('ess_energy_mwh', '储能电池容量，MWh；十进制文本保留精度'),
     ('commissioning_date', 'Commissioning Date，YYYY-MM-DD'),
-    ('grid_status', '并网调试状态：NOT_STARTED/IN_PROGRESS/COMPLETED'),
-    ('operation_status', '投运状态：NOT_OPERATIONAL/PARTIAL/OPERATIONAL/DECOMMISSIONED'),
+    ('grid_status', '并网调试状态：NOT_STARTED=未开始；IN_PROGRESS=调试中；COMPLETED=已完成'),
+    ('operation_status', '投运状态：NOT_OPERATIONAL=未投运；PARTIAL=部分投运；OPERATIONAL=已投运；DECOMMISSIONED=已退役'),
     ('source_note', '来源备注：当前未提供时保持空白，不推断'),
 )
 QUERY = text('''SELECT s.id AS site_id,s.site_name,s.customer_id,c.customer_name,s.location_text,
@@ -118,7 +120,10 @@ def generate(engine, generated_at):
             *COLUMNS,
         ):
             _row(info, values)
-        book.save(output)
+        # openpyxl's save_workbook does not close its ZIP on write failure.
+        # Own that resource here so it closes before the underlying output.
+        with ZipFile(output, 'w', ZIP_DEFLATED, allowZip64=True) as archive:
+            ExcelWriter(book, archive).save()
         output.seek(0)
         return SiteExportFile(output, f'site-reference-{generated_at:%Y%m%dT%H%M%SZ}.xlsx', generated_at, count, uuid4())
     except Exception as error:

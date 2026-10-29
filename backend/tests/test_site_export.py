@@ -57,6 +57,8 @@ def test_export_contains_each_site_once_with_official_capacities_and_unknowns(ex
         assert instructions['scope'] == 'all_readable_sites'
         assert instructions['site_count'] == 2
         assert instructions['generated_at'] == '2026-10-29T12:00:00+00:00'
+        assert 'IN_PROGRESS=调试中' in instructions['grid_status']
+        assert 'PARTIAL=部分投运' in instructions['operation_status']
         book.close()
     finally:
         exported.file.close()
@@ -209,3 +211,78 @@ def test_failed_audit_never_provides_a_download_or_claims_success(export_context
     assert caught.value.status == 503
     assert not list(tmp_path.iterdir())
     assert not [event for event in identity.audit_events(actor) if event['action_code'] == 'SITE_EXPORT_PREPARED']
+
+@pytest.mark.parametrize('fail_write', [False, True])
+def test_disk_spill_and_write_failure_close_all_download_resources(export_context, monkeypatch, tmp_path, fail_write):
+    import tempfile
+    from dga.assets.public import AssetQueryError
+    engine, identity, actor, _ = export_context
+    monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
+    resources = []
+    original_init = tempfile.SpooledTemporaryFile.__init__
+    original_write = tempfile.SpooledTemporaryFile.write
+    failed = False
+
+    def initialize(resource, *args, **kwargs):
+        kwargs['max_size'] = 1  # Filesystem boundary: force a real disk-backed download.
+        original_init(resource, *args, **kwargs)
+        resources.append(resource)
+
+    def write(resource, value):
+        nonlocal failed
+        if fail_write and not failed:
+            failed = True
+            raise OSError('Simulated disk unavailable')
+        return original_write(resource, value)
+
+    monkeypatch.setattr(tempfile.SpooledTemporaryFile, '__init__', initialize)
+    monkeypatch.setattr(tempfile.SpooledTemporaryFile, 'write', write)
+    if fail_write:
+        with pytest.raises(AssetQueryError, match='site_export_unavailable'):
+            AssetDirectory(engine).export_sites(actor)
+        assert not [e for e in identity.audit_events(actor) if e['action_code'] == 'SITE_EXPORT_PREPARED']
+    else:
+        exported = AssetDirectory(engine).export_sites(actor)
+        try:
+            book = load_workbook(exported.file, read_only=True)
+            assert dict(book['Instructions'].values)['site_count'] == 2
+            book.close()
+        finally:
+            exported.file.close()
+    assert len(resources) == 1 and resources[0].closed
+    assert not list(tmp_path.iterdir())
+
+
+def test_export_audit_metadata_survives_refused_destructive_downgrade(database_url, monkeypatch):
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine
+    from sqlalchemy.engine import make_url
+    from sqlalchemy.exc import DBAPIError
+    from dga.shared.auth.public import IdentityService
+    schema = 'site_export_upgrade_' + uuid4().hex
+    root = create_engine(database_url)
+    with root.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA {schema}'))
+    isolated = make_url(database_url).update_query_dict({'options': f'-csearch_path={schema}'}).render_as_string(hide_password=False)
+    monkeypatch.setenv('DATABASE_URL', isolated)
+    engine = None
+    try:
+        config = Config('alembic.ini')
+        command.upgrade(config, '0024_alarm_observation')
+        engine, identity, actor = reception_context(isolated)
+        command.upgrade(config, 'head')
+        exported = AssetDirectory(engine).export_sites(actor)
+        exported.file.close()
+        before = IdentityService(engine).audit_events(actor)
+        with pytest.raises(DBAPIError, match='Retained audit metadata'):
+            command.downgrade(config, '0024_alarm_observation')
+        assert IdentityService(engine).audit_events(actor) == before
+        again = AssetDirectory(engine).export_sites(actor)
+        again.file.close()
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with root.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA {schema} CASCADE'))
+        root.dispose()

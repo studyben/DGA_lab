@@ -84,3 +84,48 @@ for (const scenario of [
   await expect(page.getByRole('button', { name: '下载当前现场汇总', exact: true })).toBeEnabled();
   expect(downloads).toEqual([]);
 });
+
+test('浏览器下载超时有提示，不留下永久忙碌状态', async ({ page, baseURL }) => {
+  // Accelerate only the browser's download deadline at the platform boundary.
+  await page.addInitScript(() => {
+    const original = AbortSignal.timeout.bind(AbortSignal);
+    AbortSignal.timeout = ms => original(ms === 60000 ? 100 : ms);
+  });
+  await page.request.post('/api/auth/login', {
+    headers: { Origin: new URL(baseURL!).origin },
+    data: { username: 'field-user', password: 'Browser changed passphrase 84!' },
+  });
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/assets/sites/export', async route => {
+    await pending;
+    await route.abort().catch(() => {});
+  });
+  await page.goto('/assets');
+  await page.getByRole('button', { name: '下载当前现场汇总', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('下载响应超时');
+  await expect(page.getByRole('button', { name: '下载当前现场汇总', exact: true })).toBeEnabled();
+  release();
+});
+
+test('会话失效卸载页面时取消未完成下载', async ({ page, baseURL }) => {
+  await page.request.post('/api/auth/login', {
+    headers: { Origin: new URL(baseURL!).origin },
+    data: { username: 'field-user', password: 'Browser changed passphrase 84!' },
+  });
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/assets/sites/export', async route => {
+    await pending;
+    await route.abort().catch(() => {});
+  });
+  await page.goto('/assets');
+  await page.getByRole('button', { name: '下载当前现场汇总', exact: true }).click();
+  await expect(page.getByRole('button', { name: '正在生成现场汇总…' })).toBeDisabled();
+  await page.route('**/api/auth/session', route => route.fulfill({ status: 401, contentType: 'application/json', body: '{"code":"session_expired"}' }));
+  const cancelled = page.waitForEvent('requestfailed', r => r.url().endsWith('/api/assets/sites/export'));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  expect((await cancelled).failure()?.errorText).toContain('ERR_ABORTED');
+  await expect(page.getByRole('button', { name: '下载当前现场汇总', exact: true })).toHaveCount(0);
+  release();
+});
