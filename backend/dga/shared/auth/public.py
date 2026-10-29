@@ -1,4 +1,5 @@
 """Public identity application interface. HTTP and trusted operator tools use this seam."""
+import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
@@ -48,12 +49,13 @@ def _append_audit(
     actor_user_id: UUID | None = None,
     claimed_username: str | None = None,
     entity_id: UUID | None = None,
+    details: dict | None = None,
 ) -> None:
     connection.execute(
         text(
             """INSERT INTO audit_logs
-            (id,actor_user_id,claimed_username,action_code,result,occurred_at,entity_id)
-            VALUES (:id,:actor,:claimed,:action,:result,:time,:entity)"""
+            (id,actor_user_id,claimed_username,action_code,result,occurred_at,entity_id,details)
+            VALUES (:id,:actor,:claimed,:action,:result,:time,:entity,CAST(:details AS jsonb))"""
         ),
         {
             'id': uuid4(),
@@ -63,6 +65,7 @@ def _append_audit(
             'result': result,
             'time': occurred_at,
             'entity': entity_id,
+            'details': json.dumps(details if details is not None else {}, allow_nan=False),
         },
     )
 
@@ -81,6 +84,7 @@ class AuditTrail:
         *,
         entity_id: UUID,
         result: str = 'SUCCESS',
+        details: dict | None = None,
     ) -> None:
         if result not in {'SUCCESS', 'FAILURE'}:
             raise ValueError('invalid_audit_result')
@@ -91,6 +95,7 @@ class AuditTrail:
             result=result,
             actor_user_id=actor.user_id,
             entity_id=entity_id,
+            details=details,
         )
 
 
@@ -234,7 +239,7 @@ class IdentityService:
         with self._engine.begin() as c:
             self._authorized(c, actor, 'audit.read')
             return [dict(row) for row in c.execute(text('''SELECT id,actor_user_id,claimed_username,
-                action_code,result,occurred_at,entity_id FROM audit_logs ORDER BY occurred_at,id LIMIT :limit'''),
+                action_code,result,occurred_at,entity_id,details FROM audit_logs ORDER BY occurred_at,id LIMIT :limit'''),
                 {'limit': limit}).mappings()]
 
     def _authorized(self, c, actor, permission):

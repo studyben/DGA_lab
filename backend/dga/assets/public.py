@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from .dashboard import DashboardQuery, EquipmentQuery
 
-from dga.shared.auth.public import ActorContext, require_permission
+from dga.shared.auth.public import ActorContext, AuditTrail, require_permission
 from dga.shared.contracts import ModuleDescriptor
 
 MODULE = ModuleDescriptor(code='assets', label='资产管理')
@@ -28,6 +28,10 @@ class AssetQueryError(Exception):
         self.code = code
         self.status = status
         super().__init__(code)
+
+
+class SiteExportAction(StrEnum):
+    PREPARED = 'SITE_EXPORT_PREPARED'
 
 
 class AssetType(StrEnum):
@@ -139,6 +143,26 @@ class AssetDirectory:
     ):
         self._engine = engine
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+
+    def export_sites(self, actor: ActorContext) -> 'SiteExportFile':
+        """Return a complete readable-site workbook; caller must close its file."""
+        require_permission(actor, 'assets.read')
+        from .site_export import generate
+        exported = None
+        try:
+            exported = generate(self._engine, self._clock().astimezone(timezone.utc))
+            with self._engine.begin() as connection:
+                AuditTrail(clock=self._clock).append(connection, actor, SiteExportAction.PREPARED,
+                    entity_id=exported.export_id, details={
+                        'scope': 'all_readable_sites', 'site_count': exported.site_count,
+                        'schema_version': exported.schema_version,
+                        'generated_at': exported.generated_at.isoformat(), 'delivery': 'prepared_for_download',
+                    })
+            return exported
+        except Exception as error:
+            if exported is not None:
+                exported.file.close()
+            raise AssetQueryError('site_export_unavailable', 503) from error
 
     def dashboard(self, actor: ActorContext, **filters) -> dict:
         require_permission(actor, 'assets.read')
@@ -444,3 +468,5 @@ from .imports import AssetImports
 def import_http_router(imports: AssetImports, actor_dependency, mutation_actor):
     from .import_http import import_router
     return import_router(imports, actor_dependency, mutation_actor)
+
+from .site_export import SiteExportFile  # noqa: E402
