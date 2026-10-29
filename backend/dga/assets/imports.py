@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy import text
 
-from dga.shared.auth.public import AuditTrail, require_permission
+from dga.shared.auth.public import AuditTrail, IdentityService, require_permission
 from dga.shared.files import FileStore
 from .import_workbook import parse, template, WorkbookError, MAX_BYTES
 from .import_validation import validate, summary, issue
@@ -28,6 +28,7 @@ class AssetImports:
         self._engine, self._files = engine, files
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._audit = AuditTrail(clock=self._clock)
+        self._identity = IdentityService(engine)
         from .site_imports import SiteImports
         self._sites = SiteImports(engine, files, self._clock)
 
@@ -156,6 +157,7 @@ class AssetImports:
         """Create the entire new-asset batch atomically, never update existing assets."""
         require_permission(actor, 'assets.import')
         with self._engine.begin() as c:
+            self._identity.authorize_current(c,actor,'assets.import')
             c.execute(text('SELECT pg_advisory_xact_lock(110011)'))
             batch = c.execute(text('SELECT * FROM asset_import_batches WHERE id=:id FOR UPDATE'), {'id': batch_id}).mappings().first()
             if batch is None:

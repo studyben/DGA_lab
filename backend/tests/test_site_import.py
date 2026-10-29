@@ -402,3 +402,22 @@ def test_sparse_empty_xml_row_cannot_bypass_expansion_budget(database_url):
     assert batch['state']=='FAILED'
     assert batch['issues']
     engine.dispose()
+
+
+def test_new_lab_manager_import_grant_cannot_publish_legacy_batch_after_revocation(database_url):
+    from tests.test_asset_import import import_context,workbook,new_rows
+    from tests.identity_seed import seed_legacy_user
+    from tests.test_sample_reception import INITIAL_PASSWORD,CHANGED_PASSWORD
+    from dga.shared.auth.public import IdentityService,IdentityError
+    engine,admin,imports,_=import_context(database_url)
+    identity=IdentityService(engine)
+    manager_id=seed_legacy_user(database_url,'legacy-import-manager','Manager',INITIAL_PASSWORD,['lab_admin'])
+    first=identity.login('legacy-import-manager',INITIAL_PASSWORD)
+    manager=identity.change_password(first.token,INITIAL_PASSWORD,CHANGED_PASSWORD).actor
+    batch=imports.submit(manager,filename='legacy.xlsx',content=workbook(new_rows()))
+    imports.validate_next()
+    identity.change_roles(admin,manager_id,add=['field_engineer'],remove=['lab_admin'],expected_revision=0)
+    with pytest.raises(IdentityError):
+        imports.publish(manager,batch['id'],validation_revision=1)
+    assert imports.get(admin,batch['id'])['state']=='VALIDATED'
+    engine.dispose()
