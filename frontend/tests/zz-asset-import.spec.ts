@@ -4,7 +4,7 @@ import path from 'node:path';
 test('管理员上传校验、查看错误、确认重复序列号警告后整批发布新资产', async ({ page, baseURL }) => {
   await page.request.post('/api/auth/login', { headers: { Origin: new URL(baseURL!).origin },
     data: { username: 'browser-admin', password: 'Browser changed passphrase 84!' } });
-  await page.goto('/assets/import');
+  await page.goto('/assets/import?format_version=1');
   await expect(page.getByRole('link', { name: '下载 Excel 模板与参考资料' })).toBeVisible();
   await page.getByLabel('选择 Excel 文件').setInputFiles({ name: 'invalid.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('invalid workbook') });
   await page.getByRole('button', { name: '上传并校验' }).click();

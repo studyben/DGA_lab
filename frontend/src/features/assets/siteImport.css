@@ -8,3 +8,7 @@
 @media(max-width:900px){.site-import-grid{grid-template-columns:minmax(0,1fr)}}
 
 .import-mode-picker a.button{background:white;color:#a64a10;border-color:#e2cfbe}.import-mode-picker a[aria-current="page"]{background:#f57917;color:white}
+
+.site-import{display:grid;gap:20px;min-width:0}.site-import .dashboard-table-panel{min-width:0;scroll-margin-top:20px}.site-import td{max-width:420px;overflow-wrap:anywhere;vertical-align:top}.site-import .dashboard-table-scroll{overflow:auto;max-height:560px}.site-import details p{white-space:pre-wrap;overflow-wrap:anywhere}.site-import progress{max-width:300px;width:100%}.import-mode-picker{flex-wrap:wrap}.site-import h3{overflow-wrap:anywhere}
+
+.import-sources td{vertical-align:top;overflow-wrap:anywhere}.import-sources .dashboard-table-scroll{max-height:560px;overflow:auto}.import-sources .site-import-note{min-width:240px}

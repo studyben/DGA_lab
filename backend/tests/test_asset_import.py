@@ -289,7 +289,7 @@ def test_http_upload_preview_publish_requires_csrf_and_provides_reference_templa
         assert client.get('/api/assets/imports').status_code == 401
         login = client.post('/api/auth/login', headers={'Origin': 'http://testserver'}, json={'username': 'reception-admin', 'password': CHANGED_PASSWORD}).json()
         headers = {'Origin': 'http://testserver', 'X-CSRF-Token': login['csrf_token'], 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
-        template = client.get('/api/assets/imports/template')
+        template = client.get('/api/assets/imports/template?format_version=1&mode=ASSETS')
         assert template.status_code == 200
         from openpyxl import load_workbook
         book = load_workbook(BytesIO(template.content))

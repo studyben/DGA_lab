@@ -210,6 +210,16 @@ docker compose run --rm migrate alembic upgrade head
 
 响应中断时点击“查询未确认操作”，恢复原批次；不要换操作键或重复上传。原文件下载要求assets.import；只有assets.read的用户可查看正式来源说明，不能下载私有导入文件。旧v1入口、旧参考表和未完成批次保持旧规则。新增迁移0031承接0030，保护既有数据；完整取消/租约恢复另由#60处理。本功能不新增设备/物料v2或实验室导入。
 
+### 设备与物料批量导入（Issue #50）
+
+资产管理的批量导入页默认使用设备/物料v2；可切换“仅现场信息（v2）”或显式“旧版设备（v1）”。批次历史与来源链接以已保存的格式/模式为准。四表分别核对客户、现场、物料与设备；`MATERIAL:完整物料号`引用已有物料，`NEW:记录键`引用对应表的同批新增记录。物料号本身可带`NEW:`前缀或斜杠，应完整保留。设备仅新增，以同批父键组成初始树，只引用现场编号/名称，不能通过设备行改现场属性或客户归属。
+
+逐行查看原值、采用值、来源备注、具体问题与候选，填写核对原因后保存；每次修订或事实刷新都清除旧确认。名称与编号冲突需修正或明确确认采用的现场UUID；重复序列号需核实后逐项确认另一台物理设备，不自动合并/跳过。重复文件优先显示原已发布批次。上传进度来自实际发送字节，校验与发布另有状态。设备详情展示设备与物料来源；assets.read可读来源，批次及原文件仍需assets.import。
+
+响应丢失、会话过期或服务错误后，保留原操作并以同一账号、同一模式“查询未确认操作”，不要直接重复建批次。服务器重新核对当前授权、原件大小/SHA、目录与警告后整体提交；资料变化返回REFRESHED及新修订，不写正式资料。后来发布不改变旧操作的REFRESHED结论，成功重试返回同一组编号。
+
+批准上限为客户/现场/物料/设备各500条、总计2000行、来源备注2000字符、XLSX10MiB、展开50MiB/200ZIP成员/150000单元格；须至少有现场或设备业务行。超限、公式、宏、外链及损坏文件不截断、不部分发布。已在隔离PostgreSQL证明实际2000行发布、100页、全部物料/设备/来源与编号重试；本地1.883秒发布观测不是生产SLA。部署先备份并执行0031→0032迁移，保留任何设备v2批次后只可向前恢复。取消/租约/孤立文件治理属#60，综合负载属#61；本地测试不替代配置的MinIO/Azurite或真实Azure/Okta验收。完整证据见`docs/work-units/issue-50-s3.md`。
+
 ## English
 
 A Chinese-language portal for field asset and oil-sample management. Engineering foundations are specified in [Issue #2](https://github.com/studyben/DGA_lab/issues/2); the complete MVP specification is in [Issue #1](https://github.com/studyben/DGA_lab/issues/1).
@@ -416,3 +426,21 @@ Choose **Asset management → Batch import → Sites only (v2)** and download th
 Review row issues, save corrections with a reason, acknowledge each warning, then publish the entire customer/site batch. Limits: 500 rows per business sheet, 10MiB XLSX, 50MiB expanded/200 ZIP entries/150000 cells, 2000-character source notes. Original files, revisions and individual provenance remain available; zero-equipment sites keep declared capacity. Both system administrators and lab managers use assets.import under the existing role policy.
 
 After an interrupted response, use **Query unconfirmed operation** to recover the original batch; retain the original intent instead of uploading again. Source-file access requires assets.import; assets.read permits formal provenance metadata only. Legacy v1 semantics remain unchanged. Migration0031 follows0030; no old data is rewritten. Full cancellation/lease recovery belongs to#60; equipment/material-v2 and laboratory import are outside this slice. Local fixtures do not constitute real Azure or Okta acceptance.
+
+
+### Equipment/material v2 import (Issue #50)
+
+The asset import API and default template now support `format_version=2&mode=ASSETS`. Each batch explicitly creates or references customers, sites and materials, and creates a new initial equipment tree. Equipment rows refer to a site UUID/name or same-batch site key; they cannot change site attributes. References do not update existing master records. Serial numbers remain non-unique: review existing/same-batch candidates and acknowledge each current warning to confirm a separate physical device. The batch-import page defaults to equipment/material v2. Select **Sites only (v2)** for customer/site preparation or **Legacy equipment (v1)** for the preserved old contract. Batch history/source links load their stored format/mode, including older batch-only links.
+
+Publication rechecks the current grant, retained original file length/SHA, current catalogs, candidate context and exact warning IDs. A changed preview produces `REFRESHED` with a new validation revision and no business writes. Review it and publish with a new operation key. An old key continues to return its original `REFRESHED` result even after a later publication. Source creation, customer/site/material/equipment/installation writes, audit and the durable operation result commit together. An interrupted response is an unknown outcome: query the actor-scoped `/api/assets/imports/operations/{key}` and retry the exact intent; do not delete the original or assume a missing response means rollback. Published operation results contain all typed `targets`, including UUID identities and exact text material `target_key` values, independently of preview paging.
+
+Formal equipment and material provenance requires `assets.read`: `/api/assets/equipment/{asset_id}/sources`, `/api/assets/materials/detail?material_number=...` and `/api/assets/materials/sources?material_number=...`. Material identities use query parameters so slashes retain their meaning. These readers expose reviewed/original row evidence, reasons and confirmations, not object-store keys or access to private batch/original-file endpoints; those continue to require `assets.import`.
+
+Run the additive Alembic `0032_device_material_import` migration after0031 before starting this backend. It extends source provenance with checked UUID/text target alternatives, a material foreign key and retained warning IDs; existing identities, notes, batches and laboratory snapshots are preserved. A downgrade to0031 is permitted only without any retained ASSETS-v2 batch or equipment/material source. STAGED, FAILED, VALIDATED and PUBLISHED batches all require forward recovery rather than destructive downgrade. Downgrade tests use disposable schemas only. Cancellation/lease recovery remains#60; broader load testing remains#61. Native PostgreSQL and memory-file tests do not replace configured MinIO/Azurite contracts or real Azure/Okta acceptance.
+
+
+For v2, download the selected mode template and review the four sheet tables. `MATERIAL:exact-number` refers to an existing material; `NEW:record_key` refers to a new same-batch material or site in its respective reference field. Material numbers may themselves start `NEW:` or contain slashes: keep the whole number after `MATERIAL:`. Parent references use same-batch equipment record keys, never a serial-number match. Existing candidates show their physical context; choosing a candidate does not acknowledge any warning. Correct a UUID/name conflict or explicitly confirm the adopted site UUID. Repeated-file results list published batches first; confirm another physical device only after checking those results and serial candidates.
+
+Save each correction with a reason, then review the new issues and acknowledge each warning. A revision or refreshed preview clears earlier confirmations. Upload progress reports actual bytes sent; validation and publication have their own states. After an interrupted response, reload and select **Query unconfirmed operation** using the same account/mode; pending operation keys survive connection/session errors. A later published batch does not change an earlier operation's REFRESHED outcome. Equipment detail shows both its own and its material's provenance; original workbook downloads remain private to import-authorized users.
+
+Approved limits are500 customers +500 sites +500 materials +500 equipment roots/records (2000 total),500 per sheet,2000-character source notes,10MiB XLSX,50MiB expanded,200 ZIP members and150000 cells. A site or equipment business row is required. Unsafe formulas/macros/external links, malformed/duplicate ZIP entries and over-limit files are rejected without truncation or partial publication. Isolated native evidence published exactly2000 rows and checked all100 preview pages,500 materials,500 equipment details, all source records and identical retry IDs; observed publication1.883s in that test is evidence, not a production SLA. Full local evidence and external storage acceptance boundaries are in `docs/work-units/issue-50-s3.md`.

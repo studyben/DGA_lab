@@ -15,3 +15,11 @@ export function newImportIntentKey():string {
   const hex=bytesToHex(bytes);
   return [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
 }
+
+
+/** Stored batch metadata selects the route, including historical batch-only links. */
+export function importBatchHref(batch:{id:string;format_version?:number;mode?:string}):string {
+  const query=new URLSearchParams(batch.format_version===2?{mode:batch.mode??'ASSETS'}:{format_version:'1'});
+  query.set('batch',batch.id);
+  return '/assets/import?'+query.toString();
+}

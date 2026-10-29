@@ -340,7 +340,7 @@ def test_real_0030_upgrade_retains_v1_source_and_reference_sheet_semantics(datab
     assert result['state']=='STAGED'
     assert imports.source_file(actor,batch_id)['content']==content
     assert AssetDirectory(engine).dashboard(actor,product_line='ESS')['site_count']==0
-    v1=load_workbook(BytesIO(imports.template(actor)),read_only=True)
+    v1=load_workbook(BytesIO(imports.template(actor,format_version=1,mode='ASSETS')),read_only=True)
     assert 'Assets' in v1.sheetnames and 'Format' not in v1.sheetnames
     engine.dispose()
 

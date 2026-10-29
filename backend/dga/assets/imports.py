@@ -7,6 +7,7 @@ from enum import StrEnum
 from uuid import uuid4
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from dga.shared.auth.public import AuditTrail, IdentityService, require_permission
 from dga.shared.files import FileStore
@@ -29,14 +30,14 @@ class AssetImports:
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._audit = AuditTrail(clock=self._clock)
         self._identity = IdentityService(engine)
-        from .site_imports import SiteImports
-        self._sites = SiteImports(engine, files, self._clock)
+        from .v2_imports import V2Imports
+        self._v2 = V2Imports(engine, files, self._clock)
 
     def submit(self, actor, *, filename, content, format_version=1, mode='ASSETS', idempotency_key=None):
         if type(format_version) is not int:
             fail('invalid_import_format',422)
-        if format_version == 2 and mode == 'SITES':
-            return self._sites.submit(actor, filename=filename, content=content, idempotency_key=idempotency_key)
+        if format_version == 2 and mode in ('SITES','ASSETS'):
+            return self._v2.submit(actor, filename=filename, content=content, idempotency_key=idempotency_key,mode=mode)
         if format_version != 1 or mode != 'ASSETS':
             fail('invalid_import_format', 422)
         require_permission(actor, 'assets.import')
@@ -76,29 +77,32 @@ class AssetImports:
             raise
         return self.get(actor, batch_id)
 
-    def get(self, actor, batch_id, *, page=1):
+    def get(self, actor, batch_id, *, page=1, duplicate_page=1):
         require_permission(actor, 'assets.import')
         with self._engine.connect() as c:
+            self._identity.authorize_current(c,actor,'assets.import')
             row = c.execute(text('SELECT * FROM asset_import_batches WHERE id=:id'), {'id': batch_id}).mappings().first()
             if row is None:
                 fail('import_not_found', 404)
             # Version1 batches predate format metadata. This normalization belongs
             # to the import owner and preserves the original public v1 shape.
             version = row.get('format_version', 1)
+            if (version,row.get('mode','ASSETS')) not in ((1,'ASSETS'),(2,'ASSETS'),(2,'SITES')):
+                fail('unsupported_import_format',503)
             if version == 1:
                 return {k:v for k,v in row.items() if k not in ('source_rows','object_key','format_version','mode','working_rows','catalog_digest')}
         if version != 2:
             fail('unsupported_import_format',503)
-        return self._sites.get(actor,batch_id,page)
+        return self._v2.get(actor,batch_id,page,duplicate_page)
 
-    def template(self, actor, *, format_version=1, mode='ASSETS'):
+    def template(self, actor, *, format_version=2, mode='ASSETS'):
         if type(format_version) is not int:
             fail('invalid_import_format',422)
-        if format_version == 2 and mode == 'SITES':
+        if format_version == 2 and mode in ('SITES','ASSETS'):
             with self._engine.begin() as connection:
-                self._sites.authorize(connection, actor)
-            from .site_import_workbook import template as site_template
-            return site_template()
+                self._v2.authorize(connection, actor)
+            from .v2_import_workbook import template as site_template
+            return site_template(mode)
         if format_version != 1 or mode != 'ASSETS':
             fail('invalid_import_format',422)
         require_permission(actor, 'assets.import')
@@ -114,6 +118,7 @@ class AssetImports:
         if not isinstance(query, str) or len(query) > 200 or type(page) is not int or not 1 <= page <= 100000:
             fail('invalid_import_search', 422)
         with self._engine.connect().execution_options(isolation_level='REPEATABLE READ') as c:
+            self._identity.authorize_current(c,actor,'assets.import')
             where = "FROM asset_import_batches WHERE position(lower(:q) in lower(filename || ' ' || id::text))>0"
             params = dict(q=query.strip(), offset=(page-1)*20)
             count = c.execute(text('SELECT count(*) '+where), params).scalar_one()
@@ -121,26 +126,37 @@ class AssetImports:
             return {'batches': [dict(b) for b in batches], 'total': count, 'page': page}
 
     def validate_next(self):
-        """Trusted worker seam. Row claim and result commit together; crash releases claim."""
-        with self._engine.begin() as c:
-            batch = c.execute(text("SELECT * FROM asset_import_batches WHERE state='STAGED' ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1")).mappings().first()
-            if batch is None:
-                return False
-            if batch.get('format_version',1) == 2:
-                self._sites.validate_batch(c,batch)
+        """Trusted preview worker: domain lock before row claim, one consistent snapshot."""
+        try:
+            with self._engine.connect().execution_options(isolation_level='REPEATABLE READ') as c, c.begin():
+                c.execute(text('SELECT pg_advisory_xact_lock(110011)'))
+                batch=c.execute(text("SELECT * FROM asset_import_batches WHERE state='STAGED' ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1")).mappings().first()
+                if batch is None: return False
+                # Unknown contracts must release the claim unchanged for a compatible worker.
+                if (batch.get('format_version',1),batch.get('mode','ASSETS')) not in ((1,'ASSETS'),(2,'ASSETS'),(2,'SITES')):
+                    fail('unsupported_import_format',503)
+                try:
+                    with c.begin_nested():
+                        if batch.get('format_version',1)==2:
+                            self._v2.validate_batch(c,batch)
+                            return True
+                        rows,issues,counts=validate(c,batch['source_rows'],self._clock())
+                    state,failure='VALIDATED',None
+                except Exception as error:
+                    if isinstance(error,SQLAlchemyError) and getattr(error.orig,'sqlstate',None) in ('40001','40P01'): raise
+                    rows=[]; state,failure='FAILED','validation_unavailable'
+                    if batch.get('format_version',1)==2:
+                        from .v2_import_workbook import problem
+                        issues=[problem('校验服务暂不可用；原文件已保留，请恢复服务后重试上传。',field='validation',code=failure)]
+                    else: issues=[issue(0,'validation','校验服务暂不可用；请联系管理员恢复服务后重新上传文件。')]
+                    counts=summary(rows,issues)
+                    logger.error('Import validation failed for batch %s',batch['id'])
+                c.execute(text("UPDATE asset_import_batches SET state=:state,failure_code=:failure,rows=CAST(:rows AS jsonb),issues=CAST(:issues AS jsonb),summary=CAST(:summary AS jsonb),validation_revision=1 WHERE id=:id"),
+                    dict(state=state,failure=failure,rows=json.dumps(rows),issues=json.dumps(issues),summary=json.dumps(counts),id=batch['id']))
                 return True
-            state, failure = 'VALIDATED', None
-            try:
-                with c.begin_nested():
-                    rows, issues, counts = validate(c, batch['source_rows'], self._clock())
-            except Exception:
-                rows = []
-                issues = [issue(0, 'validation', '校验服务暂不可用；请联系管理员恢复服务后重新上传文件。')]
-                counts = summary(rows, issues)
-                state, failure = 'FAILED', 'validation_unavailable'
-                logger.error('Import validation failed for batch %s', batch['id'])
-            c.execute(text("UPDATE asset_import_batches SET state=:state,failure_code=:failure,rows=CAST(:rows AS jsonb),issues=CAST(:issues AS jsonb),summary=CAST(:summary AS jsonb),validation_revision=1 WHERE id=:id"),
-                      {'rows': json.dumps(rows), 'issues': json.dumps(issues), 'summary': json.dumps(counts), 'id': batch['id'], 'state': state, 'failure': failure})
+        except SQLAlchemyError as error:
+            if getattr(error.orig,'sqlstate',None) not in ('40001','40P01'): raise
+            logger.info('Import validation contention; rolled back for next worker pass')
             return True
 
     def publish(self, actor, batch_id, *, validation_revision, acknowledge_warnings=False, idempotency_key=None, acknowledged_warning_ids=None):
@@ -150,10 +166,10 @@ class AssetImports:
             if row is None:
                 fail('import_not_found',404)
             version = row.get('format_version',1)
-        if version not in (1,2):
+        if (version,row.get('mode','ASSETS')) not in ((1,'ASSETS'),(2,'ASSETS'),(2,'SITES')):
             fail('unsupported_import_format',503)
         if version == 2:
-            return self._sites.publish(actor,batch_id,validation_revision=validation_revision,idempotency_key=idempotency_key,acknowledged_warning_ids=acknowledged_warning_ids)
+            return self._v2.publish(actor,batch_id,validation_revision=validation_revision,idempotency_key=idempotency_key,acknowledged_warning_ids=acknowledged_warning_ids)
         """Create the entire new-asset batch atomically, never update existing assets."""
         require_permission(actor, 'assets.import')
         with self._engine.begin() as c:
@@ -211,13 +227,13 @@ class AssetImports:
         self._audit.append(c, actor, ImportAction.PUBLISH, entity_id=batch_id)
 
     def operation(self, actor, key):
-        return self._sites.operation(actor,key)
+        return self._v2.operation(actor,key)
 
     def source_file(self, actor, batch_id):
-        return self._sites.source(actor,batch_id)
+        return self._v2.source(actor,batch_id)
 
     def revise(self, actor, batch_id, *, expected_revision, changes, reason, idempotency_key):
-        return self._sites.revise(actor,batch_id,expected_revision=expected_revision,changes=changes,reason=reason,idempotency_key=idempotency_key)
+        return self._v2.revise(actor,batch_id,expected_revision=expected_revision,changes=changes,reason=reason,idempotency_key=idempotency_key)
 
     def revision_history(self, actor, batch_id, *, page=1):
-        return self._sites.revision_history(actor,batch_id,page)
+        return self._v2.revision_history(actor,batch_id,page)

@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 from sqlalchemy import text
-from .site_import_workbook import problem, COLUMNS
+from .v2_import_workbook import problem, COLUMNS
 
 
 def digest(value):
@@ -18,8 +18,8 @@ def catalog(c):
     lines=[dict(r) for r in c.execute(text('SELECT * FROM site_product_lines ORDER BY site_id,product_line')).mappings()]
     return customers,sites,lines
 
-def validate(c, source):
-    customers,sites,lines=catalog(c)
+def validate(c, source, *, snapshot=None):
+    customers,sites,lines=catalog(c) if snapshot is None else snapshot
     fingerprint=digest([customers,sites,lines])
     cm={str(r['id']):r for r in customers}; sm={str(r['id']):r for r in sites}
     rows=[]; issues=[]; keys={}; seen=set()
