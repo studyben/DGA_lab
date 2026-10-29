@@ -1,17 +1,7 @@
-# Issue #48 Gateflow state — PR阶段
+# Issue48 state after authorized main merge
 
-- Workunit:studyben/DGA_lab#48，parent47；branch codex/issue-48-site-export。
-- PR:https://github.com/studyben/DGA_lab/pull/62，OPEN/draft，base main68e4d278e3e2a6b3e976036e3581b3ff2a7a773a，Closes#48原生关联核实。
-- User:2026-10-29选择跳过人工验收并明确允许继续PR阶段，暂不合并。旧禁止push记录为历史边界，当前push/draftPR/PRreview已授权；merge/markready/后续工单仍禁止，Issuecloseoutcomment待具体授权。
-- Current gate / next entry point:push（acceptedPRreviewcommit后的最终同步），然后draft-PR-pass条件核实与finalcloseout。
-- Plan9c4e8c5；S1 1a872d1；S2 14b1952；S3 063a556；aggregate ddf1b98；本地交付63314c0；PR授权记录0d6b65e。
-- PRreview:docs/reviews/pr-62-review-20261029-074130.md，pass/no-fix re-reviewpass，无新finding。最初PRhead0d6b65ec6bfa69115292402fbd2b1d2bf1b47cca，本地/远程相等已核实。
-- Sourcevalidation:303backendpassed/40既有storage环境skip/2既有warnings；10browserpass/buildpass，真实download1pass。原改动和验收数据保留。
-- Push:origin配置github.com/studyben/DGA_lab与sungrow-usa.ghe.com/sungrow-usa-internal/dga-lms两个pushURL，初次push两边成功。
-- CI:最初push/PR工作流running，最终reviewcommitpush后必须核实最新head，不能引用旧head的green。无绕过检查。
-- Remainingriskowners:source_note#49/#50/#61；原生Excel上限明确failure；CI当前PRgate；人工验收用户选择跳过；Issuecommentfinalgate待授权。
+PR#62 https://github.com/studyben/DGA_lab/pull/62 已于2026-10-29合入GitHubmain，mergecommit2d7318eadc45dd0c0b2ff07a6e56b4958b311ccc；合并前head8f15cf7两CI均SUCCESS（343backend/storage+45browser）。Issue48已自动CLOSED，closedByPR62核实。
 
-## CI follow-up
-- 42e018a两CI：backend343passed，browser44passed/1failed；重复no-store字符串断言PR-R1 accepted→已修复。
-- Diagnosis:issue-48-ci-cache-diagnosis.md；fix re-review:docs/reviews/pr-62-review-20261029-075350.md pass。本地single/duplicate/no-store缺失negativecontrol及10browser复验。
-- Current gate:push（accepted PRreviewfix最终同步），随后核实新head全量CI；不能把42e018a失败状态记为成功。
+同步发现Sungrowmaincab4eea包含GitHub没有的既有#18管理/OIDC/站点维护。用户已明确确认保留双方已有功能统一版本。当前隔离整合在codex/issue-48-dual-main-sync，计划/实现/审查见issue-48-dual-main-*。不得覆盖企业功能或强推；最新整合CI成功后按授权同步两边main。真实Okta验收仍属OPEN的Issue18，本轮不宣称已完成、不开始后续工单。
+
+原#48worktree未提交收尾文件、原root修改及18148验收data保持；本轮测试位于全新18463cluster。合并同步最终状态以后续dual-main-summary为准。

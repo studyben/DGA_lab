@@ -1,0 +1,7 @@
+# Explicit test-only overlay. Never use for deployment or real Okta acceptance.
+services:
+  api:
+    command: ["uvicorn", "tests.oidc_browser_app:app", "--host", "0.0.0.0", "--port", "8000"]
+  browser-test:
+    environment:
+      OIDC_PROTOCOL_FIXTURE: "1"

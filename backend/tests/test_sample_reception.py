@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from tests.laboratory_seed import restore_placeholder_methods
+from tests.identity_seed import seed_legacy_user
 from uuid import UUID
 
 from sqlalchemy import create_engine, text
@@ -73,7 +74,7 @@ def reception_context(database_url):
             },
         )
     identity = IdentityService(engine)
-    identity.bootstrap_admin("reception-admin", "Reception Admin", INITIAL_PASSWORD)
+    seed_legacy_user(database_url, "reception-admin", "Reception Admin", INITIAL_PASSWORD, ['system_admin'])
     first = identity.login("reception-admin", INITIAL_PASSWORD)
     session = identity.change_password(first.token, INITIAL_PASSWORD, CHANGED_PASSWORD)
     return engine, identity, session.actor

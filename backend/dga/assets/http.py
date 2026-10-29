@@ -9,6 +9,7 @@ from starlette.responses import StreamingResponse
 from starlette.types import Receive, Scope, Send
 
 from .public import AssetDirectory, AssetLifecycle, DashboardQuery, EquipmentQuery, SiteExportFile
+from .site_basics import SiteBasics, SiteBasicsInput
 
 
 class _SiteDownload(StreamingResponse):
@@ -66,8 +67,12 @@ class CorrectionInput(BaseModel):
     reason: str = Field(min_length=1, max_length=1000)
 
 
-def assets_router(directory: AssetDirectory, actor_dependency: Callable, lifecycle: AssetLifecycle, mutation_actor: Callable):
+def assets_router(directory: AssetDirectory, actor_dependency: Callable, lifecycle: AssetLifecycle, mutation_actor: Callable, site_basics: SiteBasics):
     router = APIRouter(prefix='/api/assets')
+
+    @router.put('/sites/{site_id}/basics')
+    def edit_site(site_id: UUID, body: SiteBasicsInput, actor=Depends(mutation_actor)):
+        return site_basics.update(actor, site_id, **body.model_dump())
 
     @router.get('/catalog')
     def catalog(query: str = Query(default='', max_length=200), repair_only: bool = False,

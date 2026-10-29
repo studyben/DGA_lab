@@ -171,6 +171,7 @@ def test_concurrent_container_commands_only_apply_once(context):
     assert len(ops.sample_operations(actor,sample.barcode_value)['history'])==1
 
 
+@pytest.mark.parametrize('database_url', ['0024_alarm_observation'], indirect=True)
 def test_downgrade_refuses_to_erase_retained_operations(context):
     from alembic import command
     from alembic.config import Config

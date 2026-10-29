@@ -40,7 +40,8 @@ def test_authenticated_download_is_a_complete_unfiltered_xlsx(export_client):
 def test_anonymous_and_read_only_permission_contract(export_context, database_url):
     engine, identity, admin, _ = export_context
     from tests.test_sample_reception import INITIAL_PASSWORD
-    identity.provision_user(admin, 'export-reader', 'Reader', INITIAL_PASSWORD, ['field_engineer'])
+    from tests.identity_seed import seed_legacy_user
+    seed_legacy_user(database_url, 'export-reader', 'Reader', INITIAL_PASSWORD, ['field_engineer'])
     first = identity.login('export-reader', INITIAL_PASSWORD)
     identity.change_password(first.token, INITIAL_PASSWORD, CHANGED_PASSWORD)
     with TestClient(create_app(Settings(database_url=database_url, cookie_secure=False))) as client:
@@ -54,11 +55,15 @@ def test_anonymous_and_read_only_permission_contract(export_context, database_ur
         with engine.begin() as connection:
             connection.execute(text("INSERT INTO roles(id,role_code,role_name) VALUES (gen_random_uuid(),'export_denied','No asset access')"))
         try:
-            identity.set_roles(admin, first.actor.user_id, ['export_denied'])
+            # A retained legacy role is fixture data, not new-policy provisioning.
+            with engine.begin() as connection:
+                connection.execute(text('DELETE FROM user_roles WHERE user_id=:id'), {'id': first.actor.user_id})
+                connection.execute(text("INSERT INTO user_roles(user_id,role_id) SELECT :id,id FROM roles WHERE role_code='export_denied'"), {'id': first.actor.user_id})
             assert client.get('/api/assets/sites/export').status_code == 403
         finally:
-            identity.set_roles(admin, first.actor.user_id, ['field_engineer'])
             with engine.begin() as connection:
+                connection.execute(text('DELETE FROM user_roles WHERE user_id=:id'), {'id': first.actor.user_id})
+                connection.execute(text("INSERT INTO user_roles(user_id,role_id) SELECT :id,id FROM roles WHERE role_code='field_engineer'"), {'id': first.actor.user_id})
                 connection.execute(text("DELETE FROM roles WHERE role_code='export_denied'"))
 
 

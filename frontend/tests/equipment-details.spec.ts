@@ -18,9 +18,9 @@ test('储能系统逐级进入电池柜和 PCS 子设备，按类型展示属性
   await expect(page.getByRole('navigation', { name: '设备路径' })).toContainText('PCS-01');
   await page.goto('/assets/equipment/40000000-0000-0000-0000-000000000002');
   await expect(page.getByRole('table', { name: '油样检测历史' })).toContainText('DGA-20260802-000001');
-  await expect(page.getByRole('link', { name: 'DGA-20260802-000001', exact: true })).toHaveCount(0);
-  const denied = await page.request.get('/api/laboratory/workbench/DGA-20260802-000001');
-  expect(denied.status()).toBe(403);
+  await expect(page.getByRole('link', { name: 'DGA-20260802-000001', exact: true })).toHaveCount(1);
+  const readable = await page.request.get('/api/laboratory/workbench/DGA-20260802-000001');
+  expect(readable.status()).toBe(200);
 });
 
 test('设备检测历史按条码跳转工作台', async ({ page, baseURL }) => {
