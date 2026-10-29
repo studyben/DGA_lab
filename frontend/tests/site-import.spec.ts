@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 
+// CI serves the production portal on ordinary http://frontend, where the
+// secure-context-only APIs are absent. Model that browser boundary locally too.
+test.beforeEach(async ({page})=>{
+  await page.addInitScript(()=>{
+    Object.defineProperty(crypto,'subtle',{value:undefined});
+    Object.defineProperty(crypto,'randomUUID',{value:undefined});
+  });
+});
+
 test('仅现场导入：核对同名差异、来源备注、发布后零设备现场与原文件历史', async ({ page, baseURL }) => {
   const origin=new URL(baseURL!).origin;
   const login=await (await page.request.post('/api/auth/login', {headers:{Origin:origin},data:{username:'browser-admin',password:'Browser changed passphrase 84!'}})).json();

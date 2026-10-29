@@ -1,3 +1,4 @@
+import {importPayloadDigest,newImportIntentKey} from './siteImportIntent';
 import {importFieldLabels as labels} from './siteImportPresentation';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../Auth';
@@ -68,10 +69,10 @@ export function SiteImportPanel() {
       if(kind==='upload'&&file!.size>10*1024*1024)throw new Error('现场文件不得超过10 MiB，请分批。');
       const payload=kind==='upload'?undefined:kind==='revise'?{expected_revision:batch!.validation_revision,changes:[{sheet:editing!.sheet,row:editing!.row,values:{...draft,reason:reason.trim()}}],reason:reason.trim()}:{validation_revision:batch!.validation_revision,acknowledged_warning_ids:[...ack].sort()};
       const bytes=kind==='upload'?await file!.arrayBuffer():new TextEncoder().encode(JSON.stringify(payload));
-      const signature=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(v=>v.toString(16).padStart(2,'0')).join('')+(kind==='upload'?`:${file!.name}`:'');
+      const signature=importPayloadDigest(bytes)+(kind==='upload'?`:${file!.name}`:'');
       let pending=readPending();
       if(pending){if(await recover())return;if(pending.kind!==kind||pending.digest!==signature||pending.batch!==(kind==='upload'?undefined:batch!.id))throw new Error('仍有未确认操作。请先查询结果，或恢复原文件／原核对输入后重试。');}
-      else {pending={key:crypto.randomUUID(),kind,digest:signature,batch:kind==='upload'?undefined:batch!.id};sessionStorage.setItem(storageKey,JSON.stringify(pending));}
+      else {pending={key:newImportIntentKey(),kind,digest:signature,batch:kind==='upload'?undefined:batch!.id};sessionStorage.setItem(storageKey,JSON.stringify(pending));}
       const response=await fetch(kind==='upload'?`${root}?format_version=2&mode=SITES&filename=${encodeURIComponent(file!.name)}`:`${root}/${batch!.id}/${kind==='revise'?'revisions':'publish'}`,{
         method:'POST',credentials:'same-origin',signal:AbortSignal.timeout(45000),headers:{'X-CSRF-Token':session.csrf_token,'Content-Type':kind==='upload'?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/json','Idempotency-Key':pending.key},body:kind==='upload'?file:JSON.stringify({...payload,idempotency_key:pending.key})});
       if(!response.ok){if(response.status<500&&![401,403].includes(response.status))sessionStorage.removeItem(storageKey);throw new Error(await errorMessage(response));}
