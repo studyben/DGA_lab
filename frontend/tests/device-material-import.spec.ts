@@ -460,3 +460,74 @@ test('另一经理发布后明确拒绝修订仍保留输入并允许新批次�
     expect(original.rows.find((row:{sheet:string})=>row.sheet==='Assets').values.source_note).not.toBe(desired);
   }finally{await other.dispose();}
 });
+
+
+for(const field of ['来源备注','本次核对原因'] as const)test(`实际输入合法非BMP${field}边界完整保存并可公开读取`,async({page,baseURL})=>{
+  test.setTimeout(60000);
+  const batch=await preparedBatch(page,baseURL!,'editor-unicode-boundary-'+crypto.randomUUID()+'.xlsx');
+  await page.goto('/assets/import?batch='+batch.id);
+  await page.getByRole('button',{name:'核对 Assets 第2行'}).click();
+  const note=field==='来源备注'?'🙂'.repeat(2000):'Unicode editor note';
+  const reason=field==='本次核对原因'?'🧪'.repeat(1000):'Unicode editor boundary review';
+  const control=page.getByLabel(field,{exact:true});await control.fill('');
+  await control.pressSequentially(field==='来源备注'?note:reason);
+  await expect(control).toHaveValue(field==='来源备注'?note:reason);
+  await page.getByLabel(field==='来源备注'?'本次核对原因':'来源备注',{exact:true}).fill(field==='来源备注'?reason:note);
+  const response=page.waitForResponse(r=>r.url().endsWith(`/imports/${batch.id}/revisions`)&&r.request().method()==='POST');
+  await page.getByRole('button',{name:'保存核对并重新校验'}).click();
+  expect((await response).status()).toBe(200);
+  await expect(page.getByRole('status').filter({hasText:'核对已保存'})).toBeVisible();
+  const preview=await(await page.request.get('/api/assets/imports/'+batch.id)).json();
+  expect(preview.rows.find((row:{sheet:string})=>row.sheet==='Assets').values.source_note).toBe(note);
+  const history=await(await page.request.get(`/api/assets/imports/${batch.id}/revisions`)).json();
+  expect(history.changes.find((change:{revision:number})=>change.revision===preview.validation_revision).reason).toBe(reason);
+});
+
+
+for(const [field,limit] of [['来源备注',2000],['本次核对原因',1000],['设备名称',2000]] as const)test(`实际输入${field}超过码点边界保留原文并阻止请求`,async({page,baseURL})=>{
+  test.setTimeout(60000);
+  const batch=await preparedBatch(page,baseURL!,'editor-unicode-excess-'+crypto.randomUUID()+'.xlsx');
+  await page.goto('/assets/import?batch='+batch.id);
+  await page.getByRole('button',{name:'核对 Assets 第2行'}).click();
+  await page.getByLabel('本次核对原因',{exact:true}).fill('Review an excessive editor value');
+  let posts=0;page.on('request',request=>{if(request.method()==='POST'&&request.url().endsWith(`/imports/${batch.id}/revisions`))posts++;});
+  const excessive='🙂'.repeat(limit+1),control=page.getByLabel(field,{exact:true});
+  await control.fill('');await control.pressSequentially(excessive);
+  await expect(control).toHaveValue(excessive);
+  await expect(page.getByRole('region',{name:'核对编辑'}).getByRole('alert')).toContainText(`${field}最多${limit}个字符，当前${limit+1}个；输入已保留，请缩短后保存。`);
+  await expect(control).toHaveAttribute('aria-invalid','true');
+  await expect(page.getByRole('button',{name:'保存核对并重新校验'})).toBeDisabled();
+  expect(posts).toBe(0);
+  const preview=await(await page.request.get('/api/assets/imports/'+batch.id)).json();
+  expect(preview.validation_revision).toBe(batch.validation_revision);
+});
+
+
+test('共享SITES编辑器保留超限Unicode输入并在缩短到合法边界后保存',async({page,baseURL})=>{
+  test.setTimeout(60000);
+  const origin=new URL(baseURL!).origin;
+  const login=await(await page.request.post('/api/auth/login',{headers:{Origin:origin},data:{username:'browser-admin',password:'Browser changed passphrase 84!'}})).json();
+  const uploaded=await page.request.post('/api/assets/imports?format_version=2&mode=SITES&filename=sites-editor-unicode-'+crypto.randomUUID()+'.xlsx',{headers:{Origin:origin,'X-CSRF-Token':login.csrf_token,'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Idempotency-Key':crypto.randomUUID()},data:await readFile(path.join(process.cwd(),'tests/fixtures/site-import.xlsx'))});
+  expect(uploaded.status()).toBe(201);const batch=await uploaded.json();
+  await expect.poll(async()=>(await(await page.request.get('/api/assets/imports/'+batch.id)).json()).state).toBe('VALIDATED');
+  await page.goto('/assets/import?batch='+batch.id);
+  await page.getByRole('button',{name:'核对 Sites 第2行'}).click();
+  let posts=0;page.on('request',request=>{if(request.method()==='POST'&&request.url().endsWith(`/imports/${batch.id}/revisions`))posts++;});
+  const note=page.getByLabel('来源备注',{exact:true}),reason=page.getByLabel('本次核对原因',{exact:true}),save=page.getByRole('button',{name:'保存核对并重新校验'});
+  await note.fill('');await note.pressSequentially('🙂'.repeat(2001));
+  await expect(note).toHaveValue('🙂'.repeat(2001));
+  await expect(page.getByRole('region',{name:'核对编辑'}).getByRole('alert')).toContainText('来源备注最多2000个字符，当前2001个');
+  await expect(save).toBeDisabled();expect(posts).toBe(0);
+  await note.press('Backspace');await expect(note).toHaveValue('🙂'.repeat(2000));
+  await reason.pressSequentially('🧪'.repeat(1001));
+  await expect(reason).toHaveValue('🧪'.repeat(1001));
+  await expect(page.getByRole('region',{name:'核对编辑'}).getByRole('alert')).toContainText('本次核对原因最多1000个字符，当前1001个');
+  await expect(save).toBeDisabled();expect(posts).toBe(0);
+  await reason.press('Backspace');await expect(reason).toHaveValue('🧪'.repeat(1000));
+  await expect(save).toBeEnabled();await save.click();
+  await expect(page.getByRole('status').filter({hasText:'核对已保存'})).toBeVisible();expect(posts).toBe(1);
+  const preview=await(await page.request.get('/api/assets/imports/'+batch.id)).json();
+  expect(preview.mode).toBe('SITES');expect(preview.rows.find((row:{sheet:string})=>row.sheet==='Sites').values.source_note).toBe('🙂'.repeat(2000));
+  const history=await(await page.request.get(`/api/assets/imports/${batch.id}/revisions`)).json();
+  expect(history.changes.find((change:{revision:number})=>change.revision===preview.validation_revision).reason).toBe('🧪'.repeat(1000));
+});
