@@ -372,3 +372,33 @@ def test_downgrade_refuses_to_discard_retained_v2_source(database_url,monkeypatc
     assert imports.get(actor,batch['id'])['state']=='STAGED'
     assert imports.source_file(actor,batch['id'])['content']==content
     engine.dispose()
+
+
+@pytest.mark.parametrize('hour,expected_error',[(0,False),(12,True)])
+def test_excel_native_commissioning_date_preserves_calendar_day_without_dropping_real_time(database_url,hour,expected_error):
+    from datetime import date
+    engine, _, actor, _, imports=context(database_url)
+    batch=upload(imports,actor,document([new_site(commissioning_date=datetime(2026,1,2,hour,0))]))
+    imports.validate_next();preview=imports.get(actor,batch['id'])
+    assert bool(preview['summary']['error_count']) is expected_error
+    if not expected_error:
+        result=imports.publish(actor,batch['id'],validation_revision=preview['validation_revision'],idempotency_key=str(uuid4()),acknowledged_warning_ids=[])
+        site_id=result['rows'][0]['target_id']
+        assert AssetDirectory(engine).site_detail(actor,site_id,product_line='PV')['site']['commissioning_date']==date(2026,1,2)
+    engine.dispose()
+
+
+def test_sparse_empty_xml_row_cannot_bypass_expansion_budget(database_url):
+    from zipfile import ZipFile,ZIP_DEFLATED
+    engine, _, actor, _, imports=context(database_url)
+    content=document();output=BytesIO()
+    with ZipFile(BytesIO(content)) as original,ZipFile(output,'w',ZIP_DEFLATED) as changed:
+        for item in original.infolist():
+            data=original.read(item)
+            if item.filename=='xl/worksheets/sheet3.xml':
+                data=data.replace(b'</sheetData>',b'<row r="200000"/></sheetData>')
+            changed.writestr(item,data)
+    batch=upload(imports,actor,output.getvalue())
+    assert batch['state']=='FAILED'
+    assert batch['issues']
+    engine.dispose()

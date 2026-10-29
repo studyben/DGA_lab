@@ -4,9 +4,9 @@
 
 ## 中文 / Chinese
 
-中文现场资产与油样管理门户。当前交付 [Issue #2](https://github.com/studyben/DGA_lab/issues/2) 的工程基础，完整 MVP 规格见 [Issue #1](https://github.com/studyben/DGA_lab/issues/1)。
+中文现场资产与油样管理门户。基于已实现的资产、实验室和状态分析模块继续增量开发。完整 MVP 规格见 [Issue #1](https://github.com/studyben/DGA_lab/issues/1)，批量导入增量见 [Issue #47](https://github.com/studyben/DGA_lab/issues/47)。
 
-这是绿地项目的初始生产工程：#2 门户导航与测试基础，#3 本地账号、权限、会话和审计，#4 正式资产搜索，#5 油样收样与共享条码，#6 条码检测工作台、类型化检测结果和原始附件，#7 整体检测定稿，以及 #8 条码中文报告已经实现。其他未实施业务页明确显示待开放，不展示原型假数据。
+项目起源于绿地工程，目前已有生产用途代码。已实现的核心链包括：#2 门户导航与测试基础，#3 本地账号、权限、会话和审计，#4 正式资产搜索，#5 油样收样与共享条码，#6 条码检测工作台、类型化检测结果和原始附件，#7 整体检测定稿，以及 #8 条码中文报告已经实现。其他未实施业务页明确显示待开放，不展示原型假数据。
 
 ### 启动
 
@@ -214,7 +214,7 @@ docker compose run --rm migrate alembic upgrade head
 
 A Chinese-language portal for field asset and oil-sample management. Engineering foundations are specified in [Issue #2](https://github.com/studyben/DGA_lab/issues/2); the complete MVP specification is in [Issue #1](https://github.com/studyben/DGA_lab/issues/1).
 
-This is the initial production codebase for a greenfield project. Implemented capabilities include #2 portal navigation and test infrastructure, #3 local accounts/permissions/sessions/audit, #4 formal asset search, #5 oil-sample reception and shared barcodes, #6 the barcode test workbench with typed results and original attachments, #7 overall test finalization, and #8 Chinese barcode reports. Additional delivered capabilities are described below. Business pages that have not been implemented explicitly indicate that they are unavailable; they do not display prototype data.
+The project began as a greenfield build and now has an existing production codebase developed incrementally. Implemented capabilities include #2 portal navigation and test infrastructure, #3 local accounts/permissions/sessions/audit, #4 formal asset search, #5 oil-sample reception and shared barcodes, #6 the barcode test workbench with typed results and original attachments, #7 overall test finalization, and #8 Chinese barcode reports. Additional delivered capabilities are described below. Business pages that have not been implemented explicitly indicate that they are unavailable; they do not display prototype data.
 
 ### Getting started
 

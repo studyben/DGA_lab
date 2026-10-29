@@ -1,7 +1,7 @@
 """Asset-owned, bounded v2 site workbook format; never reinterpret v1 references."""
 from io import BytesIO
 from zipfile import ZipFile
-from datetime import date, datetime
+from datetime import date, datetime, time
 from math import isfinite
 from defusedxml.ElementTree import fromstring
 from openpyxl import Workbook, load_workbook
@@ -54,6 +54,10 @@ def parse(content):
                 if entry.filename.endswith(('.xml','.rels')):
                     for node in fromstring(archive.read(entry)).iter():
                         tag=node.tag.rsplit('}',1)[-1]
+                        if tag=='row':
+                            extent_row=max(extent_row,int(node.get('r','0')))
+                            if extent_row>150000:
+                                reject('稀疏空行展开超过150000单元格；请移除远处格式。')
                         if tag=='c':
                             cells+=1
                             column,row_index=coordinate_from_string(node.get('r','A1'))
@@ -100,7 +104,9 @@ def parse(content):
                     if isinstance(value,str) and (len(value)>2000 or any(ord(ch)<32 and ch not in '\n\r\t' for ch in value)):
                         reject('文本过长或含无效字符；来源备注最多2000字符。',sheet=name,row=n,field=key)
                     if isinstance(value,float) and not isfinite(value): reject('必须填写有限数值。',sheet=name,row=n,field=key)
-                    if isinstance(value,(date,datetime)): value=value.isoformat()
+                    if isinstance(value,datetime) and key=='commissioning_date' and value.time()==time():
+                        value=value.date().isoformat()
+                    elif isinstance(value,(date,datetime)): value=value.isoformat()
                     values[key]=value
                 result.append(dict(sheet=name,row=n,values=values))
         if not any(r['sheet']=='Sites' for r in result): reject('Sites没有现场业务行；仅说明/客户不能发布。',sheet='Sites')
