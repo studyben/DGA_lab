@@ -51,23 +51,16 @@ def _append_audit(
     entity_id: UUID | None = None,
     details: dict | None = None,
 ) -> None:
-    connection.execute(
-        text(
-            """INSERT INTO audit_logs
-            (id,actor_user_id,claimed_username,action_code,result,occurred_at,entity_id,details)
-            VALUES (:id,:actor,:claimed,:action,:result,:time,:entity,CAST(:details AS jsonb))"""
-        ),
-        {
-            'id': uuid4(),
-            'actor': actor_user_id,
-            'claimed': claimed_username,
-            'action': action_code,
-            'result': result,
-            'time': occurred_at,
-            'entity': entity_id,
-            'details': json.dumps(details if details is not None else {}, allow_nan=False),
-        },
-    )
+    columns = 'id,actor_user_id,claimed_username,action_code,result,occurred_at,entity_id'
+    values = ':id,:actor,:claimed,:action,:result,:time,:entity'
+    parameters = {'id': uuid4(), 'actor': actor_user_id, 'claimed': claimed_username,
+                  'action': action_code, 'result': result, 'time': occurred_at, 'entity': entity_id}
+    if details is not None:
+        columns += ',details'
+        values += ',CAST(:details AS jsonb)'
+        parameters['details'] = json.dumps(details, allow_nan=False)
+    connection.execute(text(f'INSERT INTO audit_logs ({columns}) VALUES ({values})'), parameters)
+
 
 
 class AuditTrail:

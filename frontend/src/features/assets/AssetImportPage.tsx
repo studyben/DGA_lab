@@ -1,3 +1,4 @@
+import { SiteExportButton } from './SiteExportButton';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../Auth';
 import { useRead } from './assetUi';
@@ -96,6 +97,7 @@ export function AssetImportPage() {
   const visibleIssues = batch?.issues.filter(i => (!severity || i.severity === severity) && `${i.row} ${i.field} ${i.message}`.toLowerCase().includes(filter.toLowerCase())) ?? [];
   const canPublish = batch?.state === 'VALIDATED' && batch.summary.error_count === 0 && (!batch.summary.warning_count || acknowledged);
   return <div className="asset-dashboard asset-import">
+    <SiteExportButton />
     <section className="dashboard-table-panel" aria-label="上传资产文件">
       <div className="table-toolbar"><h2>新增资产批量导入</h2><a className="button" href="/api/assets/imports/template">下载 Excel 模板与参考资料</a></div>
       <p>只新增资产，引用已有客户、现场和物料。不覆盖已有资产；修正文件后会保留为新批次。</p>
