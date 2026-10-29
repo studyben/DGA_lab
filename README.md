@@ -202,6 +202,14 @@ docker compose run --rm migrate alembic upgrade head
 
 生成完成并写入审计后才提供下载。审计记录发起人、时间、范围和现场数量，含义是文件已准备并提供下载，不保证用户已经保存到磁盘。失败时页面提供重试提示，不下载错误响应。超过 Excel 单表行数上限时明确失败，不截断数据。
 
+### 客户与现场独立导入（Issue #49）
+
+在“资产管理 → 批量导入”选择“仅现场信息（v2）”，下载现场模板。Customers可引用已有客户或明确同批新增；Sites至少一条，设备及物料表可省略。同名只是候选，须明确引用正式UUID或确认不同实体新增；引用不覆盖现场属性/客户归属。PV容量用MW，ESS用MW/MWh，未知留空。
+
+上传后核对问题，按行编辑并填写原因，逐项确认警告，再“发布客户与现场”。每表最多500条，XLSX最多10MiB、展开50MiB/200成员/150000单元格，来源备注最多2000字符。源文件不可修改，网页核对及来源分开保留；成功后零设备现场仍显示填报容量，详情能追溯来源。更换文件/核对会使原预览需要重新确认。
+
+响应中断时点击“查询未确认操作”，恢复原批次；不要换操作键或重复上传。原文件下载要求assets.import；只有assets.read的用户可查看正式来源说明，不能下载私有导入文件。旧v1入口、旧参考表和未完成批次保持旧规则。新增迁移0031承接0030，保护既有数据；完整取消/租约恢复另由#60处理。本功能不新增设备/物料v2或实验室导入。
+
 ## English
 
 A Chinese-language portal for field asset and oil-sample management. Engineering foundations are specified in [Issue #2](https://github.com/studyben/DGA_lab/issues/2); the complete MVP specification is in [Issue #1](https://github.com/studyben/DGA_lab/issues/1).
@@ -400,3 +408,11 @@ Implementation order: #2 foundations → #3 login/permissions/audit identity →
 Use “下载当前现场汇总” on the site list or asset import page to download all readable physical sites as XLSX, including sites without equipment or a configured product line. The export ignores UI filters, pagination and PV/ESS selection. Each site appears once; PV MW and ESS MW/MWh are separate. Existing site/customer UUIDs remain text, unknown values stay blank, and decimal capacity text preserves precision.
 
 `Sites` has stable machine-readable columns; `Instructions` provides Chinese field/status explanations, timestamp, scope and count. `source_note` remains blank until later import slices provide its source. Public `AssetDirectory.export_sites(actor)` and `GET /api/assets/sites/export` require `assets.read`, without write/import grants. Public callers close the returned file; HTTP closes it on completion or disconnect. Audit means generated/offered for download, not proof of a local save. Generation/audit failure offers no partial download; the native worksheet row limit fails explicitly rather than truncating.
+
+### Customer/site-only import (Issue #49)
+
+Choose **Asset management → Batch import → Sites only (v2)** and download the template. Customers use an existing UUID or an explicit same-batch new decision; at least one Sites record is required. Equipment/material sheets may be absent. Names only suggest candidates: choose a formal identity or explicitly confirm a separate new entity. References never overwrite site data or customer ownership. PV uses MW; ESS uses MW/MWh; unknown values remain blank.
+
+Review row issues, save corrections with a reason, acknowledge each warning, then publish the entire customer/site batch. Limits: 500 rows per business sheet, 10MiB XLSX, 50MiB expanded/200 ZIP entries/150000 cells, 2000-character source notes. Original files, revisions and individual provenance remain available; zero-equipment sites keep declared capacity. Both system administrators and lab managers use assets.import under the existing role policy.
+
+After an interrupted response, use **Query unconfirmed operation** to recover the original batch; retain the original intent instead of uploading again. Source-file access requires assets.import; assets.read permits formal provenance metadata only. Legacy v1 semantics remain unchanged. Migration0031 follows0030; no old data is rewritten. Full cancellation/lease recovery belongs to#60; equipment/material-v2 and laboratory import are outside this slice. Local fixtures do not constitute real Azure or Okta acceptance.

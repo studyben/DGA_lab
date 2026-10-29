@@ -1,0 +1,2 @@
+export const importFieldLabels:Record<string,string>={record_key:'批次记录键',decision:'处理决定',customer_id:'已有客户编号',customer_name:'客户名称',site_id:'已有现场编号',site_name:'现场名称',customer_ref:'客户引用（UUID 或 NEW:记录键）',location_text:'现场位置',product_lines:'产品线（PV、ESS 或 PV;ESS）',pv_power_mw:'光伏容量 MW',ess_power_mw:'储能功率 MW',ess_energy_mwh:'储能容量 MWh',commissioning_date:'Commissioning date',grid_status:'并网调试状态',operation_status:'投运状态',source_note:'来源备注'};
+export const sourceValue=(value:unknown)=>value==null?'未提供':String(value);

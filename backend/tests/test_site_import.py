@@ -334,7 +334,9 @@ def test_real_0030_upgrade_retains_v1_source_and_reference_sheet_semantics(datab
     command.upgrade(Config('alembic.ini'),'head')
     imports=AssetImports(engine,files)
     result=imports.get(actor,batch_id)
-    assert result['format_version']==1 and result['mode']=='ASSETS'
+    assert 'format_version' not in result  # stable legacy public response
+    listed=next(b for b in imports.list_batches(actor)['batches'] if b['id']==batch_id)
+    assert listed['format_version']==1 and listed['mode']=='ASSETS'
     assert result['state']=='STAGED'
     assert imports.source_file(actor,batch_id)['content']==content
     assert AssetDirectory(engine).dashboard(actor,product_line='ESS')['site_count']==0
@@ -354,4 +356,19 @@ def test_500_customers_and_500_sites_remain_one_atomic_batch(database_url):
     totals=AssetDirectory(engine).dashboard(actor,product_line='ESS')
     assert totals['site_count']==500 and totals['customer_count']==500
     assert imports.get(actor,batch['id'],page=50)['rows'][-1]['target_id']
+    engine.dispose()
+
+
+@pytest.mark.parametrize('database_url',['0030_merge_export_identity'],indirect=True)
+def test_downgrade_refuses_to_discard_retained_v2_source(database_url,monkeypatch):
+    from alembic import command
+    from alembic.config import Config
+    monkeypatch.setenv('DATABASE_URL',database_url)
+    command.upgrade(Config('alembic.ini'),'head')
+    engine, _, actor, _, imports=context(database_url)
+    content=document();batch=upload(imports,actor,content)
+    with pytest.raises(Exception,match='Retained site imports require forward recovery'):
+        command.downgrade(Config('alembic.ini'),'0030_merge_export_identity')
+    assert imports.get(actor,batch['id'])['state']=='STAGED'
+    assert imports.source_file(actor,batch['id'])['content']==content
     engine.dispose()

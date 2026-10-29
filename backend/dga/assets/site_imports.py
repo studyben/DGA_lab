@@ -119,7 +119,7 @@ class SiteImports:
                     row=indexed.get(entry_key)
                     if row is None or entry_key in touched or set(change['values'])-set(workbook.COLUMNS[row['sheet']]): fail('invalid_import_revision',422)
                     touched.add(entry_key)
-                    if any(v is not None and (type(v) not in (str,int,float,bool) or isinstance(v,float) and not isfinite(v)) for v in change['values'].values()): fail('invalid_import_revision',422)
+                    if any(v is not None and (type(v) not in (str,int,float,bool) or isinstance(v,float) and not isfinite(v) or isinstance(v,str) and len(v)>2000) for v in change['values'].values()): fail('invalid_import_revision',422)
                     row['values'].update(change['values'])
                 c.execute(text('UPDATE asset_import_batches SET working_rows=CAST(:rows AS jsonb) WHERE id=:id'),dict(id=batch_id,rows=dumped(working)))
                 updated=dict(batch,working_rows=working)

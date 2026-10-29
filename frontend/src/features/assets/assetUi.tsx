@@ -14,10 +14,11 @@ export function useQuery() {
   return { query, update };
 }
 
-export function useRead<T>(url: string) {
+export function useRead<T>(url: string | null) {
   const [attempt, retry] = useState(0);
-  const [state, setState] = useState<{ url: string; data?: T; error?: string }>({ url: '' });
+  const [state, setState] = useState<{ url: string | null; data?: T; error?: string }>({ url: '' });
   useEffect(() => {
+    if (!url) { setState({url}); return; }
     let active = true;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 15000);

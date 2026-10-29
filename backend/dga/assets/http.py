@@ -107,6 +107,14 @@ def assets_router(directory: AssetDirectory, actor_dependency: Callable, lifecyc
     def export_sites(actor=Depends(actor_dependency)):
         return _SiteDownload(directory.export_sites(actor))
 
+    @router.get('/sites/{site_id}/sources')
+    def site_sources(site_id: UUID,page: int = Query(default=1,ge=1,le=100000),actor=Depends(actor_dependency)):
+        return directory.import_sources(actor,'SITE',site_id,page=page)
+
+    @router.get('/customers/{customer_id}/sources')
+    def customer_sources(customer_id: UUID,page: int = Query(default=1,ge=1,le=100000),actor=Depends(actor_dependency)):
+        return directory.import_sources(actor,'CUSTOMER',customer_id,page=page)
+
     @router.get('/sites/{site_id}')
     def site_detail(site_id: UUID, query: EquipmentQuery = Query(), actor=Depends(actor_dependency)):
         return directory.site_detail(actor, site_id, **query.model_dump())

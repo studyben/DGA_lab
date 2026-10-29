@@ -76,16 +76,19 @@ class AssetImports:
         return self.get(actor, batch_id)
 
     def get(self, actor, batch_id, *, page=1):
-        with self._engine.connect() as connection:
-            version = connection.execute(text('SELECT format_version FROM asset_import_batches WHERE id=:id'), {'id':batch_id}).scalar()
-        if version == 2:
-            return self._sites.get(actor, batch_id, page)
         require_permission(actor, 'assets.import')
         with self._engine.connect() as c:
             row = c.execute(text('SELECT * FROM asset_import_batches WHERE id=:id'), {'id': batch_id}).mappings().first()
             if row is None:
                 fail('import_not_found', 404)
-            return {k: v for k, v in row.items() if k not in ('source_rows', 'object_key')}
+            # Version1 batches predate format metadata. This normalization belongs
+            # to the import owner and preserves the original public v1 shape.
+            version = row.get('format_version', 1)
+            if version == 1:
+                return {k:v for k,v in row.items() if k not in ('source_rows','object_key','format_version','mode','working_rows','catalog_digest')}
+        if version != 2:
+            fail('unsupported_import_format',503)
+        return self._sites.get(actor,batch_id,page)
 
     def template(self, actor, *, format_version=1, mode='ASSETS'):
         if type(format_version) is not int:
@@ -113,7 +116,7 @@ class AssetImports:
             where = "FROM asset_import_batches WHERE position(lower(:q) in lower(filename || ' ' || id::text))>0"
             params = dict(q=query.strip(), offset=(page-1)*20)
             count = c.execute(text('SELECT count(*) '+where), params).scalar_one()
-            batches = c.execute(text('SELECT id,filename,state,created_at,summary '+where+' ORDER BY created_at DESC,id DESC LIMIT 20 OFFSET :offset'), params).mappings().all()
+            batches = c.execute(text('SELECT id,filename,state,created_at,summary,format_version,mode '+where+' ORDER BY created_at DESC,id DESC LIMIT 20 OFFSET :offset'), params).mappings().all()
             return {'batches': [dict(b) for b in batches], 'total': count, 'page': page}
 
     def validate_next(self):
@@ -122,7 +125,7 @@ class AssetImports:
             batch = c.execute(text("SELECT * FROM asset_import_batches WHERE state='STAGED' ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1")).mappings().first()
             if batch is None:
                 return False
-            if batch['format_version'] == 2:
+            if batch.get('format_version',1) == 2:
                 self._sites.validate_batch(c,batch)
                 return True
             state, failure = 'VALIDATED', None
@@ -140,8 +143,14 @@ class AssetImports:
             return True
 
     def publish(self, actor, batch_id, *, validation_revision, acknowledge_warnings=False, idempotency_key=None, acknowledged_warning_ids=None):
+        require_permission(actor,'assets.import')
         with self._engine.connect() as connection:
-            version = connection.execute(text('SELECT format_version FROM asset_import_batches WHERE id=:id'), {'id':batch_id}).scalar()
+            row = connection.execute(text('SELECT * FROM asset_import_batches WHERE id=:id'), {'id':batch_id}).mappings().first()
+            if row is None:
+                fail('import_not_found',404)
+            version = row.get('format_version',1)
+        if version not in (1,2):
+            fail('unsupported_import_format',503)
         if version == 2:
             return self._sites.publish(actor,batch_id,validation_revision=validation_revision,idempotency_key=idempotency_key,acknowledged_warning_ids=acknowledged_warning_ids)
         """Create the entire new-asset batch atomically, never update existing assets."""
