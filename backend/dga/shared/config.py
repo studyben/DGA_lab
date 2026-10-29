@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
     session_hours: int = Field(default=8, ge=1, le=24)
     auth_allowed_origins: str = 'http://127.0.0.1:8080'
+    oidc_encryption_key: SecretStr | None = None
+    oidc_allowed_hosts: str = ''
+    oidc_callback_url: str = ''
+    oidc_callback_origins: str = ''
     object_store_provider: Literal['s3', 'azure'] | None = None
     azure_blob_account_url: str | None = None
     azure_blob_container: str | None = None

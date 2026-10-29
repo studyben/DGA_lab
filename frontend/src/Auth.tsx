@@ -4,7 +4,7 @@ import sungrowLogo from './assets/sungrow-logo.svg';
 type Session = {
   actor: { id: string; username: string; display_name: string };
   roles: string[]; permissions: string[]; must_change_password: boolean;
-  csrf_token: string; expires_at: string;
+  csrf_token: string; expires_at: string; local_password_available: boolean;
 };
 type Auth = {
   session: Session | null | undefined; error: string;
@@ -97,6 +97,10 @@ export function AuthBoundary({ children, permission }: { children: ReactNode; pe
   if (auth.error) return <AuthCard><h1>连接暂不可用</h1><p role="alert">{auth.error}</p><button onClick={() => void auth.refresh()}>重试</button></AuthCard>;
   if (auth.session === undefined) return <AuthCard><p role="status">正在确认登录状态…</p></AuthCard>;
   if (!auth.session) return <CredentialsForm />;
+  if (location.pathname === '/login' || location.pathname === '/login/local') return <AuthCard><h1>登录状态</h1>
+    {new URLSearchParams(location.search).has('oidc_error') && <p role="alert">{oidcError(new URLSearchParams(location.search).get('oidc_error') ?? '')}</p>}
+    <a href="/assets">继续进入系统</a>{auth.can('identity.manage') && <p><a href="/settings/sso">返回 OIDC 配置</a></p>}<SessionControls /></AuthCard>;
+  if (location.pathname === '/account/password' && !auth.session.local_password_available) return <AuthCard><h1>密码由公司登录管理</h1><p>此账号没有本地密码，请通过公司身份服务管理密码。</p><a href="/assets">返回系统</a></AuthCard>;
   if (auth.session.must_change_password || location.pathname === '/account/password') return <CredentialsForm change />;
   if (!auth.can(permission)) return <AuthCard><h1>无权访问此页面</h1><p>当前账号没有所需权限，请联系管理员。</p><a className="button" href="/">返回首页</a><SessionControls /></AuthCard>;
   return children;
@@ -114,8 +118,27 @@ function CredentialsForm({ change = false }: { change?: boolean }) {
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const local = location.pathname === '/login/local';
+  const [oidc, setOidc] = useState(false);
+  useEffect(() => {
+    if (change || local) return;
+    let live = true;
+    fetch('/api/auth/oidc/available', { cache: 'no-store', signal: AbortSignal.timeout(10000) })
+      .then(r => r.ok ? r.json() : null).then(v => { if (live) setOidc(v?.enabled === true); }).catch(() => {});
+    return () => { live = false; };
+  }, [change, local]);
   return <AuthCard>
-    <h1>{change ? (session?.must_change_password ? '首次登录，请修改密码' : '修改密码') : '登录'}</h1>
+    <h1>{change ? (session?.must_change_password ? '首次登录，请修改密码' : '修改密码') : local ? '本地恢复登录' : '登录'}</h1>
+    {!change && new URLSearchParams(location.search).has('oidc_error') && <p role="alert">{oidcError(new URLSearchParams(location.search).get('oidc_error') ?? '')}</p>}
+    {!change && !local && oidc && <button disabled={busy} onClick={async () => {
+      setBusy(true); setError('');
+      try {
+        const r = await fetch('/api/auth/oidc/start', { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(40000) });
+        const v = await r.json();
+        if (!r.ok) throw new Error(oidcError(v.code));
+        location.assign(v.authorization_url);
+      } catch (failure) { setError(failure instanceof Error ? failure.message : '公司登录暂不可用。'); setBusy(false); }
+    }}>使用公司 Okta 登录</button>}
     <p>{change ? '新密码需为 15–128 个字符，可以使用长口令。改密后其他会话将失效。' : '请使用管理员分配的内部账号。'}</p>
     <form onSubmit={async event => {
       event.preventDefault(); setError('');
@@ -125,6 +148,7 @@ function CredentialsForm({ change = false }: { change?: boolean }) {
         await mutate(change ? 'password' : 'login', change ? { current_password: password, new_password: newPassword } : { username, password });
         setPassword(''); setNewPassword(''); setConfirm('');
         if (change && location.pathname === '/account/password') location.assign('/');
+        if (!change && (location.pathname === '/login' || local)) location.assign('/assets');
       } catch (failure) { setError(failure instanceof Error ? failure.message : '服务暂不可用，请重试。'); }
       finally { setBusy(false); }
     }}>
@@ -136,7 +160,20 @@ function CredentialsForm({ change = false }: { change?: boolean }) {
       <button type="submit" disabled={busy}>{busy ? '处理中…' : change ? '保存密码并继续' : '登录'}</button>
     </form>
     {change && <SessionControls />}
+    {!change && !local && <p><a href="/login/local">本地管理员恢复入口</a></p>}
+    {!change && local && <p>此入口不依赖 Okta。请使用保留的本地恢复管理员账号。</p>}
   </AuthCard>;
+}
+
+export function oidcError(code: string): string {
+  return ({ oidc_flow_invalid: '登录流程已过期或与当前浏览器不匹配，请重新发起登录。',
+    oidc_link_required: '已有同名内部账号，请联系系统管理员核验并关联外部身份。',
+    oidc_account_unavailable: '账号已停用或锁定，请联系系统管理员。',
+    oidc_not_configured: '公司登录尚未配置完成，请使用本地恢复入口。',
+    oidc_provider_rejected: '公司登录验证失败或服务暂不可用，请重试；本地恢复入口仍可用。',
+    stale_oidc_configuration: '登录配置已更新，请重新发起登录。',
+    oidc_callback_origin_mismatch: '当前访问地址与此配置的回调地址不一致。请从已登记的应用地址登录。',
+  } as Record<string, string>)[code] ?? '公司登录未完成，请重新发起登录或联系管理员。';
 }
 
 export function SessionControls() {
@@ -144,7 +181,7 @@ export function SessionControls() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   return <div className="session-controls"><span>{session?.actor.display_name}</span>
-    {!session?.must_change_password && <a href="/account/password">修改密码</a>}
+    {!session?.must_change_password && session?.local_password_available && <a href="/account/password">修改密码</a>}
     <button disabled={busy} onClick={async () => {
       setBusy(true); setError('');
       try { await mutate('logout'); } catch { setError('退出失败，请重试。'); } finally { setBusy(false); }

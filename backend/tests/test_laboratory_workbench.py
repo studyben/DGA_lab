@@ -59,7 +59,7 @@ class RecordingObjectStore:
 
 
 def make_workbench(engine, store, **kwargs):
-    audit = AuditTrail()
+    audit = kwargs.pop('audit', None) or AuditTrail()
     report_lifecycle = kwargs.pop(
         'report_lifecycle', LaboratoryReports(engine, audit, store)
     )
@@ -109,7 +109,8 @@ def workbench_context(database_url):
             {'asset': ASSET_ID},
         )
     identity = IdentityService(engine)
-    identity.bootstrap_admin('workbench-admin', 'Workbench Admin', INITIAL_PASSWORD)
+    from tests.identity_seed import seed_legacy_user
+    seed_legacy_user(database_url, 'workbench-admin', 'Workbench Admin', INITIAL_PASSWORD, ['system_admin'])
     first = identity.login('workbench-admin', INITIAL_PASSWORD)
     actor = identity.change_password(first.token, INITIAL_PASSWORD, CHANGED_PASSWORD).actor
     sample = SampleRegistry(engine, AssetDirectory(engine), AuditTrail()).receive(
@@ -464,7 +465,8 @@ def test_single_result_is_auto_selected_and_label_can_be_reprinted_after_finaliz
 
 def test_removing_a_selected_result_audits_selection_clear(workbench_context):
     engine, identity, actor, sample = workbench_context
-    workbench = make_workbench(engine, RecordingObjectStore())
+    tied_at = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    workbench = make_workbench(engine, RecordingObjectStore(), audit=AuditTrail(clock=lambda: tied_at))
     method = next(
         item for item in workbench.load(actor, sample.barcode_value).methods
         if item.test_type == TestType.DGA
@@ -474,10 +476,15 @@ def test_removing_a_selected_result_audits_selection_clear(workbench_context):
 
     workbench.remove_test(actor, sample.barcode_value, record.id, 'invalid selected run')
 
-    actions = [event['action_code'] for event in identity.audit_events(actor)]
-    assert actions[-2:] == ['LAB_TEST_REMOVED', 'REPORT_RESULT_CLEARED']
+    # Equal event timestamps are ordered by UUID, not transaction insertion order.
+    events = [event for event in identity.audit_events(actor)
+              if event['entity_id'] == record.id and event['action_code'] in {'LAB_TEST_REMOVED', 'REPORT_RESULT_CLEARED'}]
+    assert sorted(event['action_code'] for event in events) == ['LAB_TEST_REMOVED', 'REPORT_RESULT_CLEARED']
+    assert all(event['occurred_at'] == tied_at for event in events)
+    assert workbench.load(actor, sample.barcode_value).tests == ()
 
 
+@pytest.mark.parametrize('database_url', ['0024_alarm_observation'], indirect=True)
 def test_finalized_data_survives_0006_downgrade_and_reupgrade_as_open(workbench_context):
     engine, _, actor, sample = workbench_context
     workbench = make_workbench(engine, RecordingObjectStore())

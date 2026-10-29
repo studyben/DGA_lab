@@ -220,6 +220,7 @@ def test_unlinked_instrument_is_explicit_in_saved_and_report_evidence(workbench_
     assert escapePDF('未关联仪器，未评估'.encode('utf-16-be')).encode('ascii') in content
 
 
+@pytest.mark.parametrize('database_url', ['0024_alarm_observation'], indirect=True)
 def test_downgrade_refuses_to_erase_saved_quality_evidence(workbench_context):
     from alembic import command
     from alembic.config import Config

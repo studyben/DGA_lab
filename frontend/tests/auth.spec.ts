@@ -19,16 +19,19 @@ test('未登录先登录，首次修改密码后进入门户并退出', async ({
   await expect(page.getByRole('heading', { name: '登录', exact: true })).toBeVisible();
 });
 
-test('现场工程师没有实验室入口且不能用地址绕过权限', async ({ page, baseURL }) => {
+test('现场工程师可读实验室但不能进入用户管理', async ({ page, baseURL }) => {
   await page.request.post('/api/auth/login', {
     headers: { Origin: new URL(baseURL!).origin },
     data: { username: 'field-user', password: 'Browser changed passphrase 84!' },
   });
   await page.goto('/');
   const top = page.getByRole('navigation', { name: '工作区', exact: true });
-  await expect(top.getByRole('link', { name: 'DGA 实验室' })).toHaveCount(0);
+  await expect(top.getByRole('link', { name: 'DGA 实验室' })).toBeVisible();
   await page.goto('/lab');
-  await expect(page.getByRole('heading', { name: '无权访问此页面' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '实验室首页', exact: true })).toBeVisible();
   const response = await page.request.get('/api/laboratory/access');
-  expect(response.status()).toBe(403);
+  expect(response.status()).toBe(200);
+  await page.goto('/settings/users');
+  await expect(page.getByRole('alert')).toHaveText('当前账号无用户管理权限。');
+  expect((await page.request.get('/api/auth/users')).status()).toBe(403);
 });

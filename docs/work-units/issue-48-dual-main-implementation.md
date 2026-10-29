@@ -1,0 +1,13 @@
+# Dual-main merge implementation
+
+Userapprovedexisting-functionunion。GitHub#62已merge2d7318e且Issue48CLOSED；Sungrowcab4eea仍含#18，原worktree保持。Isolatedbranch从GitHubmain建，merge企业main，4文本冲突按双方intent解决；authquery保留details/before_value/after_value；HTTPsiteedit+export并存；Dashboard两个组件并存；README双语保留并补export说明。
+
+Migration:0030_merge_export_identity graphmerge两已有head，noDDL/stamp/修改历史。真实CLI先REDmultipleheads再GREEN；新增test_dual_main_upgrade参数化实际25audit/29oidc两基线，publiclogin/export/audit证据数据保留。
+
+Failuresfixed:
+1. 普通用户fixture用新策略禁止的本地provision，RED local_admin_required→既有legacyfixture安排，保留原HTTP权限断言，7pass。
+2. 原审计test同时间UUIDtie ordering假设，fullbackend404pass/40skip/1fail→固定AuditTrailclock重现RED，按同实体恰好两个event及最终删除状态验证，related51pass。无production行为改变。
+
+Buildpass；16browserpass（包含隔离mockOIDCprotocol，非真实Okta）。仅本worktree18463的dga_test/dga_browser，原18148环境和验收data未触碰。No sourcepollution/debugcode/cloudservice/newcredentials/storagechange。Localfullgreen未宣称；remoteS2必须完整通过。
+
+Localreviewtimestampedartifactpass；nextfinishmergecommit→S2GitHubintegrationPR/CI→normalmerge→SungrowFF或受保护nativePR→最终两边tree/ancestry、48CLOSED/18OPEN验证。
