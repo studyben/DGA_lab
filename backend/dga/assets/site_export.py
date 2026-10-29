@@ -30,7 +30,7 @@ COLUMNS = (
     ('operation_status', '投运状态：NOT_OPERATIONAL=未投运；PARTIAL=部分投运；OPERATIONAL=已投运；DECOMMISSIONED=已退役'),
     ('source_note', '来源备注：当前未提供时保持空白，不推断'),
 )
-QUERY = text('''SELECT s.id AS site_id,s.site_name,s.customer_id,c.customer_name,s.location_text,
+QUERY = text('''SELECT s.id AS site_id,s.site_name,s.customer_id,c.customer_name,s.location_text,s.source_note,
     pv.site_id IS NOT NULL AS has_pv,ess.site_id IS NOT NULL AS has_ess,
     pv.power_mw AS pv_power_mw,ess.power_mw AS ess_power_mw,ess.energy_mwh AS ess_energy_mwh,
     s.commissioning_date,s.grid_status,s.operation_status
@@ -104,7 +104,6 @@ def generate(engine, generated_at):
                         values['product_lines'] = ';'.join(line for line, present in
                             (('PV', values['has_pv']), ('ESS', values['has_ess'])) if present) or None
                         values['commissioning_date'] = values['commissioning_date'].isoformat() if values['commissioning_date'] else None
-                        values['source_note'] = None
                         _row(sheet, [values[key] for key, _ in COLUMNS])
                         count += 1
                 finally:

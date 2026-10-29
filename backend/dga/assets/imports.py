@@ -28,8 +28,16 @@ class AssetImports:
         self._engine, self._files = engine, files
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._audit = AuditTrail(clock=self._clock)
+        from .site_imports import SiteImports
+        self._sites = SiteImports(engine, files, self._clock)
 
-    def submit(self, actor, *, filename, content):
+    def submit(self, actor, *, filename, content, format_version=1, mode='ASSETS', idempotency_key=None):
+        if type(format_version) is not int:
+            fail('invalid_import_format',422)
+        if format_version == 2 and mode == 'SITES':
+            return self._sites.submit(actor, filename=filename, content=content, idempotency_key=idempotency_key)
+        if format_version != 1 or mode != 'ASSETS':
+            fail('invalid_import_format', 422)
         require_permission(actor, 'assets.import')
         if not isinstance(filename, str) or not filename.lower().endswith('.xlsx') or not 1 <= len(filename) <= 200 or any(ord(ch) < 32 for ch in filename):
             fail('invalid_import_filename', 422)
@@ -67,7 +75,11 @@ class AssetImports:
             raise
         return self.get(actor, batch_id)
 
-    def get(self, actor, batch_id):
+    def get(self, actor, batch_id, *, page=1):
+        with self._engine.connect() as connection:
+            version = connection.execute(text('SELECT format_version FROM asset_import_batches WHERE id=:id'), {'id':batch_id}).scalar()
+        if version == 2:
+            return self._sites.get(actor, batch_id, page)
         require_permission(actor, 'assets.import')
         with self._engine.connect() as c:
             row = c.execute(text('SELECT * FROM asset_import_batches WHERE id=:id'), {'id': batch_id}).mappings().first()
@@ -75,7 +87,16 @@ class AssetImports:
                 fail('import_not_found', 404)
             return {k: v for k, v in row.items() if k not in ('source_rows', 'object_key')}
 
-    def template(self, actor):
+    def template(self, actor, *, format_version=1, mode='ASSETS'):
+        if type(format_version) is not int:
+            fail('invalid_import_format',422)
+        if format_version == 2 and mode == 'SITES':
+            with self._engine.begin() as connection:
+                self._sites.authorize(connection, actor)
+            from .site_import_workbook import template as site_template
+            return site_template()
+        if format_version != 1 or mode != 'ASSETS':
+            fail('invalid_import_format',422)
         require_permission(actor, 'assets.import')
         with self._engine.connect().execution_options(isolation_level='REPEATABLE READ') as c:
             materials = c.execute(text('SELECT * FROM asset_materials ORDER BY material_number LIMIT 500')).mappings().all()
@@ -101,6 +122,9 @@ class AssetImports:
             batch = c.execute(text("SELECT * FROM asset_import_batches WHERE state='STAGED' ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1")).mappings().first()
             if batch is None:
                 return False
+            if batch['format_version'] == 2:
+                self._sites.validate_batch(c,batch)
+                return True
             state, failure = 'VALIDATED', None
             try:
                 with c.begin_nested():
@@ -115,7 +139,11 @@ class AssetImports:
                       {'rows': json.dumps(rows), 'issues': json.dumps(issues), 'summary': json.dumps(counts), 'id': batch['id'], 'state': state, 'failure': failure})
             return True
 
-    def publish(self, actor, batch_id, *, validation_revision, acknowledge_warnings=False):
+    def publish(self, actor, batch_id, *, validation_revision, acknowledge_warnings=False, idempotency_key=None, acknowledged_warning_ids=None):
+        with self._engine.connect() as connection:
+            version = connection.execute(text('SELECT format_version FROM asset_import_batches WHERE id=:id'), {'id':batch_id}).scalar()
+        if version == 2:
+            return self._sites.publish(actor,batch_id,validation_revision=validation_revision,idempotency_key=idempotency_key,acknowledged_warning_ids=acknowledged_warning_ids)
         """Create the entire new-asset batch atomically, never update existing assets."""
         require_permission(actor, 'assets.import')
         with self._engine.begin() as c:
@@ -170,3 +198,15 @@ class AssetImports:
             published_by=:actor,published_at=:at WHERE id=:id"""),
             dict(rows=json.dumps(rows), actor=actor.user_id, at=self._clock(), id=batch_id))
         self._audit.append(c, actor, ImportAction.PUBLISH, entity_id=batch_id)
+
+    def operation(self, actor, key):
+        return self._sites.operation(actor,key)
+
+    def source_file(self, actor, batch_id):
+        return self._sites.source(actor,batch_id)
+
+    def revise(self, actor, batch_id, *, expected_revision, changes, reason, idempotency_key):
+        return self._sites.revise(actor,batch_id,expected_revision=expected_revision,changes=changes,reason=reason,idempotency_key=idempotency_key)
+
+    def revision_history(self, actor, batch_id, *, page=1):
+        return self._sites.revision_history(actor,batch_id,page)
