@@ -8,6 +8,8 @@
 
 项目起源于绿地工程，目前已有生产用途代码。已实现的核心链包括：#2 门户导航与测试基础，#3 本地账号、权限、会话和审计，#4 正式资产搜索，#5 油样收样与共享条码，#6 条码检测工作台、类型化检测结果和原始附件，#7 整体检测定稿，以及 #8 条码中文报告已经实现。其他未实施业务页明确显示待开放，不展示原型假数据。
 
+#52 S1 提供实验室资料原件暂存入口 `/lab/imports`：版本1模板/虚构示例、显式来源身份、XLSX/两份UTF-8 CSV收件、原key恢复、核对历史与私有原件下载。全部要求当前 `laboratory.write`；当前不解析业务行、不运行验证任务，也不创建正式油样/检测/报告。字段、限额、恢复及本地验证范围见 [实验室资料暂存说明](docs/laboratory-imports.md)。
+
 ### 启动
 
 安装并启动 Docker Desktop（Linux containers）或 Docker Engine 与 Compose v2+，在仓库根目录运行：
@@ -462,3 +464,8 @@ Migration0033 adds immutable per-token laboratory facts without changing ordinar
 The public Python Workbench accepts FinalizationReportPolicy.NO_REQUEST explicitly; its default and ordinary HTTP remain QUEUE_CURRENT, with the same current authorization, identity, QC, warning and transaction guards. All three analysis facades read current immutable facts independently of report requests or file state. Legal legacy NULL-token samples remain diagnostic-only; missing/corrupt qualified current facts return503 rather than a partial result. Intact old READY PDF bytes retain their separate token/size/SHA checks.
 
 Optional origin/precision/context read metadata stays unknown for existing writers. The laboratory-owned evidence serializer omits only the four absent metadata keys, preserving existing health/alarm signatures; explicit metadata participates in signatures. No formal external/date-only import, original-PDF upload, manual first-summary UI or new storage framework is delivered. Native checks and LocalFiles do not replace configured storage CI or real Azure/Okta acceptance.
+
+
+### Laboratory data staging (#52)
+
+`/lab/imports` retains XLSX/two UTF-8 CSV originals and explicit source-lab identity, then queues versioned validation using the configured `laboratory-import-worker`. Paged samples, complete retests, unassigned tests and issues preserve raw decimal/time evidence. Reviewed row overrides and reasoned history remain separate from raw originals and require an explicit recheck. Current laboratory.write/CSRF and private exact-intent recovery apply throughout. This workflow creates no formal samples/tests/containers/assets, finalizations or reports. PDF names remain declarations without content; formal publication is #53. See [laboratory import operations](docs/laboratory-imports.md).

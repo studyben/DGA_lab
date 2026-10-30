@@ -154,7 +154,10 @@ export function V2ImportPanel({mode}:{mode:'SITES'|'ASSETS'}) {
         }else if(kind!=='revise'&&response.status<500&&![401,403].includes(response.status))sessionStorage.removeItem(storageKey);
         throw new Error((terminal?'本次修订已被服务器明确拒绝，批次已发布；原输入保留供复制，请重新读取批次并创建新批次。':rejected?'本次修订已被服务器明确拒绝，未保存；输入已保留，请重新读取批次并重新核对。':'')+await errorMessage(response,failure));
       }
-      const result:Batch=await response.json();sessionStorage.removeItem(storageKey);setRetainedRevision(null);choose(result.id);setBatch(result);
+      const result:Batch=await response.json();sessionStorage.removeItem(storageKey);setRetainedRevision(null);choose(result.id);
+      // This authoritative result is already displayed. A same-version reread
+      // must not clear warnings the user confirms before that response arrives.
+      seen.current=`${result.id}:${result.validation_revision}`;setBatch(result);
       setNotice(kind==='upload'?`${title}文件已接收，等待后台校验。`:kind==='revise'?'核对已保存，预览已更新，请重新确认警告。':result.operation_result?.outcome==='PUBLISHED'?(isSites?'客户与现场已整批发布。':'设备与相关主数据已整批发布。'):'正式资料已变化，预览已刷新，尚未发布；请重新核对。');
     }catch(e){setError(e instanceof TypeError?'连接中断，结果尚未确认，请查询原操作；不要重新创建上传。':e instanceof Error&&e.name!=='TimeoutError'?e.message:'响应超时，结果尚未确认，请查询原操作；不要重新创建上传。');}
     finally{lock.current=false;setBusy(false);setUploadProgress(null);}

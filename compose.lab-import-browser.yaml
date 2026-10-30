@@ -1,0 +1,44 @@
+# Isolated laboratory validation browser overlay. Never apply to retained acceptance data.
+services:
+  db:
+    ports:
+      - "127.0.0.1:18552:5432"
+  migrate:
+    command: ["sh", "-c", "alembic upgrade head && python -m tests.seed_browser && python -m tests.seed_import_browser && python -m tests.seed_laboratory_import_browser"]
+    environment:
+      OBJECT_STORE_ACCESS_KEY: dga-local
+      OBJECT_STORE_SECRET_KEY: local-object-storage-only
+      LAB_IMPORT_TWO_WRITER_FIXTURE: /home/app/two-writer.json
+    volumes:
+      - laboratory-browser-fixtures:/home/app
+    depends_on:
+      object-store-init:
+        condition: service_completed_successfully
+  browser-test:
+    environment:
+      LAB_IMPORT_TWO_WRITER_FIXTURE: /home/app/two-writer.json
+    volumes:
+      - laboratory-browser-fixtures:/home/app:ro
+  api:
+    ports:
+      - "127.0.0.1:18572:8000"
+  laboratory-import-worker:
+    build: ./backend
+    command: ["python", "-m", "dga.laboratory.import_worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://dga_browser:isolated-browser-only@db:5432/dga_browser
+      OBJECT_STORE_PROVIDER: s3
+      OBJECT_STORE_ENDPOINT: http://object-store:9000
+      OBJECT_STORE_BUCKET: dga-lab
+      OBJECT_STORE_ACCESS_KEY: dga-local
+      OBJECT_STORE_SECRET_KEY: local-object-storage-only
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      object-store-init:
+        condition: service_completed_successfully
+
+
+volumes:
+  laboratory-browser-fixtures:
+
