@@ -1,6 +1,6 @@
-# 实验室检测资料暂存（格式 v1，S1）
+# 实验室检测资料暂存（格式 v1）
 
-入口为 /lab/imports，公开应用门面为 laboratory.public.LaboratoryImports。当前可下载模板/虚构示例，显式确认来源身份与用途，保存 XLSX 或两份 UTF-8 CSV 原件，重开批次、核对元数据/所采用的已确认原件并下载原始字节。当前不解析业务行、不发起验证任务；“原件已确认保存”只说明文件收件已经提交，不说明科学资料已核实。
+入口为 /lab/imports，公开应用门面为 laboratory.public.LaboratoryImports。可下载模板/虚构示例，显式确认来源身份与用途，保存 XLSX 或两份 UTF-8 CSV 原件，并显式排队后台校验。分页预览保留完整检测行、未关联检测和稳定问题定位；逐行核对保留原值、覆盖值、解析值及历史。重开批次可继续同一请求并下载原始字节。“原件已确认保存”只说明文件收件已经提交，不说明科学资料已核实。
 
 暂存不会创建正式油样、检测、样品容器、临时/正式资产、有效定稿或报告任务。PDF 仅有文件名声明列，内容始终未提供。现有 analyst 的 laboratory.finalize 授权保持原状。
 
@@ -22,9 +22,9 @@ source_lab_key,external_sample_id,external_test_id,test_type,measured_at,measure
 
 每个检测行表示一次完整来源检测；DGA 同行保留全部七项，复测使用另一个 external_test_id。外部油样/检测标识是最多160字符的文本，保留大小写和前导零。notes 与 source_note 分别保留，均最多2000字符。原检测者/QA/仪器陈述与上传核对人员分开。
 
-空白、数值0、ND、LT、GT 含义不同。ND 无数值，LT/GT 使用真实边界值；不自动平均、换算单位或猜测 ASTM/方法兼容性。DATE 不补午夜；缺失时区/精度及 DST 折叠/间隙不能靠浏览器时区推断。模板字段说明列出精确长度和未来验证约束；这些行规则的解码、问题呈现及安全检查属于 S2，当前收件不会声称其已通过。
+空白、数值0、ND、LT、GT 含义不同。ND 无数值，LT/GT 使用真实边界值；不自动平均、换算单位或猜测 ASTM/方法兼容性。DATE 不补午夜；缺失时区/精度及 DST 折叠/间隙不能靠浏览器时区推断。模板字段说明列出精确长度和未来验证约束；校验按实验室当前公开方法配置逐项报告问题；缺配置或未知单位仅生成问题，不猜兼容性或修正值。
 
-单 XLSX≤10MiB；每份 CSV≤10MiB，两份≤20MiB。上传 MIME 分别严格为 application/vnd.openxmlformats-officedocument.spreadsheetml.sheet 或 text/csv。文件名1–255字符，拒绝路径、控制字符和不匹配扩展名。业务上限500油样/2000完整检测、XLSX展开50MiB/200成员/150000单元格由后续 S2 实际解析验证；当前仅生成说明并执行原件/元数据边界，不提前实现解析器。
+单 XLSX≤10MiB；每份 CSV≤10MiB，两份≤20MiB。上传 MIME 分别严格为 application/vnd.openxmlformats-officedocument.spreadsheetml.sheet 或 text/csv。文件名1–255字符，拒绝路径、控制字符和不匹配扩展名。校验执行500油样/2000完整检测、XLSX展开50MiB/200成员/150000单元格和32767字符单元格上限。拒绝公式、宏、外部关系、加密、不安全/重复ZIP路径、稀疏超界XML、无效UTF-8/引号/表头。超限和语法错误形成阻塞文件问题且不保存部分当前预览行。
 
 ## 来源身份与核对
 
@@ -41,7 +41,7 @@ source_lab_key 是批次内别名（字母开头，字母/数字/下划线/短�
 
 创建/收件/核对使用 actor 私有 UUID Idempotency-Key，绑定确切操作及原参数摘要。同一 key 的相同请求返回原冻结结果；更改内容、文件名、角色或操作返回409。操作查询 /operations/{key} 只有原 actor 且当前拥有 laboratory.write 时可用。批次及原件历史可由其他当前实验室写入者访问，但不会暴露对象地址、存储 key、租约 token 或他人的 intent key。
 
-收件先将 PENDING 操作与不可变文件身份提交到数据库，再在事务外写 FileStore，最后在当前授权、租约 token 和批次锁保护下确认 RECEIVED、冻结完成结果并递增 revision。第一次确认的该角色文件成为所采用原件；角色已占用时晚到收件只加入未采用历史，不自动替换。每次成功收件/核对均留历史并使旧验证结果失效；S1 不运行验证器。
+收件先将 PENDING 操作与不可变文件身份提交到数据库，再在事务外写 FileStore，最后在当前授权、租约 token 和批次锁保护下确认 RECEIVED、冻结完成结果并递增 revision。第一次确认的该角色文件成为所采用原件；角色已占用时晚到收件只加入未采用历史，不自动替换。每次成功收件/核对均留历史并使旧验证结果失效；重新显式校验后才产生新的当前解析结果。
 
 PENDING/RETRYABLE 历史保留原上传者及恢复元数据和可能已写入的字节；没有取消、删除或代用他人 key 的动作。另一个当前 lab writer 可用自己的 intent 在同批上传替代原件，并明确选择已 RECEIVED 的文件。显式选择尚未 RECEIVED 的文件才返回 scoped files_pending，不会因无关历史阻塞整个批次。
 
@@ -53,18 +53,20 @@ PENDING/RETRYABLE 历史保留原上传者及恢复元数据和可能已写入�
 
 所有暂存读写（含模板、来源目录、历史、操作查询、原件）均要求当前 laboratory.write；仅 laboratory.read/assets.read/analysis.read 不够。HTTP 变更还要求同源 Origin 和会话 CSRF。角色撤销后旧 actor 及会话不能访问；原对象不会因此删除。
 
-S1 路由统一位于 /api/laboratory/imports：
+路由统一位于 /api/laboratory/imports：
 
 - GET /template、/sources、空路径列表、/operations/{key}、/{batch_id}。
 - POST 空路径创建；POST /{batch_id}/files 接收指定 role 的原始字节。
 - GET /{batch_id}/files 分页原件历史；GET /{batch_id}/files/{file_id}/original 下载。
-- POST /{batch_id}/revisions 核对元数据/绑定/所采用原件；GET 同路径分页核对历史。
+- POST /{batch_id}/revisions 核对元数据/绑定/所采用原件或行 changes；GET 同路径分页核对历史。
+- POST /{batch_id}/validations 使用 expected_revision 排队；GET /{batch_id} 查看真实阶段/计数。
+- GET /{batch_id}/samples、/samples/{row_id}?test_page=1、/unassigned-tests 与 /issues 分页读取；问题包含原件/表/逻辑行/字段及可导航页码。
 
-列表、原件与历史固定20项/页；批次列表支持 q（批次号/文件名）、state、purpose、来源 UUID、参与 actor UUID、UTC创建日 created_from/to。JSON请求最大32MiB。格式/字段/角色错误为422或415，大小413，私有资源不存在404，冲突409，数据库变更结果未知503 import_write_unknown、读取暂不可用503 import_read_unavailable、对象存储503 object_storage_unavailable；均不暴露 SQL、凭据或原件内容。
+列表、原件、油样、关联/未关联检测与历史固定20项/页，问题50项/页；批次列表支持 q（批次号/文件名）、state、purpose、来源 UUID、参与 actor UUID、UTC创建日 created_from/to。JSON请求最大32MiB。格式/字段/角色错误为422或415，大小413，私有资源不存在404，冲突409，数据库变更结果未知503 import_write_unknown、读取暂不可用503 import_read_unavailable、对象存储503 object_storage_unavailable；均不暴露 SQL、凭据或原件内容。
 
 ## 验证边界
 
-S1 通过公开门面+真实 PostgreSQL、HTTP、真实生产构建浏览器和配置化 MinIO/Azurite 工作流验证收件/恢复。独立迁移用历史命名空间；HTTP/browser使用独立整库，避免 create_app 的 options 覆盖 search_path。具体命令、日志、结果与资源归属见 work-units/issue-52-s1.md。S2/S3 尚需验收解析/后台验证/问题分页/逐行核对；#53 负责正式发布，本入口没有发布按钮。
+验证通过公开门面与真实 PostgreSQL，HTTP/生产构建浏览器，以及配置化 MinIO/Azurite 的真实校验任务进行。独立迁移用历史命名空间；HTTP/browser使用独立整库，避免 create_app 的 options 覆盖 search_path。历史收件证据见 work-units/issue-52-s1.md，剩余实现的最终命令与结果见 work-units/issue-52-remaining-implementation.md。#53 负责正式发布，本入口没有发布按钮。
 
 
 
@@ -84,3 +86,13 @@ S1 通过公开门面+真实 PostgreSQL、HTTP、真实生产构建浏览器和�
 
 批次历史 q 的文件名/批次号比较统一使用 PostgreSQL lower 对查询及被查文本两侧执行同一规则；不修改保留原名，不使用 Python casefold，也不把 ß 与 SS 合并为同一文件名。总数和20项分页来自同一个完整查询快照。来源实验室候选目录原有的 casefold 候选语义及显式稳定身份规则保持不变。
 
+
+## 后台校验与行核对
+
+worker 使用与 API 相同的 Settings/FileStore：`python -m dga.laboratory.import_worker`（`--once` 处理至多一项）。Compose 启动 laboratory-import-worker，无额外 broker。任务冻结已确认的所采用原件清单、批次版本、来源绑定及覆盖值；无关历史 PENDING/RETRYABLE 不阻塞。当前请求者在领取及完成时重新鉴权。租约/token/当前任务/版本/清单共同防止旧任务回写；基础设施或哈希失败为 FAILED，可显式重检。语法/容量错误为 COMPLETE 加阻塞文件问题；COMPLETE 不表示可正式使用。
+
+同一版本重新校验进入 QUEUED/RUNNING/FAILED 时旧解析结果明确过期，只有新的 COMPLETE 任务结果可标当前。目录指纹及校验时点可见；进度是实际处理字节或行数，不能将上传100%当作服务端提交或科学校验完成。
+
+行核对请求 changes 为 row_id 与严格允许的业务列标量映射，测量值必须保留词法十进制文本；禁止嵌套对象、浮点、未知字段、重复行、超长备注与行更正/原件切换同一请求。每次需 expected_revision、原因和私有 intent；审计、覆盖值、修订与冻结操作结果原子提交。原件不变，核对不会创造复测。历史分页展开每个受改行的前后值，批次条目不复制全部行。来源别名更正仍需明确 NEW/REFERENCE，缺身份只产生问题。
+
+核对后显示过期原解析值，用户显式重检；原检测者/QA 始终作为来源陈述，上传核对者由本地审计另记。source_note 与 notes 各2000 Unicode码点，界面显示计数并拒绝超长，不静默截断。未知响应、普通404/401/403/503、无证明422继续保存原 key/完整参数/旧版本；只有已提交 REJECTED 证明和用户明确准备新请求后才重新基于最新版本核对。

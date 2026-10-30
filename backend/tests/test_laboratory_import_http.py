@@ -187,3 +187,42 @@ def test_http_never_emits_rejection_proof_for_unknown_commit(database_url):
             assert confirmed.status_code==422 and confirmed.json()['disposition']=='DURABLE_REJECTED'
     engine.dispose()
 
+
+
+def test_http_validation_review_preview_and_current_authorization(database_url):
+    from tests.laboratory_import_fixtures import setup,receive
+    from tests.identity_seed import seed_legacy_user
+    from tests.test_sample_reception import INITIAL_PASSWORD
+    engine,identity,admin,imports,files,batch,sample,test,_=setup(database_url)
+    receive(imports,admin,batch,[sample],[test])
+    user=seed_legacy_user(database_url,'staging-http','Staging HTTP analyst',INITIAL_PASSWORD,['analyst'])
+    original=identity.login('staging-http',INITIAL_PASSWORD)
+    identity.change_password(original.token,INITIAL_PASSWORD,CHANGED_PASSWORD)
+    with TestClient(create_app(Settings(database_url=database_url,cookie_secure=False,
+            auth_allowed_origins='http://testserver'),file_store=files)) as client:
+        session=client.post('/api/auth/login',headers={'Origin':'http://testserver'},
+            json=dict(username='staging-http',password=CHANGED_PASSWORD)).json()
+        headers={'Origin':'http://testserver','X-CSRF-Token':session['csrf_token'],'Idempotency-Key':str(uuid4())}
+        url=ROUTE+'/'+str(batch['id'])
+        assert client.post(url+'/validations',json=dict(expected_revision=2)).status_code==403
+        queued=client.post(url+'/validations',json=dict(expected_revision=2),headers=headers)
+        assert queued.status_code==202 and queued.json()['job']['state']=='QUEUED'
+        assert imports.process_next('http-validation')
+        preview=client.get(url+'/samples').json();row=preview['items'][0]
+        assert preview['validation_current'] and preview['total']==1
+        assert client.get(url+'/samples/'+row['id']).json()['tests']['total']==1
+        revision=dict(expected_revision=2,reason='HTTP one-row review',changes=[dict(row_id=row['id'],values=dict(notes='HTTP revised note'))])
+        changed=client.post(url+'/revisions',json=revision,headers=headers|{'Idempotency-Key':str(uuid4())})
+        assert changed.status_code==200 and changed.json()['batch']['revision']==3
+        assert client.get(url+'/samples').json()['stale']
+        bad_key=str(uuid4())
+        bad=client.post(url+'/revisions',json=revision|dict(changes=[dict(row_id=row['id'],values=dict(source_note=['object']))]),
+            headers=headers|{'Idempotency-Key':bad_key})
+        assert bad.status_code==422 and bad.json()['disposition']=='DURABLE_REJECTED'
+        assert client.get(ROUTE+'/operations/'+bad_key).json()['state']=='REJECTED'
+        identity.change_roles(admin,user,add=['field_engineer'],remove=['analyst'],expected_revision=0)
+        for path in ('/samples','/samples/'+row['id'],'/unassigned-tests','/issues','/revisions'):
+            assert client.get(url+path).status_code==403
+        assert client.post(url+'/validations',json=dict(expected_revision=3),headers=headers|{'Idempotency-Key':str(uuid4())}).status_code==403
+        assert client.post(url+'/revisions',json=revision,headers=headers|{'Idempotency-Key':str(uuid4())}).status_code==403
+    engine.dispose()

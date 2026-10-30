@@ -85,20 +85,48 @@ class ImportMetadata(ImportInput):
     source_timezone_confirmed: bool | None = Field(default=None, strict=True)
 
 
+class RowChange(ImportInput):
+    row_id: UUID
+    values: dict[str, str | bool | int | None] = Field(min_length=1,max_length=39)
+
+    @field_validator('values',mode='before')
+    @classmethod
+    def scalar_values(cls, values):
+        if not isinstance(values,dict): raise ValueError('invalid_import_input')
+        for field,value in values.items():
+            if not isinstance(field,str) or type(value) not in (str,bool,int,type(None)):
+                raise ValueError('invalid_import_input')
+            if field.endswith('_value') and value is not None and not isinstance(value,str):
+                raise ValueError('invalid_import_input')
+            if isinstance(value,str):
+                if len(value)>32767 or '\x00' in value:
+                    raise ValueError('invalid_import_input')
+                if field in ('notes','source_note','source_qa') and len(value)>2000:
+                    raise ValueError('invalid_import_input')
+        return values
+
+
 class ReviseImport(ImportInput):
     expected_revision: int = Field(strict=True, ge=0)
     reason: str = Field(min_length=1, max_length=1000)
     metadata: ImportMetadata | None = None
     source_labs: tuple[SourceDecision, ...] = Field(default=(), max_length=500)
     active_files: dict[Literal['WORKBOOK', 'SAMPLES', 'TESTS'], UUID] | None = Field(default=None, max_length=3)
+    changes: tuple[RowChange, ...] = Field(default=(), max_length=2500)
 
     @model_validator(mode='after')
     def coherent(self):
         if not self.reason.strip() or '\x00' in self.reason:
             raise ValueError('invalid_import_input')
-        if not self.metadata and not self.source_labs and not self.active_files:
+        if not self.metadata and not self.source_labs and not self.active_files and not self.changes:
+            raise ValueError('invalid_import_input')
+        if (self.active_files and self.changes) or len({x.row_id for x in self.changes})!=len(self.changes):
             raise ValueError('invalid_import_input')
         if len({x.key for x in self.source_labs}) != len(self.source_labs):
             raise ValueError('invalid_source_decision')
         return self
+
+
+class ValidationInput(ImportInput):
+    expected_revision: int = Field(strict=True, ge=0)
 

@@ -32,3 +32,31 @@ def test_staged_original_uses_configured_provider_and_reopens_exact_bytes(storag
             case.store.delete(object_key=internal)  # owned ephemeral provider fixture cleanup only
         engine.dispose()
 
+
+
+import pytest
+@pytest.mark.parametrize('format',['CSV_PAIR','XLSX'])
+def test_configured_provider_runs_complete_staging_validation_job(storage_case,format):
+    from tests.laboratory_import_fixtures import setup,receive,queued
+    case=storage_case
+    engine,_,actor,imports,_,batch,sample,test,_=setup(case.settings.database_url.get_secret_value(),format=format,files=case.store)
+    originals=[]
+    try:
+        originals=receive(imports,actor,batch,[sample],[test,test|dict(external_test_id='RETEST-0002',result_value='0')])
+        queued(imports,actor,batch)
+        assert imports.process_next('configured-'+case.settings.object_store_provider+'-'+format)
+        current=imports.get(actor,batch['id'])
+        assert current['validation_current'] and current['current_job']['state']=='COMPLETE'
+        row=imports.samples(actor,batch['id'])['items'][0]
+        assert row['raw_values']['external_sample_id']=='00017'
+        results=imports.sample(actor,batch['id'],row['id'])['tests']
+        assert results['total']==2
+        assert {x['raw_values']['external_test_id'] for x in results['items']}=={'T-0001','RETEST-0002'}
+        assert {x['parsed_values']['measurements']['MOISTURE']['value'] for x in results['items']}=={'1.230000','0'}
+        for original in originals:
+            downloaded=imports.original(actor,batch['id'],original['file']['id'])
+            assert sha256(downloaded['content']).hexdigest()==original['file']['sha256']
+    finally:
+        for item in originals:case.store.delete(object_key=f"lab-imports/{batch['id']}/{item['file']['id']}/source")
+        engine.dispose()
+

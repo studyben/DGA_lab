@@ -117,6 +117,13 @@ class HealthAsset:
     parent_asset_id: UUID | None
 
 
+class PhysicalTransformerReader(Protocol):
+    def lookup_physical_transformer(self, actor: ActorContext, *, asset_id=None,
+            system_asset_number=None, connection: Connection | None=None) -> TransformerIdentity: ...
+    def resolve_sampling_context(self, actor: ActorContext, asset_id: UUID, *, sampled_at: datetime,
+            connection: Connection | None=None) -> SamplingAssetContext: ...
+
+
 class HealthAssetReader(Protocol):
     def health_assets(self, actor: ActorContext, root: UUID, at: datetime) -> tuple[HealthAsset, ...]: ...
 
@@ -143,6 +150,35 @@ class AssetDirectory:
     ):
         self._engine = engine
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+
+    def lookup_physical_transformer(self, actor: ActorContext, *, asset_id=None,
+                                    system_asset_number=None, connection: Connection | None=None) -> TransformerIdentity:
+        """Exact immutable physical identity, independent of an installation date."""
+        require_permission(actor,'assets.read')
+        if asset_id is None and system_asset_number is None:
+            raise AssetQueryError('invalid_asset_query')
+        if asset_id is not None:
+            try: asset_id=UUID(str(asset_id))
+            except (ValueError,TypeError,AttributeError):
+                raise AssetQueryError('invalid_asset_query') from None
+        if system_asset_number is not None and (not isinstance(system_asset_number,str)
+                or not 1<=len(system_asset_number)<=80 or not system_asset_number.strip()):
+            raise AssetQueryError('invalid_asset_query')
+        def read(c):
+            rows=c.execute(text("""SELECT id,system_asset_number,serial_number,model,asset_type
+                FROM formal_assets WHERE id=:id OR system_asset_number=:number"""),
+                dict(id=asset_id,number=system_asset_number)).mappings().all()
+            by_id=next((r for r in rows if r['id']==asset_id),None) if asset_id is not None else None
+            by_number=next((r for r in rows if r['system_asset_number']==system_asset_number),None) if system_asset_number is not None else None
+            if (asset_id is not None and by_id is None) or (system_asset_number is not None and by_number is None):
+                raise AssetQueryError('asset_not_found',404)
+            if by_id is not None and by_number is not None and by_id['id']!=by_number['id']:
+                raise AssetQueryError('asset_identity_conflict',409)
+            row=by_id if by_id is not None else by_number
+            if row['asset_type']!='TRANSFORMER': raise AssetQueryError('transformer_required')
+            return TransformerIdentity(row['id'],row['system_asset_number'],row['serial_number'],row['model'])
+        if connection is not None: return read(connection)
+        with self._engine.connect() as c: return read(c)
 
     def material_detail(self, actor: ActorContext, material_number: str) -> dict:
         require_permission(actor,'assets.read')

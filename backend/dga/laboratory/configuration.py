@@ -169,6 +169,26 @@ class LaboratoryConfiguration:
         self._engine = engine
         self._audit = AuditTrail()
 
+    def import_catalog(self, actor, connection=None):
+        """Narrow coherent staging read; caller-owned connection is never closed."""
+        from dga.shared.auth.public import IdentityService
+        require_permission(actor,'laboratory.write')
+        def read(c):
+            IdentityService(self._engine).authorize_current(c,actor,'laboratory.write')
+            lock_configuration(c)
+            types=[dict(r) for r in c.execute(text(
+                'SELECT code,display_name,is_active FROM laboratory_type_settings ORDER BY code')).mappings()]
+            methods=[dict(r) for r in c.execute(text("""SELECT id,test_type,display_name,version_label,
+                standard_reference,is_active,configuration FROM test_method_versions ORDER BY test_type,version_label,id""")).mappings()]
+            fields=c.execute(text("""SELECT method_version_id,field_code AS code,display_name,unit_code,
+                display_decimal_places,detection_limit FROM test_method_fields ORDER BY method_version_id,sort_order""")).mappings().all()
+            for method in methods:
+                method['fields']=[{k:v for k,v in f.items() if k!='method_version_id'}
+                                  for f in fields if f['method_version_id']==method['id']]
+            return json.loads(json.dumps(dict(types=types,methods=methods),default=str))
+        if connection is not None: return read(connection)
+        with self._engine.begin() as c: return read(c)
+
     def health_methods(self, actor):
         """Narrow analysis catalog; exposes no instrument or package maintenance data."""
         require_permission(actor, 'analysis.read')

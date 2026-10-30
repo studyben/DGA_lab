@@ -44,6 +44,11 @@ def test_0034_preserves_0033_facts_pdf_and_all_formal_public_queries(database_ur
             measurements=LaboratoryTrendSource(engine).finalized_measurements(actor,asset_id),
             health={k:h[k] for k in ('status','incomplete','sources','own','descendants')},
             alarms=center(engine).query(actor)['items'])
+    from dga.laboratory.public import LaboratoryConfiguration,MethodVersionInput
+    from tests.laboratory_import_fixtures import receive,queued,csv_bytes,SAMPLES,TESTS
+    method=LaboratoryConfiguration(engine).create_method(actor,MethodVersionInput(test_type='MOISTURE',
+        display_name='Explicit isolated staging method',version_label='non-effects-'+uuid4().hex[:10],
+        fields=[dict(code='MOISTURE',display_name='Synthetic field',unit_code='TEST-UNIT',display_decimal_places=6)]))
     before=observations()
     assert sha256(before['pdf']).hexdigest()==case['pdf_sha256']
     command.upgrade(Config('alembic.ini'),'head')
@@ -52,17 +57,42 @@ def test_0034_preserves_0033_facts_pdf_and_all_formal_public_queries(database_ur
     batch=imports.create(actor,idempotency_key=str(uuid4()),input_format='CSV_PAIR',purpose='HISTORICAL',
         source_labs=[dict(key='SRC',decision='NEW',proposed_name='Receipt source',source_kind='THIRD_PARTY',
             reason='Explicit evidence source',confirm_distinct=True,candidate_digest=candidate['candidate_digest'])])['batch']
-    for role in ('SAMPLES','TESTS'):
-        imports.receive_file(actor,batch['id'],idempotency_key=str(uuid4()),role=role,
-            filename=role.lower()+'.csv',content_type='text/csv',content=b'Unparsed retained evidence\n')
+    sample=dict(source_lab_key='SRC',source_lab_name='Receipt source',external_sample_id='00017',
+        formal_asset_id=str(asset_id),sampled_at='2026-01-15',physical_received='FALSE',container_count='0',
+        sampling_context='OTHER',source_note='Original source evidence')
+    test=dict(source_lab_key='SRC',external_sample_id='00017',external_test_id='T-00017',test_type='MOISTURE',
+        measured_at='2026-01-16',method_version_id=str(method['id']),result_value='1.230000',
+        result_qualifier='EQ',result_unit='TEST-UNIT',source_method='Supplied',source_analyst='External analyst')
+    originals=receive(imports,actor,batch,[sample],[test])
+    queued(imports,actor,batch);assert imports.process_next('known-formal-baseline')
+    row=imports.samples(actor,batch['id'])['items'][0]
+    assert row['related_test_count']==1 and imports.get(actor,batch['id'])['validation_current']
     imports.revise(actor,batch['id'],idempotency_key=str(uuid4()),expected_revision=2,
-        reason='Purpose review only',metadata=dict(purpose='DAILY'))
-    assert imports.get(actor,batch['id'])['manifest_state']=='COMPLETE'
+        reason='Review staging only',changes=[dict(row_id=row['id'],values=dict(source_note='Reviewed source evidence'))])
+    queued(imports,actor,batch);assert imports.process_next('revised-formal-baseline')
+    assert imports.samples(actor,batch['id'])['items'][0]['parsed_values']['source_note']=='Reviewed source evidence'
     assert observations()==before
-    assert reports.claim_next_report('receipt-non-effects',lease_seconds=60) is None
+    # Invalid replacement yields only a complete blocking file issue, retaining originals.
+    invalid=imports.receive_file(actor,batch['id'],idempotency_key=str(uuid4()),role='TESTS',
+        filename='invalid.csv',content_type='text/csv',content=b'not,the,required,header\n')
+    imports.revise(actor,batch['id'],idempotency_key=str(uuid4()),expected_revision=4,
+        reason='Explicit invalid source selection',active_files=dict(TESTS=invalid['file']['id']))
+    queued(imports,actor,batch);assert imports.process_next('invalid-formal-baseline')
+    assert imports.get(actor,batch['id'])['current_job']['state']=='COMPLETE'
+    assert imports.samples(actor,batch['id'])['total']==0 and imports.issues(actor,batch['id'])['total']>=1
+    assert observations()==before
+    # Real provider-byte mismatch is an infrastructure failure, never a partial result.
+    selected=originals[0]['file'];object_key=f"lab-imports/{batch['id']}/{selected['id']}/source"
+    retained=files.get(object_key=object_key);files.put(object_key=object_key,content=b'wrong bytes',content_type='text/csv')
+    queued(imports,actor,batch);assert imports.process_next('failed-formal-baseline')
+    assert imports.get(actor,batch['id'])['current_job']['state']=='FAILED'
+    files.put(object_key=object_key,content=retained,content_type='text/csv')
+    assert observations()==before
+    assert imports.original(actor,batch['id'],selected['id'])['content']==retained
+    assert reports.claim_next_report('staging-non-effects',lease_seconds=60) is None
     with pytest.raises(DBAPIError,match='Retained laboratory imports require forward recovery'):
         command.downgrade(Config('alembic.ini'),'0033_lab_finalization_facts')
-    assert imports.get(actor,batch['id'])['revision']==3
+    assert imports.get(actor,batch['id'])['revision']==5
     assert bench.get_current_finalization(actor,case['barcode'])==before['facts']
     engine.dispose()
 

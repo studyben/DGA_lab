@@ -77,6 +77,17 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+  laboratory-import-worker:
+    build: ./backend
+    environment: *app-env
+    command: ["python", "-m", "dga.laboratory.import_worker"]
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      object-store-init:
+        condition: service_completed_successfully
+
   report-worker:
     build: ./backend
     environment: *app-env

@@ -1,6 +1,9 @@
-import type {CreateInput,RevisionInput,UploadMetadata,Receipt,MutationResult,DurableInputRejection} from './importTypes';
+import type {CreateInput,RevisionInput,UploadMetadata,Receipt,MutationResult,DurableInputRejection,ValidationInput} from './importTypes';
 export const importRoot='/api/laboratory/imports';
 const messages:Record<string,string>={
+  active_files_incomplete:'当前采用的原件尚未齐备，请先确认保存工作簿或两份 CSV。',
+  validation_in_progress:'已有校验正在进行，请等待当前任务或刷新状态。',
+  import_validation_unavailable:'校验服务暂不可用，请保留原操作并查询结果。',
   import_stale_revision:'批次已被修改。原请求已拒绝；请加载最新批次后重新核对。',
   source_candidates_changed:'同名来源实验室候选已变化。请重新查询并明确选择。',
   files_pending:'所选文件尚未确认保存，当前采用的原件保持不变。',
@@ -28,7 +31,7 @@ export function parseImportError(value:unknown,status:number):ImportError {
   const body=object(value),op=object(body?.operation),result=object(op?.result);
   const code=typeof body?.code==='string'?body.code:'request_failed';
   const proven=status===422&&code==='invalid_import_input'&&body?.disposition==='DURABLE_REJECTED'
-    &&op?.state==='REJECTED'&&(op.action==='CREATE'||op.action==='REVISE')&&op.batch_id===null
+    &&op?.state==='REJECTED'&&(op.action==='CREATE'||op.action==='REVISE'||op.action==='VALIDATE')&&op.batch_id===null
     &&op.error_code===null&&result?.code==='invalid_import_input'&&result.status===422&&result.details===null;
   return new ImportError(code,status,proven?op as unknown as DurableInputRejection:undefined);
 }
@@ -43,11 +46,11 @@ async function response<T>(r:Response):Promise<T> {
   if(!r.ok)throw parseImportError(await r.json().catch(()=>null),r.status);
   return r.json() as Promise<T>;
 }
-export async function readImport<T>(suffix:string):Promise<T>{
-  return response<T>(await fetch(importRoot+suffix,{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(45000)}));
+export async function readImport<T>(suffix:string,signal?:AbortSignal):Promise<T>{
+  return response<T>(await fetch(importRoot+suffix,{cache:'no-store',credentials:'same-origin',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(45000)]):AbortSignal.timeout(45000)}));
 }
-export async function sendImport(action:'CREATE'|'REVISE',key:string,payload:CreateInput|RevisionInput,batch:string|null,csrf:string):Promise<MutationResult>{
-  return response<MutationResult>(await fetch(importRoot+(action==='REVISE'?'/'+batch+'/revisions':''),{
+export async function sendImport(action:'CREATE'|'REVISE'|'VALIDATE',key:string,payload:CreateInput|RevisionInput|ValidationInput,batch:string|null,csrf:string):Promise<MutationResult>{
+  return response<MutationResult>(await fetch(importRoot+(action==='REVISE'?'/'+batch+'/revisions':action==='VALIDATE'?'/'+batch+'/validations':''),{
     method:'POST',credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(45000),
     headers:{'Content-Type':'application/json','X-CSRF-Token':csrf,'Idempotency-Key':key},body:JSON.stringify(payload)}));
 }
@@ -73,6 +76,3 @@ export function uploadOriginal(meta:UploadMetadata,key:string,file:File,csrf:str
     xhr.send(file);
   });
 }
-
-
-

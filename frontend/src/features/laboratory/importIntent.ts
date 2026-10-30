@@ -1,8 +1,8 @@
 import {sha256} from '@noble/hashes/sha2.js';
 import {bytesToHex} from '@noble/hashes/utils.js';
-import type {CreateInput,RevisionInput,UploadMetadata,FileRole} from './importTypes';
+import type {CreateInput,RevisionInput,UploadMetadata,FileRole,ValidationInput} from './importTypes';
 
-type JsonIntent={action:'CREATE';payload:CreateInput;batch_id:null}|{action:'REVISE';payload:RevisionInput;batch_id:string};
+type JsonIntent={action:'CREATE';payload:CreateInput;batch_id:null}|{action:'REVISE';payload:RevisionInput;batch_id:string}|{action:'VALIDATE';payload:ValidationInput;batch_id:string};
 type FileIntent={action:'RECEIVE';payload:UploadMetadata;batch_id:string};
 export type ImportIntent=(JsonIntent|FileIntent)&{version:1;key:string;digest:string};
 const MAX_JSON_BYTES=32*1024*1024;
@@ -32,7 +32,7 @@ export function loadIntent(actor:string):ImportIntent|null {
   try{
     if(raw.length>MAX_JSON_BYTES)throw new Error();
     const v=JSON.parse(raw) as ImportIntent;
-    if(v.version!==1||!['CREATE','RECEIVE','REVISE'].includes(v.action)||!/^[0-9a-f-]{36}$/.test(v.key))throw new Error();
+    if(v.version!==1||!['CREATE','RECEIVE','REVISE','VALIDATE'].includes(v.action)||!/^[0-9a-f-]{36}$/.test(v.key))throw new Error();
     const value={action:v.action,payload:v.payload,batch_id:v.batch_id};
     if(v.digest!==fingerprint(value))throw new Error();
     return v;
@@ -55,5 +55,3 @@ export async function fileMetadata(file:File,batch:string,role:FileRole):Promise
 export function sameOriginal(a:UploadMetadata,b:UploadMetadata){
   return ['batch_id','role','filename','content_type','byte_size','sha256'].every(k=>a[k as keyof UploadMetadata]===b[k as keyof UploadMetadata]);
 }
-
-

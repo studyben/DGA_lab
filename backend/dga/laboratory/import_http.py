@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 from dga.shared.auth.public import require_permission
 from .imports import fail
-from .import_contracts import MAX_FILE_BYTES, MAX_REQUEST_BYTES, CreateImport, ReviseImport
+from .import_contracts import MAX_FILE_BYTES, MAX_REQUEST_BYTES, CreateImport, ReviseImport, ValidationInput
 
 
 def import_router(imports, actor_dependency, mutation_actor):
@@ -123,8 +123,33 @@ def import_router(imports, actor_dependency, mutation_actor):
         value = await run_in_threadpool(call,imports.revise,actor,batch_id,idempotency_key=str(key),writing=True,**body)
         return JSONResponse(value,headers={'Cache-Control':'no-store'})
 
+
+    @router.post('/{batch_id}/validations',status_code=202)
+    async def validate(batch_id: UUID,request: Request,key: UUID=Header(alias='Idempotency-Key'),actor=Depends(mutation_actor)):
+        require_permission(actor,'laboratory.write')
+        body=await command_body(request,ValidationInput,actor,key,'VALIDATE',batch_id)
+        if isinstance(body,Response): return body
+        value=await run_in_threadpool(call,imports.validate,actor,batch_id,idempotency_key=str(key),writing=True,**body)
+        return JSONResponse(value,status_code=202,headers={'Cache-Control':'no-store'})
+
+    @router.get('/{batch_id}/samples')
+    def samples(batch_id: UUID,page: int=Query(default=1,ge=1,le=100000),
+                severity: Literal['ERROR','WARNING','INFO']|None=None,actor=Depends(actor_dependency)):
+        return JSONResponse(call(imports.samples,actor,batch_id,page=page,severity=severity),headers={'Cache-Control':'no-store'})
+
+    @router.get('/{batch_id}/samples/{row_id}')
+    def sample(batch_id: UUID,row_id: UUID,test_page: int=Query(default=1,ge=1,le=100000),actor=Depends(actor_dependency)):
+        return JSONResponse(call(imports.sample,actor,batch_id,row_id,test_page=test_page),headers={'Cache-Control':'no-store'})
+
+    @router.get('/{batch_id}/unassigned-tests')
+    def unassigned(batch_id: UUID,page: int=Query(default=1,ge=1,le=100000),actor=Depends(actor_dependency)):
+        return JSONResponse(call(imports.unassigned_tests,actor,batch_id,page=page),headers={'Cache-Control':'no-store'})
+
+    @router.get('/{batch_id}/issues')
+    def issues(batch_id: UUID,page: int=Query(default=1,ge=1,le=100000),
+               severity: Literal['ERROR','WARNING','INFO']|None=None,code: str|None=Query(default=None,min_length=1,max_length=80),
+               sheet: Literal['油样信息','检测结果']|None=None,row_id: UUID|None=None,actor=Depends(actor_dependency)):
+        return JSONResponse(call(imports.issues,actor,batch_id,page=page,severity=severity,code=code,sheet=sheet,
+            row_id=row_id),headers={'Cache-Control':'no-store'})
+
     return router
-
-
-
-

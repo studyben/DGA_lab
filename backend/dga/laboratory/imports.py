@@ -30,11 +30,18 @@ class ImportAction(StrEnum):
     FILE_FAILED = 'LAB_IMPORT_FILE_FAILED'
     SOURCE = 'LAB_IMPORT_SOURCE_DOWNLOADED'
     REVISE = 'LAB_IMPORT_REVISED'
+    QUEUED = 'LAB_IMPORT_VALIDATION_QUEUED'
+    COMPLETED = 'LAB_IMPORT_VALIDATION_COMPLETED'
+    FAILED = 'LAB_IMPORT_VALIDATION_FAILED'
 
 
 class LaboratoryImports:
-    def __init__(self, engine, files, *, identities=None, audit=None, clock=None):
+    def __init__(self, engine, files, *, identities=None, audit=None, assets=None, configuration=None, clock=None):
         self.engine, self.files = engine, files
+        from dga.assets.public import AssetDirectory
+        from .configuration import LaboratoryConfiguration
+        self.assets=assets if assets is not None else AssetDirectory(engine)
+        self.configuration=configuration if configuration is not None else LaboratoryConfiguration(engine)
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.identity = identities or IdentityService(engine)
         self.audit = audit or AuditTrail(clock=self.clock)
@@ -133,17 +140,17 @@ class LaboratoryImports:
         normal command and this rejection have distinct digest namespaces.
         """
         require_permission(actor, 'laboratory.write')
-        if action not in ('CREATE', 'REVISE') or not isinstance(request, dict):
+        if action not in ('CREATE', 'REVISE', 'VALIDATE') or not isinstance(request, dict):
             fail('invalid_import_input')
-        from .import_contracts import ReviseImport
+        from .import_contracts import ReviseImport, ValidationInput
         try:
-            (CreateImport if action == 'CREATE' else ReviseImport).model_validate(request)
+            {'CREATE':CreateImport,'REVISE':ReviseImport,'VALIDATE':ValidationInput}[action].model_validate(request)
         except ValidationError:
             pass
         else:
             # This method proves invalid input, not a general cancellation command.
             fail('invalid_import_input')
-        route_batch = str(self._uuid(batch_id)) if action == 'REVISE' else None
+        route_batch = str(self._uuid(batch_id)) if action != 'CREATE' else None
         try:
             request_hash = digest(request)
         except (ValueError, TypeError, UnicodeError, RecursionError):
@@ -158,7 +165,7 @@ class LaboratoryImports:
                 rejected = dict(code='invalid_import_input', status=422, details=None)
                 operation_id = self._complete(c, actor, key, action, payload, fingerprint, None,
                                               rejected, state='REJECTED')
-                self.audit.append(c, actor, ImportAction.CREATE if action == 'CREATE' else ImportAction.REVISE,
+                self.audit.append(c, actor, {'CREATE':ImportAction.CREATE,'REVISE':ImportAction.REVISE,'VALIDATE':ImportAction.QUEUED}[action],
                                   entity_id=operation_id, result='FAILURE',
                                   details=dict(code='invalid_import_input', rejection_contract=1))
         # Only a known committed rejection (and still-current actor) is returned.
@@ -214,7 +221,9 @@ class LaboratoryImports:
                 JOIN laboratory_source_labs s ON s.id=b.source_lab_id
                 WHERE b.batch_id=:id ORDER BY b.source_lab_key'''), {'id': batch_id}).mappings().all()
             files, manifest_state = self._manifest(c, row)
-            return json.loads(dumped(dict(row, manifest_state=manifest_state, active_files=files, source_labs=[dict(x) for x in bindings])))
+            from .import_jobs import ValidationJobs
+            validation = ValidationJobs(self).status(c,row)
+            return json.loads(dumped(dict(row, manifest_state=manifest_state, active_files=files, source_labs=[dict(x) for x in bindings], **validation)))
 
     def list_batches(self, actor, *, page=1, q='', state=None, purpose=None,
                      created_from=None, created_to=None, actor_id=None, source_lab_id=None, **filters):
@@ -376,14 +385,16 @@ class LaboratoryImports:
 
 
     def revise(self, actor, batch_id, *, idempotency_key, **values):
-        from .import_contracts import ReviseImport
+        from .import_contracts import ReviseImport, ValidationInput
         require_permission(actor, 'laboratory.write')
         batch_id = self._uuid(batch_id)
         try:
             command = ReviseImport(**values)
         except ValidationError:
             fail('invalid_import_input')
-        payload = dict(batch_id=str(batch_id), **command.model_dump(mode='json'))
+        normalized=command.model_dump(mode='json')
+        if not command.changes: normalized.pop('changes',None)  # Preserve S1 canonical metadata intents.
+        payload = dict(batch_id=str(batch_id), **normalized)
         rejected = None
         with self.engine.begin() as c:
             key, fingerprint, old = self._intent(c, actor, idempotency_key, 'REVISE', payload)
@@ -427,9 +438,16 @@ class LaboratoryImports:
                                       dict(batch=batch_id, roles=list(command.active_files)))
                             for file_id in command.active_files.values():
                                 c.execute(text('UPDATE lab_import_files SET active=true WHERE id=:id'), {'id': file_id})
+                        row_before,row_after=[],[]
+                        if command.changes:
+                            from .import_review import apply_rows
+                            row_before,row_after=apply_rows(c,batch,command.changes)
                         current = c.execute(text('SELECT * FROM lab_import_batches WHERE id=:id FOR SHARE'), {'id': self._uuid(batch_id)}).mappings().one()
                         after = self._snapshot(c, current)
-                        if before == after:
+                        if row_after:
+                            before['row_changes']=row_before
+                            after['row_changes']=row_after
+                        if dumped(before) == dumped(after):
                             fail('invalid_import_input')
                         revision = self._changed(c, current, actor, command.reason.strip(), before, after)
                         self._complete(c, actor, key, 'REVISE', payload, fingerprint, batch_id,
@@ -447,21 +465,8 @@ class LaboratoryImports:
         return dict(operation=self.operation(actor, key), batch=self.get(actor, batch_id))
 
     def revision_history(self, actor, batch_id, *, page=1):
-        if type(page) is not int or not 1 <= page <= 100000:
-            fail('invalid_import_input')
-        batch_id = self._uuid(batch_id)
-        with self.engine.begin() as c:
-            self._authorize(c, actor)
-            self._locked(c, batch_id)
-            params = dict(id=batch_id, offset=(page-1)*20)
-            total = c.execute(text('SELECT count(*) FROM lab_import_revisions WHERE batch_id=:id'), params).scalar_one()
-            rows = c.execute(text('''SELECT r.id,r.revision,r.actor_id,u.display_name,r.occurred_at,r.reason,
-                r.before_value,r.after_value FROM lab_import_revisions r JOIN users u ON u.id=r.actor_id
-                WHERE r.batch_id=:id ORDER BY r.revision DESC LIMIT 20 OFFSET :offset'''), params).mappings()
-            return dict(items=[json.loads(dumped(dict(x))) for x in rows], total=total, page=page, page_size=20)
-
-
-
+        from .import_review import history
+        return history(self,actor,batch_id,page=page)
     def template(self, actor, *, format='XLSX', example=False, version=1):
         if format not in ('XLSX', 'CSV_PAIR') or type(example) is not bool or type(version) is not int or version != 1:
             fail('invalid_import_input')
@@ -472,6 +477,53 @@ class LaboratoryImports:
 
 
 
+
+
+
+
+
+    def validate(self,actor,batch_id,**values):
+        from .import_jobs import ValidationJobs
+        return ValidationJobs(self).queue(actor,batch_id,**values)
+
+
+    def claim_validation(self,worker_id,*,lease_seconds=120):
+        from .import_jobs import ValidationJobs
+        return ValidationJobs(self).claim(worker_id,lease_seconds=lease_seconds)
+
+    def heartbeat(self,claim,*,phase,done,total):
+        from .import_jobs import ValidationJobs
+        return ValidationJobs(self).heartbeat(claim,phase=phase,done=done,total=total)
+
+    def fail_validation(self,claim,code):
+        from .import_jobs import ValidationJobs
+        return ValidationJobs(self).fail(claim,code)
+
+
+
+    def complete_validation(self,claim,result):
+        from .import_jobs import ValidationJobs
+        return ValidationJobs(self).complete(claim,result)
+
+    def process_next(self,worker_id,*,lease_seconds=120):
+        from .import_jobs import ValidationJobs
+        return ValidationJobs(self).process(worker_id,lease_seconds=lease_seconds)
+
+    def samples(self,actor,batch_id,*,page=1,severity=None):
+        from .import_preview import ImportPreview
+        return ImportPreview(self).samples(actor,batch_id,page=page,severity=severity)
+
+    def sample(self,actor,batch_id,row_id,*,test_page=1):
+        from .import_preview import ImportPreview
+        return ImportPreview(self).sample(actor,batch_id,row_id,test_page=test_page)
+
+    def unassigned_tests(self,actor,batch_id,*,page=1):
+        from .import_preview import ImportPreview
+        return ImportPreview(self).unassigned(actor,batch_id,page=page)
+
+    def issues(self,actor,batch_id,**filters):
+        from .import_preview import ImportPreview
+        return ImportPreview(self).issues(actor,batch_id,**filters)
 
 
 

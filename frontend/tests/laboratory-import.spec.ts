@@ -34,7 +34,7 @@ test('保存暂存原件后关闭重开，下载完整原始字节',async({page,
   await page.getByRole('link',{name:'下载原件：原始 laboratory.xlsx',exact:true}).click();
   const download=await downloadPromise;
   expect(await readFile((await download.path())!)).toEqual(content);
-  await expect(page.getByRole('button',{name:/校验|发布|定稿/})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/发布|定稿/})).toHaveCount(0);
   await page.screenshot({path:'test-results/laboratory-import-reopened.png',fullPage:true});
 });
 
