@@ -484,22 +484,21 @@ def test_removing_a_selected_result_audits_selection_clear(workbench_context):
     assert workbench.load(actor, sample.barcode_value).tests == ()
 
 
-@pytest.mark.parametrize('database_url', ['0024_alarm_observation'], indirect=True)
-def test_finalized_data_survives_0006_downgrade_and_reupgrade_as_open(workbench_context):
-    engine, _, actor, sample = workbench_context
-    workbench = make_workbench(engine, RecordingObjectStore())
-    method = next(
-        item for item in workbench.load(actor, sample.barcode_value).methods
-        if item.test_type == TestType.DGA
-    )
-    record = workbench.add_test(actor, sample.barcode_value, _dga(method.id))
-    # This historical migration fixture represents pre-0017 tests, which had no
-    # quality evidence. New records must instead refuse evidence-losing rollback.
-    with engine.begin() as connection:
-        connection.execute(text('UPDATE laboratory_tests SET quality_snapshot=NULL WHERE id=:id'), {'id': record.id})
-    workbench.finalize(actor, sample.barcode_value)
+@pytest.mark.parametrize('database_url', ['0007_laboratory_reports'], indirect=True)
+def test_finalized_data_survives_0006_downgrade_and_reupgrade_as_open(database_url):
+    from tests.finalization_legacy import load_case
+    engine = create_engine(database_url)
+    store = RecordingObjectStore()
+    case, actor = load_case(engine, 'old71_placeholder_ready', store)
+    # Real pre-quality storage then real upgrade; never erase quality evidence.
+    command.upgrade(Config('alembic.ini'), '0024_alarm_observation')
+    workbench = make_workbench(engine, store)
+    sample = SampleRegistry(engine, AssetDirectory(engine), AuditTrail()).find_by_barcode(actor, case['barcode'])
+    record_id = UUID(case['selected_test_ids'][0])
+    assert workbench.load(actor, sample.barcode_value).testing_status == TestingStatus.FINALIZED
 
     config = Config('alembic.ini')
+    # Retained data from the actual old producer, not the post0033 writer on0024.
     # Target only the laboratory branch; asset lifecycle deliberately forbids rollback.
     command.downgrade(config, '0007_laboratory_reports@0005_laboratory_test_entry')
     with engine.connect() as connection:
@@ -511,9 +510,8 @@ def test_finalized_data_survives_0006_downgrade_and_reupgrade_as_open(workbench_
 
     reloaded = workbench.load(actor, sample.barcode_value)
     assert reloaded.testing_status == TestingStatus.OPEN
-    assert [(item.id, item.selected_for_report) for item in reloaded.tests] == [
-        (record.id, False)
-    ]
+    assert [(item.id, item.selected_for_report) for item in reloaded.tests] == [(record_id, False)]
+    engine.dispose()
 
 
 def test_finalization_locks_all_scientific_data_mutations(workbench_context):

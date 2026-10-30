@@ -1,0 +1,4581 @@
+{
+  "actor": {
+    "display_name": "Workbench Admin",
+    "id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+    "username": "workbench-admin"
+  },
+  "cases": [
+    {
+      "barcode": "DGA-20260802-000001",
+      "caller_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "name": "parent_dga_ready",
+      "object_key": "laboratory/reports/0f4736ac-02fc-46ca-9b8b-aa6a2f480303/8ad63ede-1ae4-4056-ac73-b1d851dabd81.pdf",
+      "pdf_sha256": "48d45c95df1e5946523a6b2397396083cf1f492ec1ab79e6ee9c8cb743884ec8",
+      "pdf_size": 10812,
+      "producer_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "public_measurements": [
+        {
+          "analyte": "H2",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000001",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "36e09905-8edf-4e3b-9a19-ed118da764e0",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+          "sampled_at": "2026-08-01T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "10.125000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "CH4",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000001",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "36e09905-8edf-4e3b-9a19-ed118da764e0",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+          "sampled_at": "2026-08-01T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "11.250000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "C2H2",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000001",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "36e09905-8edf-4e3b-9a19-ed118da764e0",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+          "sampled_at": "2026-08-01T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "0.125000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "C2H4",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000001",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "36e09905-8edf-4e3b-9a19-ed118da764e0",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+          "sampled_at": "2026-08-01T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "4.500000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "C2H6",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000001",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "36e09905-8edf-4e3b-9a19-ed118da764e0",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+          "sampled_at": "2026-08-01T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "5.750000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "CO",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000001",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "36e09905-8edf-4e3b-9a19-ed118da764e0",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+          "sampled_at": "2026-08-01T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "120.000000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "CO2",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000001",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "36e09905-8edf-4e3b-9a19-ed118da764e0",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+          "sampled_at": "2026-08-01T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "900.000000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        }
+      ],
+      "public_report": {
+        "barcode": "DGA-20260802-000001",
+        "error_code": null,
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "unavailable_reason": null
+      },
+      "report_snapshot": {
+        "acknowledged_warning_codes": [],
+        "finalization": {
+          "finalized_at": "2026-08-06T12:00:00+00:00",
+          "finalized_by_display_name": "Workbench Admin",
+          "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+          "token": "36e09905-8edf-4e3b-9a19-ed118da764e0"
+        },
+        "quality_evidence": [
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [],
+            "revision": "99f8caba-b581-4d76-a5d5-c8be7c9a6979",
+            "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+            "warnings": []
+          }
+        ],
+        "sample": {
+          "asset_snapshot": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "barcode": "DGA-20260802-000001",
+          "equipment_serial": "TX-CURRENT-2002",
+          "identity_status": "ASSOCIATED",
+          "notes": "annual sample",
+          "received_at": "2026-08-02T09:00:00+00:00",
+          "sampled_at": "2026-08-01T12:00:00+00:00",
+          "site_name": "Prairie Sun"
+        },
+        "schema_version": 1,
+        "selected_results": [
+          {
+            "instrument_name": "GC-01",
+            "measured_at": "2026-08-03T15:30:00+00:00",
+            "method": {
+              "configuration": null,
+              "display_name": "DGA方法（待配置）",
+              "fields": [
+                {
+                  "code": "H2",
+                  "display_name": "H₂",
+                  "unit_code": null
+                },
+                {
+                  "code": "CH4",
+                  "display_name": "CH₄",
+                  "unit_code": null
+                },
+                {
+                  "code": "C2H2",
+                  "display_name": "C₂H₂",
+                  "unit_code": null
+                },
+                {
+                  "code": "C2H4",
+                  "display_name": "C₂H₄",
+                  "unit_code": null
+                },
+                {
+                  "code": "C2H6",
+                  "display_name": "C₂H₆",
+                  "unit_code": null
+                },
+                {
+                  "code": "CO",
+                  "display_name": "CO",
+                  "unit_code": null
+                },
+                {
+                  "code": "CO2",
+                  "display_name": "CO₂",
+                  "unit_code": null
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "66000000-0000-0000-0000-000000000001",
+              "version_label": "MVP-PLACEHOLDER"
+            },
+            "notes": "first pass",
+            "quality_snapshot": {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "99f8caba-b581-4d76-a5d5-c8be7c9a6979",
+              "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+              "warnings": []
+            },
+            "result": {
+              "c2h2": {
+                "qualifier": "EQ",
+                "value": "0.125000"
+              },
+              "c2h4": {
+                "qualifier": "EQ",
+                "value": "4.500000"
+              },
+              "c2h6": {
+                "qualifier": "EQ",
+                "value": "5.750000"
+              },
+              "ch4": {
+                "qualifier": "EQ",
+                "value": "11.250000"
+              },
+              "co": {
+                "qualifier": "EQ",
+                "value": "120.000000"
+              },
+              "co2": {
+                "qualifier": "EQ",
+                "value": "900.000000"
+              },
+              "h2": {
+                "qualifier": "EQ",
+                "value": "10.125000"
+              }
+            },
+            "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+            "test_type": "DGA"
+          }
+        ]
+      },
+      "sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+      "selected_test_ids": [
+        "5c13d011-6f7a-4217-97c5-1bea9f4bc384"
+      ],
+      "token": "36e09905-8edf-4e3b-9a19-ed118da764e0"
+    },
+    {
+      "barcode": "DGA-20260801-000002",
+      "caller_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "name": "parent_repeated_quality_ready",
+      "object_key": "laboratory/reports/442a48de-3e94-4b18-af2e-0d8532cf8d0b/05e26828-8d8d-414c-88cf-41333210ec36.pdf",
+      "pdf_sha256": "2c9a2dbd3ab52a85acfec26dccb345d251cb6ffbf297e7f36b389af56ed69175",
+      "pdf_size": 10027,
+      "producer_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "public_measurements": [
+        {
+          "analyte": "MOISTURE",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260801-000002",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "2d3365e2-a04b-43d3-b121-bb7cf33dbd23",
+          "instrument_name": "MOISTURE-01",
+          "measured_at": "2026-08-03T16:00:00+00:00",
+          "method_configured": true,
+          "method_name": "Isolated capture method",
+          "method_version_id": "86307c8d-261f-4f8c-9cc7-7d1b5dd700bf",
+          "qualifier": "EQ",
+          "sample_id": "c1a85504-1d7f-47f3-bf12-76c8b7a633b8",
+          "sampled_at": "2026-08-01T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "89975e41-3478-44a0-b72d-db5354618308",
+          "test_type": "MOISTURE",
+          "unit": "TEST-UNIT",
+          "value": "8.500000",
+          "version_label": "CAPTURE-V1",
+          "warnings": [
+            "89975e41-3478-44a0-b72d-db5354618308:421df58d-4e4a-4201-8b96-f9d52ce80481:0",
+            "e43d4610-22fc-4f9e-9835-59efd19e295a:636567f2-70b5-46aa-816c-9876dce4100b:0"
+          ]
+        }
+      ],
+      "public_report": {
+        "barcode": "DGA-20260801-000002",
+        "error_code": null,
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "unavailable_reason": null
+      },
+      "report_snapshot": {
+        "acknowledged_warning_codes": [
+          "89975e41-3478-44a0-b72d-db5354618308:421df58d-4e4a-4201-8b96-f9d52ce80481:0",
+          "e43d4610-22fc-4f9e-9835-59efd19e295a:636567f2-70b5-46aa-816c-9876dce4100b:0"
+        ],
+        "finalization": {
+          "finalized_at": "2026-08-06T12:00:00+00:00",
+          "finalized_by_display_name": "Workbench Admin",
+          "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+          "token": "2d3365e2-a04b-43d3-b121-bb7cf33dbd23"
+        },
+        "quality_evidence": [
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [
+              {
+                "code": "BLANK",
+                "instructions": "",
+                "label": "Isolated capture blank",
+                "note": "",
+                "status": "NOT_RUN"
+              }
+            ],
+            "revision": "421df58d-4e4a-4201-8b96-f9d52ce80481",
+            "test_id": "89975e41-3478-44a0-b72d-db5354618308",
+            "warnings": [
+              {
+                "code": "89975e41-3478-44a0-b72d-db5354618308:421df58d-4e4a-4201-8b96-f9d52ce80481:0",
+                "message": "QA/QC Isolated capture blank：未执行"
+              }
+            ]
+          },
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [
+              {
+                "code": "BLANK",
+                "instructions": "",
+                "label": "Isolated capture blank",
+                "note": "",
+                "status": "NOT_RUN"
+              }
+            ],
+            "revision": "636567f2-70b5-46aa-816c-9876dce4100b",
+            "test_id": "e43d4610-22fc-4f9e-9835-59efd19e295a",
+            "warnings": [
+              {
+                "code": "e43d4610-22fc-4f9e-9835-59efd19e295a:636567f2-70b5-46aa-816c-9876dce4100b:0",
+                "message": "QA/QC Isolated capture blank：未执行"
+              }
+            ]
+          }
+        ],
+        "sample": {
+          "asset_snapshot": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "barcode": "DGA-20260801-000002",
+          "equipment_serial": "TX-CURRENT-2002",
+          "identity_status": "ASSOCIATED",
+          "notes": "Isolated corpus1",
+          "received_at": "2026-08-01T13:00:00+00:00",
+          "sampled_at": "2026-08-01T12:00:00+00:00",
+          "site_name": "Prairie Sun"
+        },
+        "schema_version": 1,
+        "selected_results": [
+          {
+            "instrument_name": "MOISTURE-01",
+            "measured_at": "2026-08-03T16:00:00+00:00",
+            "method": {
+              "configuration": {
+                "display_name": "Isolated capture method",
+                "fields": [
+                  {
+                    "allowed_qualifiers": [
+                      "EQ",
+                      "ND",
+                      "LT",
+                      "GT"
+                    ],
+                    "code": "MOISTURE",
+                    "detection_limit": null,
+                    "display_decimal_places": 3,
+                    "display_name": "微水",
+                    "maximum": null,
+                    "minimum": null,
+                    "quantitation_limit": null,
+                    "unit_code": "TEST-UNIT"
+                  }
+                ],
+                "qa_checks": [
+                  {
+                    "code": "BLANK",
+                    "instructions": "",
+                    "label": "Isolated capture blank"
+                  }
+                ],
+                "standard_reference": null,
+                "test_type": "MOISTURE",
+                "version_label": "CAPTURE-V1"
+              },
+              "display_name": "Isolated capture method",
+              "fields": [
+                {
+                  "allowed_qualifiers": [
+                    "EQ",
+                    "ND",
+                    "LT",
+                    "GT"
+                  ],
+                  "code": "MOISTURE",
+                  "detection_limit": null,
+                  "display_decimal_places": 3,
+                  "display_name": "微水",
+                  "maximum": null,
+                  "minimum": null,
+                  "quantitation_limit": null,
+                  "unit_code": "TEST-UNIT"
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "86307c8d-261f-4f8c-9cc7-7d1b5dd700bf",
+              "version_label": "CAPTURE-V1"
+            },
+            "notes": null,
+            "quality_snapshot": {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [
+                {
+                  "code": "BLANK",
+                  "instructions": "",
+                  "label": "Isolated capture blank",
+                  "note": "",
+                  "status": "NOT_RUN"
+                }
+              ],
+              "revision": "421df58d-4e4a-4201-8b96-f9d52ce80481",
+              "test_id": "89975e41-3478-44a0-b72d-db5354618308",
+              "warnings": [
+                {
+                  "code": "89975e41-3478-44a0-b72d-db5354618308:421df58d-4e4a-4201-8b96-f9d52ce80481:0",
+                  "message": "QA/QC Isolated capture blank：未执行"
+                }
+              ]
+            },
+            "result": {
+              "result": {
+                "qualifier": "EQ",
+                "value": "8.500000"
+              }
+            },
+            "test_id": "89975e41-3478-44a0-b72d-db5354618308",
+            "test_type": "MOISTURE"
+          }
+        ]
+      },
+      "sample_id": "c1a85504-1d7f-47f3-bf12-76c8b7a633b8",
+      "selected_test_ids": [
+        "89975e41-3478-44a0-b72d-db5354618308"
+      ],
+      "token": "2d3365e2-a04b-43d3-b121-bb7cf33dbd23"
+    },
+    {
+      "barcode": "DGA-20260802-000003",
+      "caller_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "name": "parent_mixed_qualified_ready",
+      "object_key": "laboratory/reports/7666414c-2e1e-4372-a8a4-341932a51e1d/ee7b046b-b103-4e61-ab6d-6b3127df1062.pdf",
+      "pdf_sha256": "d3fc300b9ca152d3fea1f364b72d6ec33eb83ba12557ab93552488fe8c840b3e",
+      "pdf_size": 15144,
+      "producer_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "public_measurements": [
+        {
+          "analyte": "BREAKDOWN_VOLTAGE",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000003",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+          "instrument_name": null,
+          "measured_at": "2026-08-06T12:00:00+00:00",
+          "method_configured": false,
+          "method_name": "击穿电压方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000003",
+          "qualifier": "GT",
+          "sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+          "sampled_at": "2026-08-02T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "88abd209-8590-4be6-8400-91b179b372a1",
+          "test_type": "BREAKDOWN_VOLTAGE",
+          "unit": null,
+          "value": "80.000000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "H2",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000003",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "ND",
+          "sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+          "sampled_at": "2026-08-02T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+          "test_type": "DGA",
+          "unit": null,
+          "value": null,
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "CH4",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000003",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+          "sampled_at": "2026-08-02T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "11.250000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "C2H2",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000003",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+          "sampled_at": "2026-08-02T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "0.125000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "C2H4",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000003",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+          "sampled_at": "2026-08-02T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "4.500000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "C2H6",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000003",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+          "sampled_at": "2026-08-02T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "5.750000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "CO",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000003",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+          "sampled_at": "2026-08-02T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "120.000000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "CO2",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000003",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+          "instrument_name": "GC-01",
+          "measured_at": "2026-08-03T15:30:00+00:00",
+          "method_configured": false,
+          "method_name": "DGA方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000001",
+          "qualifier": "EQ",
+          "sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+          "sampled_at": "2026-08-02T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+          "test_type": "DGA",
+          "unit": null,
+          "value": "900.000000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        },
+        {
+          "analyte": "MOISTURE",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260802-000003",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+          "instrument_name": "MOISTURE-01",
+          "measured_at": "2026-08-03T16:00:00+00:00",
+          "method_configured": false,
+          "method_name": "微水方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000002",
+          "qualifier": "LT",
+          "sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+          "sampled_at": "2026-08-02T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "e580cf18-99d6-4b52-894a-8496923fe1d1",
+          "test_type": "MOISTURE",
+          "unit": null,
+          "value": "8.500000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        }
+      ],
+      "public_report": {
+        "barcode": "DGA-20260802-000003",
+        "error_code": null,
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "unavailable_reason": null
+      },
+      "report_snapshot": {
+        "acknowledged_warning_codes": [],
+        "finalization": {
+          "finalized_at": "2026-08-06T12:00:00+00:00",
+          "finalized_by_display_name": "Workbench Admin",
+          "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+          "token": "afaa889a-9631-497a-8511-63d77a8bc162"
+        },
+        "quality_evidence": [
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [],
+            "revision": "34daef32-18c3-49a1-af3d-ea019f42d200",
+            "test_id": "88abd209-8590-4be6-8400-91b179b372a1",
+            "warnings": []
+          },
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [],
+            "revision": "97613823-1ef7-43eb-b543-ac7aaaa327c4",
+            "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+            "warnings": []
+          },
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [],
+            "revision": "850a4238-ec08-49aa-8353-abe9175d4cee",
+            "test_id": "e580cf18-99d6-4b52-894a-8496923fe1d1",
+            "warnings": []
+          }
+        ],
+        "sample": {
+          "asset_snapshot": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "barcode": "DGA-20260802-000003",
+          "equipment_serial": "TX-CURRENT-2002",
+          "identity_status": "ASSOCIATED",
+          "notes": "Isolated corpus2",
+          "received_at": "2026-08-02T13:00:00+00:00",
+          "sampled_at": "2026-08-02T12:00:00+00:00",
+          "site_name": "Prairie Sun"
+        },
+        "schema_version": 1,
+        "selected_results": [
+          {
+            "instrument_name": null,
+            "measured_at": "2026-08-06T12:00:00+00:00",
+            "method": {
+              "configuration": null,
+              "display_name": "击穿电压方法（待配置）",
+              "fields": [
+                {
+                  "code": "BREAKDOWN_VOLTAGE",
+                  "display_name": "击穿电压",
+                  "unit_code": null
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "66000000-0000-0000-0000-000000000003",
+              "version_label": "MVP-PLACEHOLDER"
+            },
+            "notes": null,
+            "quality_snapshot": {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "34daef32-18c3-49a1-af3d-ea019f42d200",
+              "test_id": "88abd209-8590-4be6-8400-91b179b372a1",
+              "warnings": []
+            },
+            "result": {
+              "result": {
+                "qualifier": "GT",
+                "value": "80.000000"
+              }
+            },
+            "test_id": "88abd209-8590-4be6-8400-91b179b372a1",
+            "test_type": "BREAKDOWN_VOLTAGE"
+          },
+          {
+            "instrument_name": "GC-01",
+            "measured_at": "2026-08-03T15:30:00+00:00",
+            "method": {
+              "configuration": null,
+              "display_name": "DGA方法（待配置）",
+              "fields": [
+                {
+                  "code": "H2",
+                  "display_name": "H₂",
+                  "unit_code": null
+                },
+                {
+                  "code": "CH4",
+                  "display_name": "CH₄",
+                  "unit_code": null
+                },
+                {
+                  "code": "C2H2",
+                  "display_name": "C₂H₂",
+                  "unit_code": null
+                },
+                {
+                  "code": "C2H4",
+                  "display_name": "C₂H₄",
+                  "unit_code": null
+                },
+                {
+                  "code": "C2H6",
+                  "display_name": "C₂H₆",
+                  "unit_code": null
+                },
+                {
+                  "code": "CO",
+                  "display_name": "CO",
+                  "unit_code": null
+                },
+                {
+                  "code": "CO2",
+                  "display_name": "CO₂",
+                  "unit_code": null
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "66000000-0000-0000-0000-000000000001",
+              "version_label": "MVP-PLACEHOLDER"
+            },
+            "notes": "first pass",
+            "quality_snapshot": {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "97613823-1ef7-43eb-b543-ac7aaaa327c4",
+              "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+              "warnings": []
+            },
+            "result": {
+              "c2h2": {
+                "qualifier": "EQ",
+                "value": "0.125000"
+              },
+              "c2h4": {
+                "qualifier": "EQ",
+                "value": "4.500000"
+              },
+              "c2h6": {
+                "qualifier": "EQ",
+                "value": "5.750000"
+              },
+              "ch4": {
+                "qualifier": "EQ",
+                "value": "11.250000"
+              },
+              "co": {
+                "qualifier": "EQ",
+                "value": "120.000000"
+              },
+              "co2": {
+                "qualifier": "EQ",
+                "value": "900.000000"
+              },
+              "h2": {
+                "qualifier": "ND",
+                "value": null
+              }
+            },
+            "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+            "test_type": "DGA"
+          },
+          {
+            "instrument_name": "MOISTURE-01",
+            "measured_at": "2026-08-03T16:00:00+00:00",
+            "method": {
+              "configuration": null,
+              "display_name": "微水方法（待配置）",
+              "fields": [
+                {
+                  "code": "MOISTURE",
+                  "display_name": "微水",
+                  "unit_code": null
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "66000000-0000-0000-0000-000000000002",
+              "version_label": "MVP-PLACEHOLDER"
+            },
+            "notes": null,
+            "quality_snapshot": {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "850a4238-ec08-49aa-8353-abe9175d4cee",
+              "test_id": "e580cf18-99d6-4b52-894a-8496923fe1d1",
+              "warnings": []
+            },
+            "result": {
+              "result": {
+                "qualifier": "LT",
+                "value": "8.500000"
+              }
+            },
+            "test_id": "e580cf18-99d6-4b52-894a-8496923fe1d1",
+            "test_type": "MOISTURE"
+          }
+        ]
+      },
+      "sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+      "selected_test_ids": [
+        "88abd209-8590-4be6-8400-91b179b372a1",
+        "cdbae590-e176-4c03-aabb-b829441a2b8c",
+        "e580cf18-99d6-4b52-894a-8496923fe1d1"
+      ],
+      "token": "afaa889a-9631-497a-8511-63d77a8bc162"
+    },
+    {
+      "barcode": "DGA-20260803-000004",
+      "caller_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "name": "old71_placeholder_ready",
+      "object_key": "laboratory/reports/1d5de698-7ec8-4b9a-8f42-1aee5c1630c6/469cb903-7308-47cc-bb2d-5dd894b37863.pdf",
+      "pdf_sha256": "dc68d585b7d079060b6ba2e8879dc8c962dbef71602d172e97234a00410f4740",
+      "pdf_size": 8907,
+      "producer_commit": "71d8a9e23a4e2428937f604b8ef8e24c4fe272de",
+      "public_measurements": [
+        {
+          "analyte": "MOISTURE",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260803-000004",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "5f4a6df7-e8cf-4600-96c2-9899b71778ea",
+          "instrument_name": "MOISTURE-01",
+          "measured_at": "2026-08-03T16:00:00+00:00",
+          "method_configured": false,
+          "method_name": "微水方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000002",
+          "qualifier": "EQ",
+          "sample_id": "cc118124-4126-4865-a27f-8619fb967668",
+          "sampled_at": "2026-08-03T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "882aa0c0-1eda-4aec-b6f6-0a0f11bcc633",
+          "test_type": "MOISTURE",
+          "unit": null,
+          "value": "8.500000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        }
+      ],
+      "public_report": {
+        "barcode": "DGA-20260803-000004",
+        "error_code": null,
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "unavailable_reason": null
+      },
+      "report_snapshot": {
+        "acknowledged_warning_codes": [],
+        "finalization": {
+          "finalized_at": "2026-08-06T12:00:00+00:00",
+          "finalized_by_display_name": "Workbench Admin",
+          "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+          "token": "5f4a6df7-e8cf-4600-96c2-9899b71778ea"
+        },
+        "sample": {
+          "asset_snapshot": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "barcode": "DGA-20260803-000004",
+          "equipment_serial": "TX-CURRENT-2002",
+          "identity_status": "ASSOCIATED",
+          "notes": "Isolated corpus3",
+          "received_at": "2026-08-03T13:00:00+00:00",
+          "sampled_at": "2026-08-03T12:00:00+00:00",
+          "site_name": "Prairie Sun"
+        },
+        "schema_version": 1,
+        "selected_results": [
+          {
+            "instrument_name": "MOISTURE-01",
+            "measured_at": "2026-08-03T16:00:00+00:00",
+            "method": {
+              "display_name": "微水方法（待配置）",
+              "fields": [
+                {
+                  "code": "MOISTURE",
+                  "display_name": "微水",
+                  "unit_code": null
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "66000000-0000-0000-0000-000000000002",
+              "version_label": "MVP-PLACEHOLDER"
+            },
+            "notes": null,
+            "result": {
+              "result": {
+                "qualifier": "EQ",
+                "value": "8.500000"
+              }
+            },
+            "test_id": "882aa0c0-1eda-4aec-b6f6-0a0f11bcc633",
+            "test_type": "MOISTURE"
+          }
+        ]
+      },
+      "sample_id": "cc118124-4126-4865-a27f-8619fb967668",
+      "selected_test_ids": [
+        "882aa0c0-1eda-4aec-b6f6-0a0f11bcc633"
+      ],
+      "token": "5f4a6df7-e8cf-4600-96c2-9899b71778ea"
+    },
+    {
+      "barcode": "DGA-20260804-000005",
+      "caller_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "name": "parent_failed",
+      "producer_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "public_measurements": [
+        {
+          "analyte": "MOISTURE",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260804-000005",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "e1647771-cade-4f87-8ddb-776965aa8a47",
+          "instrument_name": "MOISTURE-01",
+          "measured_at": "2026-08-03T16:00:00+00:00",
+          "method_configured": false,
+          "method_name": "微水方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000002",
+          "qualifier": "EQ",
+          "sample_id": "6a308e5b-13b7-41c8-a3f4-d9b1631b4813",
+          "sampled_at": "2026-08-04T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "67157fb0-57d0-4512-8ae9-262b6445516c",
+          "test_type": "MOISTURE",
+          "unit": null,
+          "value": "8.500000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        }
+      ],
+      "public_report": {
+        "barcode": "DGA-20260804-000005",
+        "error_code": "isolated_capture_failure",
+        "generated_at": null,
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "state": "FAILED",
+        "unavailable_reason": null
+      },
+      "report_snapshot": {
+        "acknowledged_warning_codes": [],
+        "finalization": {
+          "finalized_at": "2026-08-06T12:00:00+00:00",
+          "finalized_by_display_name": "Workbench Admin",
+          "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+          "token": "e1647771-cade-4f87-8ddb-776965aa8a47"
+        },
+        "quality_evidence": [
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [],
+            "revision": "1fe1ed97-e992-43b2-ad81-76f0f400d288",
+            "test_id": "67157fb0-57d0-4512-8ae9-262b6445516c",
+            "warnings": []
+          }
+        ],
+        "sample": {
+          "asset_snapshot": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "barcode": "DGA-20260804-000005",
+          "equipment_serial": "TX-CURRENT-2002",
+          "identity_status": "ASSOCIATED",
+          "notes": "Isolated corpus4",
+          "received_at": "2026-08-04T13:00:00+00:00",
+          "sampled_at": "2026-08-04T12:00:00+00:00",
+          "site_name": "Prairie Sun"
+        },
+        "schema_version": 1,
+        "selected_results": [
+          {
+            "instrument_name": "MOISTURE-01",
+            "measured_at": "2026-08-03T16:00:00+00:00",
+            "method": {
+              "configuration": null,
+              "display_name": "微水方法（待配置）",
+              "fields": [
+                {
+                  "code": "MOISTURE",
+                  "display_name": "微水",
+                  "unit_code": null
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "66000000-0000-0000-0000-000000000002",
+              "version_label": "MVP-PLACEHOLDER"
+            },
+            "notes": null,
+            "quality_snapshot": {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "1fe1ed97-e992-43b2-ad81-76f0f400d288",
+              "test_id": "67157fb0-57d0-4512-8ae9-262b6445516c",
+              "warnings": []
+            },
+            "result": {
+              "result": {
+                "qualifier": "EQ",
+                "value": "8.500000"
+              }
+            },
+            "test_id": "67157fb0-57d0-4512-8ae9-262b6445516c",
+            "test_type": "MOISTURE"
+          }
+        ]
+      },
+      "sample_id": "6a308e5b-13b7-41c8-a3f4-d9b1631b4813",
+      "selected_test_ids": [
+        "67157fb0-57d0-4512-8ae9-262b6445516c"
+      ],
+      "token": "e1647771-cade-4f87-8ddb-776965aa8a47"
+    },
+    {
+      "barcode": "DGA-20260805-000006",
+      "caller_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "name": "parent_before_refinalization",
+      "object_key": "laboratory/reports/6b7b6cc3-8e2c-4621-98db-a0ce083112ef/6398f10d-2c93-4264-bab0-55cdef621435.pdf",
+      "pdf_sha256": "a4c0d854b1609b9cef0c620f3d9249819f57979abe57b723d964a22d3ced4005",
+      "pdf_size": 9178,
+      "producer_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "public_measurements": [
+        {
+          "analyte": "MOISTURE",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260805-000006",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "f1fffa79-04d0-4b0f-90cf-244d6f290d02",
+          "instrument_name": "MOISTURE-01",
+          "measured_at": "2026-08-03T16:00:00+00:00",
+          "method_configured": false,
+          "method_name": "微水方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000002",
+          "qualifier": "EQ",
+          "sample_id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+          "sampled_at": "2026-08-05T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+          "test_type": "MOISTURE",
+          "unit": null,
+          "value": "8.500000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        }
+      ],
+      "public_report": {
+        "barcode": "DGA-20260805-000006",
+        "error_code": null,
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "unavailable_reason": null
+      },
+      "report_snapshot": {
+        "acknowledged_warning_codes": [],
+        "finalization": {
+          "finalized_at": "2026-08-06T12:00:00+00:00",
+          "finalized_by_display_name": "Workbench Admin",
+          "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+          "token": "f1fffa79-04d0-4b0f-90cf-244d6f290d02"
+        },
+        "quality_evidence": [
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [],
+            "revision": "11f80069-452e-4f74-a0e8-96f1576dd02e",
+            "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+            "warnings": []
+          }
+        ],
+        "sample": {
+          "asset_snapshot": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "barcode": "DGA-20260805-000006",
+          "equipment_serial": "TX-CURRENT-2002",
+          "identity_status": "ASSOCIATED",
+          "notes": "Isolated corpus5",
+          "received_at": "2026-08-05T13:00:00+00:00",
+          "sampled_at": "2026-08-05T12:00:00+00:00",
+          "site_name": "Prairie Sun"
+        },
+        "schema_version": 1,
+        "selected_results": [
+          {
+            "instrument_name": "MOISTURE-01",
+            "measured_at": "2026-08-03T16:00:00+00:00",
+            "method": {
+              "configuration": null,
+              "display_name": "微水方法（待配置）",
+              "fields": [
+                {
+                  "code": "MOISTURE",
+                  "display_name": "微水",
+                  "unit_code": null
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "66000000-0000-0000-0000-000000000002",
+              "version_label": "MVP-PLACEHOLDER"
+            },
+            "notes": null,
+            "quality_snapshot": {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "11f80069-452e-4f74-a0e8-96f1576dd02e",
+              "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+              "warnings": []
+            },
+            "result": {
+              "result": {
+                "qualifier": "EQ",
+                "value": "8.500000"
+              }
+            },
+            "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+            "test_type": "MOISTURE"
+          }
+        ]
+      },
+      "sample_id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+      "selected_test_ids": [
+        "dcab8fc5-e74d-44ed-9071-a751f74c2a42"
+      ],
+      "token": "f1fffa79-04d0-4b0f-90cf-244d6f290d02"
+    },
+    {
+      "barcode": "DGA-20260805-000006",
+      "caller_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "name": "parent_refinalized_ready",
+      "object_key": "laboratory/reports/aed2616e-e242-42bf-b48d-33257cb35f04/8db32aad-e272-4929-979e-acda195d38ed.pdf",
+      "pdf_sha256": "e92767529a5b94f4d923062c93a78076df5921b6a6d7a30b1866c6296ad06274",
+      "pdf_size": 9183,
+      "producer_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "public_measurements": [
+        {
+          "analyte": "MOISTURE",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260805-000006",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "e75896e8-03b7-4770-86d6-9fba184bb405",
+          "instrument_name": "MOISTURE-01",
+          "measured_at": "2026-08-03T16:00:00+00:00",
+          "method_configured": false,
+          "method_name": "微水方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000002",
+          "qualifier": "EQ",
+          "sample_id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+          "sampled_at": "2026-08-05T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+          "test_type": "MOISTURE",
+          "unit": null,
+          "value": "12.500000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        }
+      ],
+      "public_report": {
+        "barcode": "DGA-20260805-000006",
+        "error_code": null,
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "unavailable_reason": null
+      },
+      "report_snapshot": {
+        "acknowledged_warning_codes": [],
+        "finalization": {
+          "finalized_at": "2026-08-06T12:00:00+00:00",
+          "finalized_by_display_name": "Workbench Admin",
+          "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+          "token": "e75896e8-03b7-4770-86d6-9fba184bb405"
+        },
+        "quality_evidence": [
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [],
+            "revision": "9be4cef2-0af2-40e4-891e-507f293099d1",
+            "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+            "warnings": []
+          }
+        ],
+        "sample": {
+          "asset_snapshot": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "barcode": "DGA-20260805-000006",
+          "equipment_serial": "TX-CURRENT-2002",
+          "identity_status": "ASSOCIATED",
+          "notes": "Isolated corpus5",
+          "received_at": "2026-08-05T13:00:00+00:00",
+          "sampled_at": "2026-08-05T12:00:00+00:00",
+          "site_name": "Prairie Sun"
+        },
+        "schema_version": 1,
+        "selected_results": [
+          {
+            "instrument_name": "MOISTURE-01",
+            "measured_at": "2026-08-03T16:00:00+00:00",
+            "method": {
+              "configuration": null,
+              "display_name": "微水方法（待配置）",
+              "fields": [
+                {
+                  "code": "MOISTURE",
+                  "display_name": "微水",
+                  "unit_code": null
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "66000000-0000-0000-0000-000000000002",
+              "version_label": "MVP-PLACEHOLDER"
+            },
+            "notes": null,
+            "quality_snapshot": {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "9be4cef2-0af2-40e4-891e-507f293099d1",
+              "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+              "warnings": []
+            },
+            "result": {
+              "result": {
+                "qualifier": "EQ",
+                "value": "12.500000"
+              }
+            },
+            "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+            "test_type": "MOISTURE"
+          }
+        ]
+      },
+      "sample_id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+      "selected_test_ids": [
+        "dcab8fc5-e74d-44ed-9071-a751f74c2a42"
+      ],
+      "token": "e75896e8-03b7-4770-86d6-9fba184bb405"
+    },
+    {
+      "barcode": "DGA-20260806-000007",
+      "caller_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "name": "parent_withdrawn",
+      "object_key": "laboratory/reports/eced640c-e6cd-4c00-954b-f45a22894a9e/407c7f69-3c12-4b33-b874-ae91284ca13e.pdf",
+      "pdf_sha256": "501372f42df557cf0ef941930d50818ef769aedf1adb261bb7e928071c910004",
+      "pdf_size": 9178,
+      "producer_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "public_after_withdrawal": {
+        "barcode": "DGA-20260806-000007",
+        "error_code": null,
+        "generated_at": null,
+        "requested_at": null,
+        "state": "UNAVAILABLE",
+        "unavailable_reason": "sample_not_finalized"
+      },
+      "public_measurements": [
+        {
+          "analyte": "MOISTURE",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260806-000007",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "27fd2ef5-e7a5-40cc-a96f-c317e839073e",
+          "instrument_name": "MOISTURE-01",
+          "measured_at": "2026-08-03T16:00:00+00:00",
+          "method_configured": false,
+          "method_name": "微水方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000002",
+          "qualifier": "EQ",
+          "sample_id": "219b2e81-6f1d-4211-913d-0ad44664e721",
+          "sampled_at": "2026-08-06T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "dcf47b91-b0e0-487b-92d0-c6fcff036868",
+          "test_type": "MOISTURE",
+          "unit": null,
+          "value": "8.500000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        }
+      ],
+      "public_report": {
+        "barcode": "DGA-20260806-000007",
+        "error_code": null,
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "unavailable_reason": null
+      },
+      "report_snapshot": {
+        "acknowledged_warning_codes": [],
+        "finalization": {
+          "finalized_at": "2026-08-06T12:00:00+00:00",
+          "finalized_by_display_name": "Workbench Admin",
+          "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+          "token": "27fd2ef5-e7a5-40cc-a96f-c317e839073e"
+        },
+        "quality_evidence": [
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [],
+            "revision": "2feac1e1-d932-4091-9bb3-d02635cfe98f",
+            "test_id": "dcf47b91-b0e0-487b-92d0-c6fcff036868",
+            "warnings": []
+          }
+        ],
+        "sample": {
+          "asset_snapshot": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "barcode": "DGA-20260806-000007",
+          "equipment_serial": "TX-CURRENT-2002",
+          "identity_status": "ASSOCIATED",
+          "notes": "Isolated corpus6",
+          "received_at": "2026-08-06T13:00:00+00:00",
+          "sampled_at": "2026-08-06T12:00:00+00:00",
+          "site_name": "Prairie Sun"
+        },
+        "schema_version": 1,
+        "selected_results": [
+          {
+            "instrument_name": "MOISTURE-01",
+            "measured_at": "2026-08-03T16:00:00+00:00",
+            "method": {
+              "configuration": null,
+              "display_name": "微水方法（待配置）",
+              "fields": [
+                {
+                  "code": "MOISTURE",
+                  "display_name": "微水",
+                  "unit_code": null
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "66000000-0000-0000-0000-000000000002",
+              "version_label": "MVP-PLACEHOLDER"
+            },
+            "notes": null,
+            "quality_snapshot": {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "2feac1e1-d932-4091-9bb3-d02635cfe98f",
+              "test_id": "dcf47b91-b0e0-487b-92d0-c6fcff036868",
+              "warnings": []
+            },
+            "result": {
+              "result": {
+                "qualifier": "EQ",
+                "value": "8.500000"
+              }
+            },
+            "test_id": "dcf47b91-b0e0-487b-92d0-c6fcff036868",
+            "test_type": "MOISTURE"
+          }
+        ]
+      },
+      "sample_id": "219b2e81-6f1d-4211-913d-0ad44664e721",
+      "selected_test_ids": [
+        "dcf47b91-b0e0-487b-92d0-c6fcff036868"
+      ],
+      "token": "27fd2ef5-e7a5-40cc-a96f-c317e839073e"
+    },
+    {
+      "barcode": "DGA-20260807-000008",
+      "caller_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "name": "parent_queued",
+      "producer_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+      "public_measurements": [
+        {
+          "analyte": "MOISTURE",
+          "asset_id": "44000000-0000-0000-0000-000000000001",
+          "barcode": "DGA-20260807-000008",
+          "equipment_serial": "TX-CURRENT-2002",
+          "finalization_token": "84dc2077-8c96-4968-8e8c-04a6b211fa8c",
+          "instrument_name": "MOISTURE-01",
+          "measured_at": "2026-08-03T16:00:00+00:00",
+          "method_configured": false,
+          "method_name": "微水方法（待配置）",
+          "method_version_id": "66000000-0000-0000-0000-000000000002",
+          "qualifier": "EQ",
+          "sample_id": "b270705e-3d6e-422b-9861-a52bd1ff2b52",
+          "sampled_at": "2026-08-07T12:00:00+00:00",
+          "sampling_context": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "site_name": "Prairie Sun",
+          "test_id": "3b346fcc-e175-4895-b365-338919a0227a",
+          "test_type": "MOISTURE",
+          "unit": null,
+          "value": "8.500000",
+          "version_label": "MVP-PLACEHOLDER",
+          "warnings": []
+        }
+      ],
+      "public_report": {
+        "barcode": "DGA-20260807-000008",
+        "error_code": null,
+        "generated_at": null,
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "state": "QUEUED",
+        "unavailable_reason": null
+      },
+      "report_snapshot": {
+        "acknowledged_warning_codes": [],
+        "finalization": {
+          "finalized_at": "2026-08-06T12:00:00+00:00",
+          "finalized_by_display_name": "Workbench Admin",
+          "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+          "token": "84dc2077-8c96-4968-8e8c-04a6b211fa8c"
+        },
+        "quality_evidence": [
+          {
+            "calibration": {
+              "status": "NOT_LINKED"
+            },
+            "instrument": null,
+            "qa_results": [],
+            "revision": "3ffea42d-a503-4089-bbc3-bf832401e9ba",
+            "test_id": "3b346fcc-e175-4895-b365-338919a0227a",
+            "warnings": []
+          }
+        ],
+        "sample": {
+          "asset_snapshot": {
+            "customer_id": "11000000-0000-0000-0000-000000000001",
+            "customer_name": "Prairie Solar LLC",
+            "equipment_path": [
+              {
+                "asset_type": "TRANSFORMER",
+                "id": "44000000-0000-0000-0000-000000000001",
+                "lifecycle_status": "IN_SERVICE",
+                "material_number": "MAT-TX-41",
+                "model": "TX-4400",
+                "serial_number": "TX-CURRENT-2002",
+                "system_asset_number": "SYS-TX-002"
+              }
+            ],
+            "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+            "location_kind": "SITE",
+            "site_id": "22000000-0000-0000-0000-000000000001",
+            "site_location": "Texas, USA",
+            "site_name": "Prairie Sun"
+          },
+          "barcode": "DGA-20260807-000008",
+          "equipment_serial": "TX-CURRENT-2002",
+          "identity_status": "ASSOCIATED",
+          "notes": "Isolated corpus7",
+          "received_at": "2026-08-07T13:00:00+00:00",
+          "sampled_at": "2026-08-07T12:00:00+00:00",
+          "site_name": "Prairie Sun"
+        },
+        "schema_version": 1,
+        "selected_results": [
+          {
+            "instrument_name": "MOISTURE-01",
+            "measured_at": "2026-08-03T16:00:00+00:00",
+            "method": {
+              "configuration": null,
+              "display_name": "微水方法（待配置）",
+              "fields": [
+                {
+                  "code": "MOISTURE",
+                  "display_name": "微水",
+                  "unit_code": null
+                }
+              ],
+              "method_code": null,
+              "method_version_id": "66000000-0000-0000-0000-000000000002",
+              "version_label": "MVP-PLACEHOLDER"
+            },
+            "notes": null,
+            "quality_snapshot": {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "3ffea42d-a503-4089-bbc3-bf832401e9ba",
+              "test_id": "3b346fcc-e175-4895-b365-338919a0227a",
+              "warnings": []
+            },
+            "result": {
+              "result": {
+                "qualifier": "EQ",
+                "value": "8.500000"
+              }
+            },
+            "test_id": "3b346fcc-e175-4895-b365-338919a0227a",
+            "test_type": "MOISTURE"
+          }
+        ]
+      },
+      "sample_id": "b270705e-3d6e-422b-9861-a52bd1ff2b52",
+      "selected_test_ids": [
+        "3b346fcc-e175-4895-b365-338919a0227a"
+      ],
+      "token": "84dc2077-8c96-4968-8e8c-04a6b211fa8c"
+    }
+  ],
+  "objects": {
+    "laboratory/reports/0f4736ac-02fc-46ca-9b8b-aa6a2f480303/8ad63ede-1ae4-4056-ac73-b1d851dabd81.pdf": "pdfs/48d45c95df1e5946523a6b2397396083cf1f492ec1ab79e6ee9c8cb743884ec8.pdf",
+    "laboratory/reports/1d5de698-7ec8-4b9a-8f42-1aee5c1630c6/469cb903-7308-47cc-bb2d-5dd894b37863.pdf": "pdfs/dc68d585b7d079060b6ba2e8879dc8c962dbef71602d172e97234a00410f4740.pdf",
+    "laboratory/reports/442a48de-3e94-4b18-af2e-0d8532cf8d0b/05e26828-8d8d-414c-88cf-41333210ec36.pdf": "pdfs/2c9a2dbd3ab52a85acfec26dccb345d251cb6ffbf297e7f36b389af56ed69175.pdf",
+    "laboratory/reports/6b7b6cc3-8e2c-4621-98db-a0ce083112ef/6398f10d-2c93-4264-bab0-55cdef621435.pdf": "pdfs/a4c0d854b1609b9cef0c620f3d9249819f57979abe57b723d964a22d3ced4005.pdf",
+    "laboratory/reports/7666414c-2e1e-4372-a8a4-341932a51e1d/ee7b046b-b103-4e61-ab6d-6b3127df1062.pdf": "pdfs/d3fc300b9ca152d3fea1f364b72d6ec33eb83ba12557ab93552488fe8c840b3e.pdf",
+    "laboratory/reports/aed2616e-e242-42bf-b48d-33257cb35f04/8db32aad-e272-4929-979e-acda195d38ed.pdf": "pdfs/e92767529a5b94f4d923062c93a78076df5921b6a6d7a30b1866c6296ad06274.pdf",
+    "laboratory/reports/eced640c-e6cd-4c00-954b-f45a22894a9e/407c7f69-3c12-4b33-b874-ae91284ca13e.pdf": "pdfs/501372f42df557cf0ef941930d50818ef769aedf1adb261bb7e928071c910004.pdf"
+  },
+  "tables": {
+    "asset_installations": [
+      {
+        "asset_id": "44000000-0000-0000-0000-000000000001",
+        "id": "55000000-0000-0000-0000-000000000001",
+        "parent_asset_id": null,
+        "repair_center": false,
+        "site_id": "22000000-0000-0000-0000-000000000001",
+        "valid_from": "2020-01-01T00:00:00+00:00",
+        "valid_to": null
+      }
+    ],
+    "breakdown_voltage_test_results": [
+      {
+        "result_qualifier": "GT",
+        "result_value": 80.0,
+        "test_id": "88abd209-8590-4be6-8400-91b179b372a1"
+      }
+    ],
+    "customers": [
+      {
+        "customer_name": "Prairie Solar LLC",
+        "id": "11000000-0000-0000-0000-000000000001"
+      }
+    ],
+    "dga_test_results": [
+      {
+        "c2h2_qualifier": "EQ",
+        "c2h2_value": 0.125,
+        "c2h4_qualifier": "EQ",
+        "c2h4_value": 4.5,
+        "c2h6_qualifier": "EQ",
+        "c2h6_value": 5.75,
+        "ch4_qualifier": "EQ",
+        "ch4_value": 11.25,
+        "co2_qualifier": "EQ",
+        "co2_value": 900.0,
+        "co_qualifier": "EQ",
+        "co_value": 120.0,
+        "h2_qualifier": "EQ",
+        "h2_value": 10.125,
+        "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384"
+      },
+      {
+        "c2h2_qualifier": "EQ",
+        "c2h2_value": 0.125,
+        "c2h4_qualifier": "EQ",
+        "c2h4_value": 4.5,
+        "c2h6_qualifier": "EQ",
+        "c2h6_value": 5.75,
+        "ch4_qualifier": "EQ",
+        "ch4_value": 11.25,
+        "co2_qualifier": "EQ",
+        "co2_value": 900.0,
+        "co_qualifier": "EQ",
+        "co_value": 120.0,
+        "h2_qualifier": "ND",
+        "h2_value": null,
+        "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c"
+      }
+    ],
+    "formal_assets": [
+      {
+        "asset_type": "TRANSFORMER",
+        "battery_manufacturer": null,
+        "commissioning_date": null,
+        "energy_mwh": null,
+        "equipment_name": null,
+        "id": "44000000-0000-0000-0000-000000000001",
+        "lifecycle_revision": 0,
+        "lifecycle_status": "IN_SERVICE",
+        "machine_type": null,
+        "material_number": "MAT-TX-41",
+        "model": "TX-4400",
+        "power_mw": null,
+        "product_line": null,
+        "serial_number": "TX-CURRENT-2002",
+        "system_asset_number": "SYS-TX-002",
+        "tag_number": null
+      }
+    ],
+    "laboratory_finalization_events": [
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "FINALIZED",
+        "id": "61e659e1-99cb-46ef-9998-689604755f52",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+        "reason": null
+      },
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "FINALIZED",
+        "id": "4dba88f1-65aa-40c8-984c-519b3fff6604",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "c1a85504-1d7f-47f3-bf12-76c8b7a633b8",
+        "reason": null
+      },
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "FINALIZED",
+        "id": "445df6d8-8c42-4d4f-84a7-7a41428f4582",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+        "reason": null
+      },
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "FINALIZED",
+        "id": "c3f58d95-cbde-4afb-8283-e6e080226c0b",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "cc118124-4126-4865-a27f-8619fb967668",
+        "reason": null
+      },
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "FINALIZED",
+        "id": "da1c7ff0-9d7a-41c2-8a45-4e41ec201761",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "6a308e5b-13b7-41c8-a3f4-d9b1631b4813",
+        "reason": null
+      },
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "FINALIZED",
+        "id": "6d171baf-0a6c-4f29-a052-5a91f6cc2d11",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+        "reason": null
+      },
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "WITHDRAWN",
+        "id": "cda9bf8a-b125-4445-81a9-c82421a26577",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+        "reason": "Isolated attested correction"
+      },
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "FINALIZED",
+        "id": "8fabe903-d826-468f-8056-d6e06c746938",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+        "reason": null
+      },
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "FINALIZED",
+        "id": "98f525cb-18ce-49e7-8608-55b5d2dc150f",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "219b2e81-6f1d-4211-913d-0ad44664e721",
+        "reason": null
+      },
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "WITHDRAWN",
+        "id": "f3692094-e39a-48d2-a740-008570e34ff8",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "219b2e81-6f1d-4211-913d-0ad44664e721",
+        "reason": "Isolated withdrawn fixture"
+      },
+      {
+        "actor_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "event_type": "FINALIZED",
+        "id": "33d1a587-f5b8-4609-b48a-edb0b9ef3ed6",
+        "occurred_at": "2026-08-06T12:00:00+00:00",
+        "oil_sample_id": "b270705e-3d6e-422b-9861-a52bd1ff2b52",
+        "reason": null
+      }
+    ],
+    "laboratory_reports": [
+      {
+        "byte_size": 10812,
+        "claim_token": null,
+        "content_sha256": "48d45c95df1e5946523a6b2397396083cf1f492ec1ab79e6ee9c8cb743884ec8",
+        "error_code": null,
+        "finalization_token": "36e09905-8edf-4e3b-9a19-ed118da764e0",
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "generation_token": "0f4736ac-02fc-46ca-9b8b-aa6a2f480303",
+        "id": "1a7e2f01-f190-4b9f-bbaa-d3431feea250",
+        "lease_expires_at": null,
+        "object_key": "laboratory/reports/0f4736ac-02fc-46ca-9b8b-aa6a2f480303/8ad63ede-1ae4-4056-ac73-b1d851dabd81.pdf",
+        "oil_sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+        "report_snapshot": {
+          "acknowledged_warning_codes": [],
+          "finalization": {
+            "finalized_at": "2026-08-06T12:00:00+00:00",
+            "finalized_by_display_name": "Workbench Admin",
+            "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+            "token": "36e09905-8edf-4e3b-9a19-ed118da764e0"
+          },
+          "quality_evidence": [
+            {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "99f8caba-b581-4d76-a5d5-c8be7c9a6979",
+              "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+              "warnings": []
+            }
+          ],
+          "sample": {
+            "asset_snapshot": {
+              "customer_id": "11000000-0000-0000-0000-000000000001",
+              "customer_name": "Prairie Solar LLC",
+              "equipment_path": [
+                {
+                  "asset_type": "TRANSFORMER",
+                  "id": "44000000-0000-0000-0000-000000000001",
+                  "lifecycle_status": "IN_SERVICE",
+                  "material_number": "MAT-TX-41",
+                  "model": "TX-4400",
+                  "serial_number": "TX-CURRENT-2002",
+                  "system_asset_number": "SYS-TX-002"
+                }
+              ],
+              "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+              "location_kind": "SITE",
+              "site_id": "22000000-0000-0000-0000-000000000001",
+              "site_location": "Texas, USA",
+              "site_name": "Prairie Sun"
+            },
+            "barcode": "DGA-20260802-000001",
+            "equipment_serial": "TX-CURRENT-2002",
+            "identity_status": "ASSOCIATED",
+            "notes": "annual sample",
+            "received_at": "2026-08-02T09:00:00+00:00",
+            "sampled_at": "2026-08-01T12:00:00+00:00",
+            "site_name": "Prairie Sun"
+          },
+          "schema_version": 1,
+          "selected_results": [
+            {
+              "instrument_name": "GC-01",
+              "measured_at": "2026-08-03T15:30:00+00:00",
+              "method": {
+                "configuration": null,
+                "display_name": "DGA方法（待配置）",
+                "fields": [
+                  {
+                    "code": "H2",
+                    "display_name": "H₂",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "CH4",
+                    "display_name": "CH₄",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "C2H2",
+                    "display_name": "C₂H₂",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "C2H4",
+                    "display_name": "C₂H₄",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "C2H6",
+                    "display_name": "C₂H₆",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "CO",
+                    "display_name": "CO",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "CO2",
+                    "display_name": "CO₂",
+                    "unit_code": null
+                  }
+                ],
+                "method_code": null,
+                "method_version_id": "66000000-0000-0000-0000-000000000001",
+                "version_label": "MVP-PLACEHOLDER"
+              },
+              "notes": "first pass",
+              "quality_snapshot": {
+                "calibration": {
+                  "status": "NOT_LINKED"
+                },
+                "instrument": null,
+                "qa_results": [],
+                "revision": "99f8caba-b581-4d76-a5d5-c8be7c9a6979",
+                "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+                "warnings": []
+              },
+              "result": {
+                "c2h2": {
+                  "qualifier": "EQ",
+                  "value": "0.125000"
+                },
+                "c2h4": {
+                  "qualifier": "EQ",
+                  "value": "4.500000"
+                },
+                "c2h6": {
+                  "qualifier": "EQ",
+                  "value": "5.750000"
+                },
+                "ch4": {
+                  "qualifier": "EQ",
+                  "value": "11.250000"
+                },
+                "co": {
+                  "qualifier": "EQ",
+                  "value": "120.000000"
+                },
+                "co2": {
+                  "qualifier": "EQ",
+                  "value": "900.000000"
+                },
+                "h2": {
+                  "qualifier": "EQ",
+                  "value": "10.125000"
+                }
+              },
+              "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+              "test_type": "DGA"
+            }
+          ]
+        },
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "requested_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "snapshot_schema_version": 1,
+        "started_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "updated_at": "2026-08-06T12:00:00+00:00"
+      },
+      {
+        "byte_size": 10027,
+        "claim_token": null,
+        "content_sha256": "2c9a2dbd3ab52a85acfec26dccb345d251cb6ffbf297e7f36b389af56ed69175",
+        "error_code": null,
+        "finalization_token": "2d3365e2-a04b-43d3-b121-bb7cf33dbd23",
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "generation_token": "442a48de-3e94-4b18-af2e-0d8532cf8d0b",
+        "id": "569b18de-9ec1-453a-851c-de630bc86660",
+        "lease_expires_at": null,
+        "object_key": "laboratory/reports/442a48de-3e94-4b18-af2e-0d8532cf8d0b/05e26828-8d8d-414c-88cf-41333210ec36.pdf",
+        "oil_sample_id": "c1a85504-1d7f-47f3-bf12-76c8b7a633b8",
+        "report_snapshot": {
+          "acknowledged_warning_codes": [
+            "89975e41-3478-44a0-b72d-db5354618308:421df58d-4e4a-4201-8b96-f9d52ce80481:0",
+            "e43d4610-22fc-4f9e-9835-59efd19e295a:636567f2-70b5-46aa-816c-9876dce4100b:0"
+          ],
+          "finalization": {
+            "finalized_at": "2026-08-06T12:00:00+00:00",
+            "finalized_by_display_name": "Workbench Admin",
+            "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+            "token": "2d3365e2-a04b-43d3-b121-bb7cf33dbd23"
+          },
+          "quality_evidence": [
+            {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [
+                {
+                  "code": "BLANK",
+                  "instructions": "",
+                  "label": "Isolated capture blank",
+                  "note": "",
+                  "status": "NOT_RUN"
+                }
+              ],
+              "revision": "421df58d-4e4a-4201-8b96-f9d52ce80481",
+              "test_id": "89975e41-3478-44a0-b72d-db5354618308",
+              "warnings": [
+                {
+                  "code": "89975e41-3478-44a0-b72d-db5354618308:421df58d-4e4a-4201-8b96-f9d52ce80481:0",
+                  "message": "QA/QC Isolated capture blank：未执行"
+                }
+              ]
+            },
+            {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [
+                {
+                  "code": "BLANK",
+                  "instructions": "",
+                  "label": "Isolated capture blank",
+                  "note": "",
+                  "status": "NOT_RUN"
+                }
+              ],
+              "revision": "636567f2-70b5-46aa-816c-9876dce4100b",
+              "test_id": "e43d4610-22fc-4f9e-9835-59efd19e295a",
+              "warnings": [
+                {
+                  "code": "e43d4610-22fc-4f9e-9835-59efd19e295a:636567f2-70b5-46aa-816c-9876dce4100b:0",
+                  "message": "QA/QC Isolated capture blank：未执行"
+                }
+              ]
+            }
+          ],
+          "sample": {
+            "asset_snapshot": {
+              "customer_id": "11000000-0000-0000-0000-000000000001",
+              "customer_name": "Prairie Solar LLC",
+              "equipment_path": [
+                {
+                  "asset_type": "TRANSFORMER",
+                  "id": "44000000-0000-0000-0000-000000000001",
+                  "lifecycle_status": "IN_SERVICE",
+                  "material_number": "MAT-TX-41",
+                  "model": "TX-4400",
+                  "serial_number": "TX-CURRENT-2002",
+                  "system_asset_number": "SYS-TX-002"
+                }
+              ],
+              "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+              "location_kind": "SITE",
+              "site_id": "22000000-0000-0000-0000-000000000001",
+              "site_location": "Texas, USA",
+              "site_name": "Prairie Sun"
+            },
+            "barcode": "DGA-20260801-000002",
+            "equipment_serial": "TX-CURRENT-2002",
+            "identity_status": "ASSOCIATED",
+            "notes": "Isolated corpus1",
+            "received_at": "2026-08-01T13:00:00+00:00",
+            "sampled_at": "2026-08-01T12:00:00+00:00",
+            "site_name": "Prairie Sun"
+          },
+          "schema_version": 1,
+          "selected_results": [
+            {
+              "instrument_name": "MOISTURE-01",
+              "measured_at": "2026-08-03T16:00:00+00:00",
+              "method": {
+                "configuration": {
+                  "display_name": "Isolated capture method",
+                  "fields": [
+                    {
+                      "allowed_qualifiers": [
+                        "EQ",
+                        "ND",
+                        "LT",
+                        "GT"
+                      ],
+                      "code": "MOISTURE",
+                      "detection_limit": null,
+                      "display_decimal_places": 3,
+                      "display_name": "微水",
+                      "maximum": null,
+                      "minimum": null,
+                      "quantitation_limit": null,
+                      "unit_code": "TEST-UNIT"
+                    }
+                  ],
+                  "qa_checks": [
+                    {
+                      "code": "BLANK",
+                      "instructions": "",
+                      "label": "Isolated capture blank"
+                    }
+                  ],
+                  "standard_reference": null,
+                  "test_type": "MOISTURE",
+                  "version_label": "CAPTURE-V1"
+                },
+                "display_name": "Isolated capture method",
+                "fields": [
+                  {
+                    "allowed_qualifiers": [
+                      "EQ",
+                      "ND",
+                      "LT",
+                      "GT"
+                    ],
+                    "code": "MOISTURE",
+                    "detection_limit": null,
+                    "display_decimal_places": 3,
+                    "display_name": "微水",
+                    "maximum": null,
+                    "minimum": null,
+                    "quantitation_limit": null,
+                    "unit_code": "TEST-UNIT"
+                  }
+                ],
+                "method_code": null,
+                "method_version_id": "86307c8d-261f-4f8c-9cc7-7d1b5dd700bf",
+                "version_label": "CAPTURE-V1"
+              },
+              "notes": null,
+              "quality_snapshot": {
+                "calibration": {
+                  "status": "NOT_LINKED"
+                },
+                "instrument": null,
+                "qa_results": [
+                  {
+                    "code": "BLANK",
+                    "instructions": "",
+                    "label": "Isolated capture blank",
+                    "note": "",
+                    "status": "NOT_RUN"
+                  }
+                ],
+                "revision": "421df58d-4e4a-4201-8b96-f9d52ce80481",
+                "test_id": "89975e41-3478-44a0-b72d-db5354618308",
+                "warnings": [
+                  {
+                    "code": "89975e41-3478-44a0-b72d-db5354618308:421df58d-4e4a-4201-8b96-f9d52ce80481:0",
+                    "message": "QA/QC Isolated capture blank：未执行"
+                  }
+                ]
+              },
+              "result": {
+                "result": {
+                  "qualifier": "EQ",
+                  "value": "8.500000"
+                }
+              },
+              "test_id": "89975e41-3478-44a0-b72d-db5354618308",
+              "test_type": "MOISTURE"
+            }
+          ]
+        },
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "requested_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "snapshot_schema_version": 1,
+        "started_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "updated_at": "2026-08-06T12:00:00+00:00"
+      },
+      {
+        "byte_size": 15144,
+        "claim_token": null,
+        "content_sha256": "d3fc300b9ca152d3fea1f364b72d6ec33eb83ba12557ab93552488fe8c840b3e",
+        "error_code": null,
+        "finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "generation_token": "7666414c-2e1e-4372-a8a4-341932a51e1d",
+        "id": "8952a7d3-ff82-4b53-b5fc-9a9be1461683",
+        "lease_expires_at": null,
+        "object_key": "laboratory/reports/7666414c-2e1e-4372-a8a4-341932a51e1d/ee7b046b-b103-4e61-ab6d-6b3127df1062.pdf",
+        "oil_sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+        "report_snapshot": {
+          "acknowledged_warning_codes": [],
+          "finalization": {
+            "finalized_at": "2026-08-06T12:00:00+00:00",
+            "finalized_by_display_name": "Workbench Admin",
+            "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+            "token": "afaa889a-9631-497a-8511-63d77a8bc162"
+          },
+          "quality_evidence": [
+            {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "34daef32-18c3-49a1-af3d-ea019f42d200",
+              "test_id": "88abd209-8590-4be6-8400-91b179b372a1",
+              "warnings": []
+            },
+            {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "97613823-1ef7-43eb-b543-ac7aaaa327c4",
+              "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+              "warnings": []
+            },
+            {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "850a4238-ec08-49aa-8353-abe9175d4cee",
+              "test_id": "e580cf18-99d6-4b52-894a-8496923fe1d1",
+              "warnings": []
+            }
+          ],
+          "sample": {
+            "asset_snapshot": {
+              "customer_id": "11000000-0000-0000-0000-000000000001",
+              "customer_name": "Prairie Solar LLC",
+              "equipment_path": [
+                {
+                  "asset_type": "TRANSFORMER",
+                  "id": "44000000-0000-0000-0000-000000000001",
+                  "lifecycle_status": "IN_SERVICE",
+                  "material_number": "MAT-TX-41",
+                  "model": "TX-4400",
+                  "serial_number": "TX-CURRENT-2002",
+                  "system_asset_number": "SYS-TX-002"
+                }
+              ],
+              "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+              "location_kind": "SITE",
+              "site_id": "22000000-0000-0000-0000-000000000001",
+              "site_location": "Texas, USA",
+              "site_name": "Prairie Sun"
+            },
+            "barcode": "DGA-20260802-000003",
+            "equipment_serial": "TX-CURRENT-2002",
+            "identity_status": "ASSOCIATED",
+            "notes": "Isolated corpus2",
+            "received_at": "2026-08-02T13:00:00+00:00",
+            "sampled_at": "2026-08-02T12:00:00+00:00",
+            "site_name": "Prairie Sun"
+          },
+          "schema_version": 1,
+          "selected_results": [
+            {
+              "instrument_name": null,
+              "measured_at": "2026-08-06T12:00:00+00:00",
+              "method": {
+                "configuration": null,
+                "display_name": "击穿电压方法（待配置）",
+                "fields": [
+                  {
+                    "code": "BREAKDOWN_VOLTAGE",
+                    "display_name": "击穿电压",
+                    "unit_code": null
+                  }
+                ],
+                "method_code": null,
+                "method_version_id": "66000000-0000-0000-0000-000000000003",
+                "version_label": "MVP-PLACEHOLDER"
+              },
+              "notes": null,
+              "quality_snapshot": {
+                "calibration": {
+                  "status": "NOT_LINKED"
+                },
+                "instrument": null,
+                "qa_results": [],
+                "revision": "34daef32-18c3-49a1-af3d-ea019f42d200",
+                "test_id": "88abd209-8590-4be6-8400-91b179b372a1",
+                "warnings": []
+              },
+              "result": {
+                "result": {
+                  "qualifier": "GT",
+                  "value": "80.000000"
+                }
+              },
+              "test_id": "88abd209-8590-4be6-8400-91b179b372a1",
+              "test_type": "BREAKDOWN_VOLTAGE"
+            },
+            {
+              "instrument_name": "GC-01",
+              "measured_at": "2026-08-03T15:30:00+00:00",
+              "method": {
+                "configuration": null,
+                "display_name": "DGA方法（待配置）",
+                "fields": [
+                  {
+                    "code": "H2",
+                    "display_name": "H₂",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "CH4",
+                    "display_name": "CH₄",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "C2H2",
+                    "display_name": "C₂H₂",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "C2H4",
+                    "display_name": "C₂H₄",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "C2H6",
+                    "display_name": "C₂H₆",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "CO",
+                    "display_name": "CO",
+                    "unit_code": null
+                  },
+                  {
+                    "code": "CO2",
+                    "display_name": "CO₂",
+                    "unit_code": null
+                  }
+                ],
+                "method_code": null,
+                "method_version_id": "66000000-0000-0000-0000-000000000001",
+                "version_label": "MVP-PLACEHOLDER"
+              },
+              "notes": "first pass",
+              "quality_snapshot": {
+                "calibration": {
+                  "status": "NOT_LINKED"
+                },
+                "instrument": null,
+                "qa_results": [],
+                "revision": "97613823-1ef7-43eb-b543-ac7aaaa327c4",
+                "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+                "warnings": []
+              },
+              "result": {
+                "c2h2": {
+                  "qualifier": "EQ",
+                  "value": "0.125000"
+                },
+                "c2h4": {
+                  "qualifier": "EQ",
+                  "value": "4.500000"
+                },
+                "c2h6": {
+                  "qualifier": "EQ",
+                  "value": "5.750000"
+                },
+                "ch4": {
+                  "qualifier": "EQ",
+                  "value": "11.250000"
+                },
+                "co": {
+                  "qualifier": "EQ",
+                  "value": "120.000000"
+                },
+                "co2": {
+                  "qualifier": "EQ",
+                  "value": "900.000000"
+                },
+                "h2": {
+                  "qualifier": "ND",
+                  "value": null
+                }
+              },
+              "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+              "test_type": "DGA"
+            },
+            {
+              "instrument_name": "MOISTURE-01",
+              "measured_at": "2026-08-03T16:00:00+00:00",
+              "method": {
+                "configuration": null,
+                "display_name": "微水方法（待配置）",
+                "fields": [
+                  {
+                    "code": "MOISTURE",
+                    "display_name": "微水",
+                    "unit_code": null
+                  }
+                ],
+                "method_code": null,
+                "method_version_id": "66000000-0000-0000-0000-000000000002",
+                "version_label": "MVP-PLACEHOLDER"
+              },
+              "notes": null,
+              "quality_snapshot": {
+                "calibration": {
+                  "status": "NOT_LINKED"
+                },
+                "instrument": null,
+                "qa_results": [],
+                "revision": "850a4238-ec08-49aa-8353-abe9175d4cee",
+                "test_id": "e580cf18-99d6-4b52-894a-8496923fe1d1",
+                "warnings": []
+              },
+              "result": {
+                "result": {
+                  "qualifier": "LT",
+                  "value": "8.500000"
+                }
+              },
+              "test_id": "e580cf18-99d6-4b52-894a-8496923fe1d1",
+              "test_type": "MOISTURE"
+            }
+          ]
+        },
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "requested_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "snapshot_schema_version": 1,
+        "started_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "updated_at": "2026-08-06T12:00:00+00:00"
+      },
+      {
+        "byte_size": 8907,
+        "claim_token": null,
+        "content_sha256": "dc68d585b7d079060b6ba2e8879dc8c962dbef71602d172e97234a00410f4740",
+        "error_code": null,
+        "finalization_token": "5f4a6df7-e8cf-4600-96c2-9899b71778ea",
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "generation_token": "1d5de698-7ec8-4b9a-8f42-1aee5c1630c6",
+        "id": "e97d2456-30dc-41a5-b85e-32749e96bd31",
+        "lease_expires_at": null,
+        "object_key": "laboratory/reports/1d5de698-7ec8-4b9a-8f42-1aee5c1630c6/469cb903-7308-47cc-bb2d-5dd894b37863.pdf",
+        "oil_sample_id": "cc118124-4126-4865-a27f-8619fb967668",
+        "report_snapshot": {
+          "acknowledged_warning_codes": [],
+          "finalization": {
+            "finalized_at": "2026-08-06T12:00:00+00:00",
+            "finalized_by_display_name": "Workbench Admin",
+            "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+            "token": "5f4a6df7-e8cf-4600-96c2-9899b71778ea"
+          },
+          "sample": {
+            "asset_snapshot": {
+              "customer_id": "11000000-0000-0000-0000-000000000001",
+              "customer_name": "Prairie Solar LLC",
+              "equipment_path": [
+                {
+                  "asset_type": "TRANSFORMER",
+                  "id": "44000000-0000-0000-0000-000000000001",
+                  "lifecycle_status": "IN_SERVICE",
+                  "material_number": "MAT-TX-41",
+                  "model": "TX-4400",
+                  "serial_number": "TX-CURRENT-2002",
+                  "system_asset_number": "SYS-TX-002"
+                }
+              ],
+              "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+              "location_kind": "SITE",
+              "site_id": "22000000-0000-0000-0000-000000000001",
+              "site_location": "Texas, USA",
+              "site_name": "Prairie Sun"
+            },
+            "barcode": "DGA-20260803-000004",
+            "equipment_serial": "TX-CURRENT-2002",
+            "identity_status": "ASSOCIATED",
+            "notes": "Isolated corpus3",
+            "received_at": "2026-08-03T13:00:00+00:00",
+            "sampled_at": "2026-08-03T12:00:00+00:00",
+            "site_name": "Prairie Sun"
+          },
+          "schema_version": 1,
+          "selected_results": [
+            {
+              "instrument_name": "MOISTURE-01",
+              "measured_at": "2026-08-03T16:00:00+00:00",
+              "method": {
+                "display_name": "微水方法（待配置）",
+                "fields": [
+                  {
+                    "code": "MOISTURE",
+                    "display_name": "微水",
+                    "unit_code": null
+                  }
+                ],
+                "method_code": null,
+                "method_version_id": "66000000-0000-0000-0000-000000000002",
+                "version_label": "MVP-PLACEHOLDER"
+              },
+              "notes": null,
+              "result": {
+                "result": {
+                  "qualifier": "EQ",
+                  "value": "8.500000"
+                }
+              },
+              "test_id": "882aa0c0-1eda-4aec-b6f6-0a0f11bcc633",
+              "test_type": "MOISTURE"
+            }
+          ]
+        },
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "requested_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "snapshot_schema_version": 1,
+        "started_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "updated_at": "2026-08-06T12:00:00+00:00"
+      },
+      {
+        "byte_size": null,
+        "claim_token": null,
+        "content_sha256": null,
+        "error_code": "isolated_capture_failure",
+        "finalization_token": "e1647771-cade-4f87-8ddb-776965aa8a47",
+        "generated_at": null,
+        "generation_token": "8943633c-8a72-48dd-8303-498313b55700",
+        "id": "c476beaa-a571-4238-8e86-09cd5f2b30f8",
+        "lease_expires_at": null,
+        "object_key": null,
+        "oil_sample_id": "6a308e5b-13b7-41c8-a3f4-d9b1631b4813",
+        "report_snapshot": {
+          "acknowledged_warning_codes": [],
+          "finalization": {
+            "finalized_at": "2026-08-06T12:00:00+00:00",
+            "finalized_by_display_name": "Workbench Admin",
+            "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+            "token": "e1647771-cade-4f87-8ddb-776965aa8a47"
+          },
+          "quality_evidence": [
+            {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "1fe1ed97-e992-43b2-ad81-76f0f400d288",
+              "test_id": "67157fb0-57d0-4512-8ae9-262b6445516c",
+              "warnings": []
+            }
+          ],
+          "sample": {
+            "asset_snapshot": {
+              "customer_id": "11000000-0000-0000-0000-000000000001",
+              "customer_name": "Prairie Solar LLC",
+              "equipment_path": [
+                {
+                  "asset_type": "TRANSFORMER",
+                  "id": "44000000-0000-0000-0000-000000000001",
+                  "lifecycle_status": "IN_SERVICE",
+                  "material_number": "MAT-TX-41",
+                  "model": "TX-4400",
+                  "serial_number": "TX-CURRENT-2002",
+                  "system_asset_number": "SYS-TX-002"
+                }
+              ],
+              "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+              "location_kind": "SITE",
+              "site_id": "22000000-0000-0000-0000-000000000001",
+              "site_location": "Texas, USA",
+              "site_name": "Prairie Sun"
+            },
+            "barcode": "DGA-20260804-000005",
+            "equipment_serial": "TX-CURRENT-2002",
+            "identity_status": "ASSOCIATED",
+            "notes": "Isolated corpus4",
+            "received_at": "2026-08-04T13:00:00+00:00",
+            "sampled_at": "2026-08-04T12:00:00+00:00",
+            "site_name": "Prairie Sun"
+          },
+          "schema_version": 1,
+          "selected_results": [
+            {
+              "instrument_name": "MOISTURE-01",
+              "measured_at": "2026-08-03T16:00:00+00:00",
+              "method": {
+                "configuration": null,
+                "display_name": "微水方法（待配置）",
+                "fields": [
+                  {
+                    "code": "MOISTURE",
+                    "display_name": "微水",
+                    "unit_code": null
+                  }
+                ],
+                "method_code": null,
+                "method_version_id": "66000000-0000-0000-0000-000000000002",
+                "version_label": "MVP-PLACEHOLDER"
+              },
+              "notes": null,
+              "quality_snapshot": {
+                "calibration": {
+                  "status": "NOT_LINKED"
+                },
+                "instrument": null,
+                "qa_results": [],
+                "revision": "1fe1ed97-e992-43b2-ad81-76f0f400d288",
+                "test_id": "67157fb0-57d0-4512-8ae9-262b6445516c",
+                "warnings": []
+              },
+              "result": {
+                "result": {
+                  "qualifier": "EQ",
+                  "value": "8.500000"
+                }
+              },
+              "test_id": "67157fb0-57d0-4512-8ae9-262b6445516c",
+              "test_type": "MOISTURE"
+            }
+          ]
+        },
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "requested_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "snapshot_schema_version": 1,
+        "started_at": "2026-08-06T12:00:00+00:00",
+        "state": "FAILED",
+        "updated_at": "2026-08-06T12:00:00+00:00"
+      },
+      {
+        "byte_size": 9183,
+        "claim_token": null,
+        "content_sha256": "e92767529a5b94f4d923062c93a78076df5921b6a6d7a30b1866c6296ad06274",
+        "error_code": null,
+        "finalization_token": "e75896e8-03b7-4770-86d6-9fba184bb405",
+        "generated_at": "2026-08-06T12:00:00+00:00",
+        "generation_token": "aed2616e-e242-42bf-b48d-33257cb35f04",
+        "id": "9f3b8105-13eb-46d6-a9e1-f3145f77a5ba",
+        "lease_expires_at": null,
+        "object_key": "laboratory/reports/aed2616e-e242-42bf-b48d-33257cb35f04/8db32aad-e272-4929-979e-acda195d38ed.pdf",
+        "oil_sample_id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+        "report_snapshot": {
+          "acknowledged_warning_codes": [],
+          "finalization": {
+            "finalized_at": "2026-08-06T12:00:00+00:00",
+            "finalized_by_display_name": "Workbench Admin",
+            "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+            "token": "e75896e8-03b7-4770-86d6-9fba184bb405"
+          },
+          "quality_evidence": [
+            {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "9be4cef2-0af2-40e4-891e-507f293099d1",
+              "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+              "warnings": []
+            }
+          ],
+          "sample": {
+            "asset_snapshot": {
+              "customer_id": "11000000-0000-0000-0000-000000000001",
+              "customer_name": "Prairie Solar LLC",
+              "equipment_path": [
+                {
+                  "asset_type": "TRANSFORMER",
+                  "id": "44000000-0000-0000-0000-000000000001",
+                  "lifecycle_status": "IN_SERVICE",
+                  "material_number": "MAT-TX-41",
+                  "model": "TX-4400",
+                  "serial_number": "TX-CURRENT-2002",
+                  "system_asset_number": "SYS-TX-002"
+                }
+              ],
+              "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+              "location_kind": "SITE",
+              "site_id": "22000000-0000-0000-0000-000000000001",
+              "site_location": "Texas, USA",
+              "site_name": "Prairie Sun"
+            },
+            "barcode": "DGA-20260805-000006",
+            "equipment_serial": "TX-CURRENT-2002",
+            "identity_status": "ASSOCIATED",
+            "notes": "Isolated corpus5",
+            "received_at": "2026-08-05T13:00:00+00:00",
+            "sampled_at": "2026-08-05T12:00:00+00:00",
+            "site_name": "Prairie Sun"
+          },
+          "schema_version": 1,
+          "selected_results": [
+            {
+              "instrument_name": "MOISTURE-01",
+              "measured_at": "2026-08-03T16:00:00+00:00",
+              "method": {
+                "configuration": null,
+                "display_name": "微水方法（待配置）",
+                "fields": [
+                  {
+                    "code": "MOISTURE",
+                    "display_name": "微水",
+                    "unit_code": null
+                  }
+                ],
+                "method_code": null,
+                "method_version_id": "66000000-0000-0000-0000-000000000002",
+                "version_label": "MVP-PLACEHOLDER"
+              },
+              "notes": null,
+              "quality_snapshot": {
+                "calibration": {
+                  "status": "NOT_LINKED"
+                },
+                "instrument": null,
+                "qa_results": [],
+                "revision": "9be4cef2-0af2-40e4-891e-507f293099d1",
+                "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+                "warnings": []
+              },
+              "result": {
+                "result": {
+                  "qualifier": "EQ",
+                  "value": "12.500000"
+                }
+              },
+              "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+              "test_type": "MOISTURE"
+            }
+          ]
+        },
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "requested_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "snapshot_schema_version": 1,
+        "started_at": "2026-08-06T12:00:00+00:00",
+        "state": "READY",
+        "updated_at": "2026-08-06T12:00:00+00:00"
+      },
+      {
+        "byte_size": null,
+        "claim_token": null,
+        "content_sha256": null,
+        "error_code": "finalization_withdrawn",
+        "finalization_token": "27fd2ef5-e7a5-40cc-a96f-c317e839073e",
+        "generated_at": null,
+        "generation_token": "cd0c3797-dece-40c2-a9ee-1c379563ef8a",
+        "id": "584706fb-6776-4c11-b9f1-fa72f2524dfe",
+        "lease_expires_at": null,
+        "object_key": null,
+        "oil_sample_id": "219b2e81-6f1d-4211-913d-0ad44664e721",
+        "report_snapshot": {
+          "acknowledged_warning_codes": [],
+          "finalization": {
+            "finalized_at": "2026-08-06T12:00:00+00:00",
+            "finalized_by_display_name": "Workbench Admin",
+            "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+            "token": "27fd2ef5-e7a5-40cc-a96f-c317e839073e"
+          },
+          "quality_evidence": [
+            {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "2feac1e1-d932-4091-9bb3-d02635cfe98f",
+              "test_id": "dcf47b91-b0e0-487b-92d0-c6fcff036868",
+              "warnings": []
+            }
+          ],
+          "sample": {
+            "asset_snapshot": {
+              "customer_id": "11000000-0000-0000-0000-000000000001",
+              "customer_name": "Prairie Solar LLC",
+              "equipment_path": [
+                {
+                  "asset_type": "TRANSFORMER",
+                  "id": "44000000-0000-0000-0000-000000000001",
+                  "lifecycle_status": "IN_SERVICE",
+                  "material_number": "MAT-TX-41",
+                  "model": "TX-4400",
+                  "serial_number": "TX-CURRENT-2002",
+                  "system_asset_number": "SYS-TX-002"
+                }
+              ],
+              "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+              "location_kind": "SITE",
+              "site_id": "22000000-0000-0000-0000-000000000001",
+              "site_location": "Texas, USA",
+              "site_name": "Prairie Sun"
+            },
+            "barcode": "DGA-20260806-000007",
+            "equipment_serial": "TX-CURRENT-2002",
+            "identity_status": "ASSOCIATED",
+            "notes": "Isolated corpus6",
+            "received_at": "2026-08-06T13:00:00+00:00",
+            "sampled_at": "2026-08-06T12:00:00+00:00",
+            "site_name": "Prairie Sun"
+          },
+          "schema_version": 1,
+          "selected_results": [
+            {
+              "instrument_name": "MOISTURE-01",
+              "measured_at": "2026-08-03T16:00:00+00:00",
+              "method": {
+                "configuration": null,
+                "display_name": "微水方法（待配置）",
+                "fields": [
+                  {
+                    "code": "MOISTURE",
+                    "display_name": "微水",
+                    "unit_code": null
+                  }
+                ],
+                "method_code": null,
+                "method_version_id": "66000000-0000-0000-0000-000000000002",
+                "version_label": "MVP-PLACEHOLDER"
+              },
+              "notes": null,
+              "quality_snapshot": {
+                "calibration": {
+                  "status": "NOT_LINKED"
+                },
+                "instrument": null,
+                "qa_results": [],
+                "revision": "2feac1e1-d932-4091-9bb3-d02635cfe98f",
+                "test_id": "dcf47b91-b0e0-487b-92d0-c6fcff036868",
+                "warnings": []
+              },
+              "result": {
+                "result": {
+                  "qualifier": "EQ",
+                  "value": "8.500000"
+                }
+              },
+              "test_id": "dcf47b91-b0e0-487b-92d0-c6fcff036868",
+              "test_type": "MOISTURE"
+            }
+          ]
+        },
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "requested_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "snapshot_schema_version": 1,
+        "started_at": "2026-08-06T12:00:00+00:00",
+        "state": "FAILED",
+        "updated_at": "2026-08-06T12:00:00+00:00"
+      },
+      {
+        "byte_size": null,
+        "claim_token": null,
+        "content_sha256": null,
+        "error_code": null,
+        "finalization_token": "84dc2077-8c96-4968-8e8c-04a6b211fa8c",
+        "generated_at": null,
+        "generation_token": "54ea1edb-97f4-4ee6-9db7-f3f033192620",
+        "id": "00fc8043-e6ff-477d-b08b-6c50411215d0",
+        "lease_expires_at": null,
+        "object_key": null,
+        "oil_sample_id": "b270705e-3d6e-422b-9861-a52bd1ff2b52",
+        "report_snapshot": {
+          "acknowledged_warning_codes": [],
+          "finalization": {
+            "finalized_at": "2026-08-06T12:00:00+00:00",
+            "finalized_by_display_name": "Workbench Admin",
+            "finalized_by_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+            "token": "84dc2077-8c96-4968-8e8c-04a6b211fa8c"
+          },
+          "quality_evidence": [
+            {
+              "calibration": {
+                "status": "NOT_LINKED"
+              },
+              "instrument": null,
+              "qa_results": [],
+              "revision": "3ffea42d-a503-4089-bbc3-bf832401e9ba",
+              "test_id": "3b346fcc-e175-4895-b365-338919a0227a",
+              "warnings": []
+            }
+          ],
+          "sample": {
+            "asset_snapshot": {
+              "customer_id": "11000000-0000-0000-0000-000000000001",
+              "customer_name": "Prairie Solar LLC",
+              "equipment_path": [
+                {
+                  "asset_type": "TRANSFORMER",
+                  "id": "44000000-0000-0000-0000-000000000001",
+                  "lifecycle_status": "IN_SERVICE",
+                  "material_number": "MAT-TX-41",
+                  "model": "TX-4400",
+                  "serial_number": "TX-CURRENT-2002",
+                  "system_asset_number": "SYS-TX-002"
+                }
+              ],
+              "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+              "location_kind": "SITE",
+              "site_id": "22000000-0000-0000-0000-000000000001",
+              "site_location": "Texas, USA",
+              "site_name": "Prairie Sun"
+            },
+            "barcode": "DGA-20260807-000008",
+            "equipment_serial": "TX-CURRENT-2002",
+            "identity_status": "ASSOCIATED",
+            "notes": "Isolated corpus7",
+            "received_at": "2026-08-07T13:00:00+00:00",
+            "sampled_at": "2026-08-07T12:00:00+00:00",
+            "site_name": "Prairie Sun"
+          },
+          "schema_version": 1,
+          "selected_results": [
+            {
+              "instrument_name": "MOISTURE-01",
+              "measured_at": "2026-08-03T16:00:00+00:00",
+              "method": {
+                "configuration": null,
+                "display_name": "微水方法（待配置）",
+                "fields": [
+                  {
+                    "code": "MOISTURE",
+                    "display_name": "微水",
+                    "unit_code": null
+                  }
+                ],
+                "method_code": null,
+                "method_version_id": "66000000-0000-0000-0000-000000000002",
+                "version_label": "MVP-PLACEHOLDER"
+              },
+              "notes": null,
+              "quality_snapshot": {
+                "calibration": {
+                  "status": "NOT_LINKED"
+                },
+                "instrument": null,
+                "qa_results": [],
+                "revision": "3ffea42d-a503-4089-bbc3-bf832401e9ba",
+                "test_id": "3b346fcc-e175-4895-b365-338919a0227a",
+                "warnings": []
+              },
+              "result": {
+                "result": {
+                  "qualifier": "EQ",
+                  "value": "8.500000"
+                }
+              },
+              "test_id": "3b346fcc-e175-4895-b365-338919a0227a",
+              "test_type": "MOISTURE"
+            }
+          ]
+        },
+        "requested_at": "2026-08-06T12:00:00+00:00",
+        "requested_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "snapshot_schema_version": 1,
+        "started_at": null,
+        "state": "QUEUED",
+        "updated_at": "2026-08-06T12:00:00+00:00"
+      }
+    ],
+    "laboratory_test_attachments": [],
+    "laboratory_tests": [
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+        "instrument_id": null,
+        "instrument_name": "GC-01",
+        "measured_at": "2026-08-03T15:30:00+00:00",
+        "method_version_id": "66000000-0000-0000-0000-000000000001",
+        "notes": "first pass",
+        "oil_sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [],
+          "revision": "99f8caba-b581-4d76-a5d5-c8be7c9a6979",
+          "test_id": "5c13d011-6f7a-4217-97c5-1bea9f4bc384",
+          "warnings": []
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": true,
+        "test_type": "DGA",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "dcf47b91-b0e0-487b-92d0-c6fcff036868",
+        "instrument_id": null,
+        "instrument_name": "MOISTURE-01",
+        "measured_at": "2026-08-03T16:00:00+00:00",
+        "method_version_id": "66000000-0000-0000-0000-000000000002",
+        "notes": null,
+        "oil_sample_id": "219b2e81-6f1d-4211-913d-0ad44664e721",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [],
+          "revision": "2feac1e1-d932-4091-9bb3-d02635cfe98f",
+          "test_id": "dcf47b91-b0e0-487b-92d0-c6fcff036868",
+          "warnings": []
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": true,
+        "test_type": "MOISTURE",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "e43d4610-22fc-4f9e-9835-59efd19e295a",
+        "instrument_id": null,
+        "instrument_name": "MOISTURE-01",
+        "measured_at": "2026-08-03T16:00:00+00:00",
+        "method_version_id": "86307c8d-261f-4f8c-9cc7-7d1b5dd700bf",
+        "notes": null,
+        "oil_sample_id": "c1a85504-1d7f-47f3-bf12-76c8b7a633b8",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [
+            {
+              "code": "BLANK",
+              "instructions": "",
+              "label": "Isolated capture blank",
+              "note": "",
+              "status": "NOT_RUN"
+            }
+          ],
+          "revision": "636567f2-70b5-46aa-816c-9876dce4100b",
+          "test_id": "e43d4610-22fc-4f9e-9835-59efd19e295a",
+          "warnings": [
+            {
+              "code": "e43d4610-22fc-4f9e-9835-59efd19e295a:636567f2-70b5-46aa-816c-9876dce4100b:0",
+              "message": "QA/QC Isolated capture blank：未执行"
+            }
+          ]
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": false,
+        "test_type": "MOISTURE",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "89975e41-3478-44a0-b72d-db5354618308",
+        "instrument_id": null,
+        "instrument_name": "MOISTURE-01",
+        "measured_at": "2026-08-03T16:00:00+00:00",
+        "method_version_id": "86307c8d-261f-4f8c-9cc7-7d1b5dd700bf",
+        "notes": null,
+        "oil_sample_id": "c1a85504-1d7f-47f3-bf12-76c8b7a633b8",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [
+            {
+              "code": "BLANK",
+              "instructions": "",
+              "label": "Isolated capture blank",
+              "note": "",
+              "status": "NOT_RUN"
+            }
+          ],
+          "revision": "421df58d-4e4a-4201-8b96-f9d52ce80481",
+          "test_id": "89975e41-3478-44a0-b72d-db5354618308",
+          "warnings": [
+            {
+              "code": "89975e41-3478-44a0-b72d-db5354618308:421df58d-4e4a-4201-8b96-f9d52ce80481:0",
+              "message": "QA/QC Isolated capture blank：未执行"
+            }
+          ]
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": true,
+        "test_type": "MOISTURE",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "67157fb0-57d0-4512-8ae9-262b6445516c",
+        "instrument_id": null,
+        "instrument_name": "MOISTURE-01",
+        "measured_at": "2026-08-03T16:00:00+00:00",
+        "method_version_id": "66000000-0000-0000-0000-000000000002",
+        "notes": null,
+        "oil_sample_id": "6a308e5b-13b7-41c8-a3f4-d9b1631b4813",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [],
+          "revision": "1fe1ed97-e992-43b2-ad81-76f0f400d288",
+          "test_id": "67157fb0-57d0-4512-8ae9-262b6445516c",
+          "warnings": []
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": true,
+        "test_type": "MOISTURE",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "88abd209-8590-4be6-8400-91b179b372a1",
+        "instrument_id": null,
+        "instrument_name": null,
+        "measured_at": "2026-08-06T12:00:00+00:00",
+        "method_version_id": "66000000-0000-0000-0000-000000000003",
+        "notes": null,
+        "oil_sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [],
+          "revision": "34daef32-18c3-49a1-af3d-ea019f42d200",
+          "test_id": "88abd209-8590-4be6-8400-91b179b372a1",
+          "warnings": []
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": true,
+        "test_type": "BREAKDOWN_VOLTAGE",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+        "instrument_id": null,
+        "instrument_name": "GC-01",
+        "measured_at": "2026-08-03T15:30:00+00:00",
+        "method_version_id": "66000000-0000-0000-0000-000000000001",
+        "notes": "first pass",
+        "oil_sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [],
+          "revision": "97613823-1ef7-43eb-b543-ac7aaaa327c4",
+          "test_id": "cdbae590-e176-4c03-aabb-b829441a2b8c",
+          "warnings": []
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": true,
+        "test_type": "DGA",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "e580cf18-99d6-4b52-894a-8496923fe1d1",
+        "instrument_id": null,
+        "instrument_name": "MOISTURE-01",
+        "measured_at": "2026-08-03T16:00:00+00:00",
+        "method_version_id": "66000000-0000-0000-0000-000000000002",
+        "notes": null,
+        "oil_sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [],
+          "revision": "850a4238-ec08-49aa-8353-abe9175d4cee",
+          "test_id": "e580cf18-99d6-4b52-894a-8496923fe1d1",
+          "warnings": []
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": true,
+        "test_type": "MOISTURE",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "882aa0c0-1eda-4aec-b6f6-0a0f11bcc633",
+        "instrument_id": null,
+        "instrument_name": "MOISTURE-01",
+        "measured_at": "2026-08-03T16:00:00+00:00",
+        "method_version_id": "66000000-0000-0000-0000-000000000002",
+        "notes": null,
+        "oil_sample_id": "cc118124-4126-4865-a27f-8619fb967668",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [],
+          "revision": "8c3b01c4-3e58-4d95-91c2-28fa936f7460",
+          "test_id": "882aa0c0-1eda-4aec-b6f6-0a0f11bcc633",
+          "warnings": []
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": true,
+        "test_type": "MOISTURE",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "3b346fcc-e175-4895-b365-338919a0227a",
+        "instrument_id": null,
+        "instrument_name": "MOISTURE-01",
+        "measured_at": "2026-08-03T16:00:00+00:00",
+        "method_version_id": "66000000-0000-0000-0000-000000000002",
+        "notes": null,
+        "oil_sample_id": "b270705e-3d6e-422b-9861-a52bd1ff2b52",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [],
+          "revision": "3ffea42d-a503-4089-bbc3-bf832401e9ba",
+          "test_id": "3b346fcc-e175-4895-b365-338919a0227a",
+          "warnings": []
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": true,
+        "test_type": "MOISTURE",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "analyst_user_id": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "created_at": "2026-08-06T12:00:00+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+        "instrument_id": null,
+        "instrument_name": "MOISTURE-01",
+        "measured_at": "2026-08-03T16:00:00+00:00",
+        "method_version_id": "66000000-0000-0000-0000-000000000002",
+        "notes": null,
+        "oil_sample_id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+        "quality_snapshot": {
+          "calibration": {
+            "status": "NOT_LINKED"
+          },
+          "instrument": null,
+          "qa_results": [],
+          "revision": "9be4cef2-0af2-40e4-891e-507f293099d1",
+          "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42",
+          "warnings": []
+        },
+        "record_status": "ACTIVE",
+        "removal_reason": null,
+        "selected_for_report": true,
+        "test_type": "MOISTURE",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      }
+    ],
+    "moisture_test_results": [
+      {
+        "result_qualifier": "EQ",
+        "result_value": 8.5,
+        "test_id": "89975e41-3478-44a0-b72d-db5354618308"
+      },
+      {
+        "result_qualifier": "EQ",
+        "result_value": 9.5,
+        "test_id": "e43d4610-22fc-4f9e-9835-59efd19e295a"
+      },
+      {
+        "result_qualifier": "LT",
+        "result_value": 8.5,
+        "test_id": "e580cf18-99d6-4b52-894a-8496923fe1d1"
+      },
+      {
+        "result_qualifier": "EQ",
+        "result_value": 8.5,
+        "test_id": "882aa0c0-1eda-4aec-b6f6-0a0f11bcc633"
+      },
+      {
+        "result_qualifier": "EQ",
+        "result_value": 8.5,
+        "test_id": "67157fb0-57d0-4512-8ae9-262b6445516c"
+      },
+      {
+        "result_qualifier": "EQ",
+        "result_value": 12.5,
+        "test_id": "dcab8fc5-e74d-44ed-9071-a751f74c2a42"
+      },
+      {
+        "result_qualifier": "EQ",
+        "result_value": 8.5,
+        "test_id": "dcf47b91-b0e0-487b-92d0-c6fcff036868"
+      },
+      {
+        "result_qualifier": "EQ",
+        "result_value": 8.5,
+        "test_id": "3b346fcc-e175-4895-b365-338919a0227a"
+      }
+    ],
+    "oil_samples": [
+      {
+        "asset_snapshot": {
+          "customer_id": "11000000-0000-0000-0000-000000000001",
+          "customer_name": "Prairie Solar LLC",
+          "equipment_path": [
+            {
+              "asset_type": "TRANSFORMER",
+              "id": "44000000-0000-0000-0000-000000000001",
+              "lifecycle_status": "IN_SERVICE",
+              "material_number": "MAT-TX-41",
+              "model": "TX-4400",
+              "serial_number": "TX-CURRENT-2002",
+              "system_asset_number": "SYS-TX-002"
+            }
+          ],
+          "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+          "location_kind": "SITE",
+          "site_id": "22000000-0000-0000-0000-000000000001",
+          "site_location": "Texas, USA",
+          "site_name": "Prairie Sun"
+        },
+        "barcode_value": "DGA-20260802-000001",
+        "created_at": "2026-10-30T00:29:16.76049+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "equipment_serial": "TX-CURRENT-2002",
+        "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+        "id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+        "identity_status": "ASSOCIATED",
+        "notes": "annual sample",
+        "operations_revision": 0,
+        "package_snapshot": null,
+        "received_at": "2026-08-02T09:00:00+00:00",
+        "sample_number": "DGA-20260802-000001",
+        "sampled_at": "2026-08-01T12:00:00+00:00",
+        "site_name": "Prairie Sun",
+        "testing_finalization_token": "36e09905-8edf-4e3b-9a19-ed118da764e0",
+        "testing_finalized_at": "2026-08-06T12:00:00+00:00",
+        "testing_finalized_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "testing_status": "FINALIZED",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "asset_snapshot": {
+          "customer_id": "11000000-0000-0000-0000-000000000001",
+          "customer_name": "Prairie Solar LLC",
+          "equipment_path": [
+            {
+              "asset_type": "TRANSFORMER",
+              "id": "44000000-0000-0000-0000-000000000001",
+              "lifecycle_status": "IN_SERVICE",
+              "material_number": "MAT-TX-41",
+              "model": "TX-4400",
+              "serial_number": "TX-CURRENT-2002",
+              "system_asset_number": "SYS-TX-002"
+            }
+          ],
+          "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+          "location_kind": "SITE",
+          "site_id": "22000000-0000-0000-0000-000000000001",
+          "site_location": "Texas, USA",
+          "site_name": "Prairie Sun"
+        },
+        "barcode_value": "DGA-20260801-000002",
+        "created_at": "2026-10-30T00:29:16.814458+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "equipment_serial": "TX-CURRENT-2002",
+        "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+        "id": "c1a85504-1d7f-47f3-bf12-76c8b7a633b8",
+        "identity_status": "ASSOCIATED",
+        "notes": "Isolated corpus1",
+        "operations_revision": 0,
+        "package_snapshot": null,
+        "received_at": "2026-08-01T13:00:00+00:00",
+        "sample_number": "DGA-20260801-000002",
+        "sampled_at": "2026-08-01T12:00:00+00:00",
+        "site_name": "Prairie Sun",
+        "testing_finalization_token": "2d3365e2-a04b-43d3-b121-bb7cf33dbd23",
+        "testing_finalized_at": "2026-08-06T12:00:00+00:00",
+        "testing_finalized_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "testing_status": "FINALIZED",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "asset_snapshot": {
+          "customer_id": "11000000-0000-0000-0000-000000000001",
+          "customer_name": "Prairie Solar LLC",
+          "equipment_path": [
+            {
+              "asset_type": "TRANSFORMER",
+              "id": "44000000-0000-0000-0000-000000000001",
+              "lifecycle_status": "IN_SERVICE",
+              "material_number": "MAT-TX-41",
+              "model": "TX-4400",
+              "serial_number": "TX-CURRENT-2002",
+              "system_asset_number": "SYS-TX-002"
+            }
+          ],
+          "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+          "location_kind": "SITE",
+          "site_id": "22000000-0000-0000-0000-000000000001",
+          "site_location": "Texas, USA",
+          "site_name": "Prairie Sun"
+        },
+        "barcode_value": "DGA-20260802-000003",
+        "created_at": "2026-10-30T00:29:16.852593+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "equipment_serial": "TX-CURRENT-2002",
+        "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+        "id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+        "identity_status": "ASSOCIATED",
+        "notes": "Isolated corpus2",
+        "operations_revision": 0,
+        "package_snapshot": null,
+        "received_at": "2026-08-02T13:00:00+00:00",
+        "sample_number": "DGA-20260802-000003",
+        "sampled_at": "2026-08-02T12:00:00+00:00",
+        "site_name": "Prairie Sun",
+        "testing_finalization_token": "afaa889a-9631-497a-8511-63d77a8bc162",
+        "testing_finalized_at": "2026-08-06T12:00:00+00:00",
+        "testing_finalized_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "testing_status": "FINALIZED",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "asset_snapshot": {
+          "customer_id": "11000000-0000-0000-0000-000000000001",
+          "customer_name": "Prairie Solar LLC",
+          "equipment_path": [
+            {
+              "asset_type": "TRANSFORMER",
+              "id": "44000000-0000-0000-0000-000000000001",
+              "lifecycle_status": "IN_SERVICE",
+              "material_number": "MAT-TX-41",
+              "model": "TX-4400",
+              "serial_number": "TX-CURRENT-2002",
+              "system_asset_number": "SYS-TX-002"
+            }
+          ],
+          "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+          "location_kind": "SITE",
+          "site_id": "22000000-0000-0000-0000-000000000001",
+          "site_location": "Texas, USA",
+          "site_name": "Prairie Sun"
+        },
+        "barcode_value": "DGA-20260803-000004",
+        "created_at": "2026-10-30T00:29:16.891616+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "equipment_serial": "TX-CURRENT-2002",
+        "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+        "id": "cc118124-4126-4865-a27f-8619fb967668",
+        "identity_status": "ASSOCIATED",
+        "notes": "Isolated corpus3",
+        "operations_revision": 0,
+        "package_snapshot": null,
+        "received_at": "2026-08-03T13:00:00+00:00",
+        "sample_number": "DGA-20260803-000004",
+        "sampled_at": "2026-08-03T12:00:00+00:00",
+        "site_name": "Prairie Sun",
+        "testing_finalization_token": "5f4a6df7-e8cf-4600-96c2-9899b71778ea",
+        "testing_finalized_at": "2026-08-06T12:00:00+00:00",
+        "testing_finalized_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "testing_status": "FINALIZED",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "asset_snapshot": {
+          "customer_id": "11000000-0000-0000-0000-000000000001",
+          "customer_name": "Prairie Solar LLC",
+          "equipment_path": [
+            {
+              "asset_type": "TRANSFORMER",
+              "id": "44000000-0000-0000-0000-000000000001",
+              "lifecycle_status": "IN_SERVICE",
+              "material_number": "MAT-TX-41",
+              "model": "TX-4400",
+              "serial_number": "TX-CURRENT-2002",
+              "system_asset_number": "SYS-TX-002"
+            }
+          ],
+          "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+          "location_kind": "SITE",
+          "site_id": "22000000-0000-0000-0000-000000000001",
+          "site_location": "Texas, USA",
+          "site_name": "Prairie Sun"
+        },
+        "barcode_value": "DGA-20260804-000005",
+        "created_at": "2026-10-30T00:29:16.920005+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "equipment_serial": "TX-CURRENT-2002",
+        "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+        "id": "6a308e5b-13b7-41c8-a3f4-d9b1631b4813",
+        "identity_status": "ASSOCIATED",
+        "notes": "Isolated corpus4",
+        "operations_revision": 0,
+        "package_snapshot": null,
+        "received_at": "2026-08-04T13:00:00+00:00",
+        "sample_number": "DGA-20260804-000005",
+        "sampled_at": "2026-08-04T12:00:00+00:00",
+        "site_name": "Prairie Sun",
+        "testing_finalization_token": "e1647771-cade-4f87-8ddb-776965aa8a47",
+        "testing_finalized_at": "2026-08-06T12:00:00+00:00",
+        "testing_finalized_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "testing_status": "FINALIZED",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "asset_snapshot": {
+          "customer_id": "11000000-0000-0000-0000-000000000001",
+          "customer_name": "Prairie Solar LLC",
+          "equipment_path": [
+            {
+              "asset_type": "TRANSFORMER",
+              "id": "44000000-0000-0000-0000-000000000001",
+              "lifecycle_status": "IN_SERVICE",
+              "material_number": "MAT-TX-41",
+              "model": "TX-4400",
+              "serial_number": "TX-CURRENT-2002",
+              "system_asset_number": "SYS-TX-002"
+            }
+          ],
+          "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+          "location_kind": "SITE",
+          "site_id": "22000000-0000-0000-0000-000000000001",
+          "site_location": "Texas, USA",
+          "site_name": "Prairie Sun"
+        },
+        "barcode_value": "DGA-20260807-000008",
+        "created_at": "2026-10-30T00:29:17.018721+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "equipment_serial": "TX-CURRENT-2002",
+        "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+        "id": "b270705e-3d6e-422b-9861-a52bd1ff2b52",
+        "identity_status": "ASSOCIATED",
+        "notes": "Isolated corpus7",
+        "operations_revision": 0,
+        "package_snapshot": null,
+        "received_at": "2026-08-07T13:00:00+00:00",
+        "sample_number": "DGA-20260807-000008",
+        "sampled_at": "2026-08-07T12:00:00+00:00",
+        "site_name": "Prairie Sun",
+        "testing_finalization_token": "84dc2077-8c96-4968-8e8c-04a6b211fa8c",
+        "testing_finalized_at": "2026-08-06T12:00:00+00:00",
+        "testing_finalized_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "testing_status": "FINALIZED",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "asset_snapshot": {
+          "customer_id": "11000000-0000-0000-0000-000000000001",
+          "customer_name": "Prairie Solar LLC",
+          "equipment_path": [
+            {
+              "asset_type": "TRANSFORMER",
+              "id": "44000000-0000-0000-0000-000000000001",
+              "lifecycle_status": "IN_SERVICE",
+              "material_number": "MAT-TX-41",
+              "model": "TX-4400",
+              "serial_number": "TX-CURRENT-2002",
+              "system_asset_number": "SYS-TX-002"
+            }
+          ],
+          "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+          "location_kind": "SITE",
+          "site_id": "22000000-0000-0000-0000-000000000001",
+          "site_location": "Texas, USA",
+          "site_name": "Prairie Sun"
+        },
+        "barcode_value": "DGA-20260806-000007",
+        "created_at": "2026-10-30T00:29:16.990744+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "equipment_serial": "TX-CURRENT-2002",
+        "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+        "id": "219b2e81-6f1d-4211-913d-0ad44664e721",
+        "identity_status": "ASSOCIATED",
+        "notes": "Isolated corpus6",
+        "operations_revision": 0,
+        "package_snapshot": null,
+        "received_at": "2026-08-06T13:00:00+00:00",
+        "sample_number": "DGA-20260806-000007",
+        "sampled_at": "2026-08-06T12:00:00+00:00",
+        "site_name": "Prairie Sun",
+        "testing_finalization_token": null,
+        "testing_finalized_at": null,
+        "testing_finalized_by": null,
+        "testing_status": "OPEN",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      },
+      {
+        "asset_snapshot": {
+          "customer_id": "11000000-0000-0000-0000-000000000001",
+          "customer_name": "Prairie Solar LLC",
+          "equipment_path": [
+            {
+              "asset_type": "TRANSFORMER",
+              "id": "44000000-0000-0000-0000-000000000001",
+              "lifecycle_status": "IN_SERVICE",
+              "material_number": "MAT-TX-41",
+              "model": "TX-4400",
+              "serial_number": "TX-CURRENT-2002",
+              "system_asset_number": "SYS-TX-002"
+            }
+          ],
+          "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+          "location_kind": "SITE",
+          "site_id": "22000000-0000-0000-0000-000000000001",
+          "site_location": "Texas, USA",
+          "site_name": "Prairie Sun"
+        },
+        "barcode_value": "DGA-20260805-000006",
+        "created_at": "2026-10-30T00:29:16.94295+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "equipment_serial": "TX-CURRENT-2002",
+        "formal_asset_id": "44000000-0000-0000-0000-000000000001",
+        "id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+        "identity_status": "ASSOCIATED",
+        "notes": "Isolated corpus5",
+        "operations_revision": 0,
+        "package_snapshot": null,
+        "received_at": "2026-08-05T13:00:00+00:00",
+        "sample_number": "DGA-20260805-000006",
+        "sampled_at": "2026-08-05T12:00:00+00:00",
+        "site_name": "Prairie Sun",
+        "testing_finalization_token": "e75896e8-03b7-4770-86d6-9fba184bb405",
+        "testing_finalized_at": "2026-08-06T12:00:00+00:00",
+        "testing_finalized_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "testing_status": "FINALIZED",
+        "updated_at": "2026-08-06T12:00:00+00:00",
+        "updated_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2"
+      }
+    ],
+    "sample_containers": [
+      {
+        "container_number": "DGA-20260802-000001-C01",
+        "id": "b3392cf2-2eb5-4352-b034-6c17e67c76cd",
+        "oil_sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+        "ordinal": 1,
+        "revision": 0,
+        "status": "RECEIVED"
+      },
+      {
+        "container_number": "DGA-20260802-000001-C02",
+        "id": "aef24f89-9e52-4299-ab1c-4c83126d63cd",
+        "oil_sample_id": "b2a18826-582a-48cb-b3f8-940a41904f7c",
+        "ordinal": 2,
+        "revision": 0,
+        "status": "RECEIVED"
+      },
+      {
+        "container_number": "DGA-20260801-000002-C01",
+        "id": "a0e2dac8-1415-4aa6-876c-19bd81b07405",
+        "oil_sample_id": "c1a85504-1d7f-47f3-bf12-76c8b7a633b8",
+        "ordinal": 1,
+        "revision": 0,
+        "status": "RECEIVED"
+      },
+      {
+        "container_number": "DGA-20260802-000003-C01",
+        "id": "028c9076-4803-4776-8507-9f92c00ecf37",
+        "oil_sample_id": "fd15fe70-479e-482d-ac05-691f115a2b82",
+        "ordinal": 1,
+        "revision": 0,
+        "status": "RECEIVED"
+      },
+      {
+        "container_number": "DGA-20260803-000004-C01",
+        "id": "0642cc90-b3f3-49a6-b9a6-846e03bb4b27",
+        "oil_sample_id": "cc118124-4126-4865-a27f-8619fb967668",
+        "ordinal": 1,
+        "revision": 0,
+        "status": "RECEIVED"
+      },
+      {
+        "container_number": "DGA-20260804-000005-C01",
+        "id": "0270b510-996f-4c6a-a900-141ba4123171",
+        "oil_sample_id": "6a308e5b-13b7-41c8-a3f4-d9b1631b4813",
+        "ordinal": 1,
+        "revision": 0,
+        "status": "RECEIVED"
+      },
+      {
+        "container_number": "DGA-20260805-000006-C01",
+        "id": "742fd396-024b-477c-b366-45435f0640d6",
+        "oil_sample_id": "611bcec2-3fd3-4b72-a9ba-62aa2c7ea1b9",
+        "ordinal": 1,
+        "revision": 0,
+        "status": "RECEIVED"
+      },
+      {
+        "container_number": "DGA-20260806-000007-C01",
+        "id": "4d795301-3a27-4746-bcfe-ab3b7c9c0ebd",
+        "oil_sample_id": "219b2e81-6f1d-4211-913d-0ad44664e721",
+        "ordinal": 1,
+        "revision": 0,
+        "status": "RECEIVED"
+      },
+      {
+        "container_number": "DGA-20260807-000008-C01",
+        "id": "2b9cb7fc-05eb-4ebc-8342-7cf464e4e3a4",
+        "oil_sample_id": "b270705e-3d6e-422b-9861-a52bd1ff2b52",
+        "ordinal": 1,
+        "revision": 0,
+        "status": "RECEIVED"
+      }
+    ],
+    "sites": [
+      {
+        "commissioning_date": null,
+        "customer_id": "11000000-0000-0000-0000-000000000001",
+        "grid_status": null,
+        "grid_year": null,
+        "id": "22000000-0000-0000-0000-000000000001",
+        "location_text": "Texas, USA",
+        "operation_status": null,
+        "revision": 0,
+        "site_name": "Prairie Sun",
+        "source_note": null
+      }
+    ],
+    "stored_objects": [],
+    "test_method_fields": [
+      {
+        "detection_limit": null,
+        "display_decimal_places": null,
+        "display_name": "H₂",
+        "field_code": "H2",
+        "method_version_id": "66000000-0000-0000-0000-000000000001",
+        "sort_order": 0,
+        "unit_code": null
+      },
+      {
+        "detection_limit": null,
+        "display_decimal_places": null,
+        "display_name": "CH₄",
+        "field_code": "CH4",
+        "method_version_id": "66000000-0000-0000-0000-000000000001",
+        "sort_order": 1,
+        "unit_code": null
+      },
+      {
+        "detection_limit": null,
+        "display_decimal_places": null,
+        "display_name": "C₂H₂",
+        "field_code": "C2H2",
+        "method_version_id": "66000000-0000-0000-0000-000000000001",
+        "sort_order": 2,
+        "unit_code": null
+      },
+      {
+        "detection_limit": null,
+        "display_decimal_places": null,
+        "display_name": "C₂H₄",
+        "field_code": "C2H4",
+        "method_version_id": "66000000-0000-0000-0000-000000000001",
+        "sort_order": 3,
+        "unit_code": null
+      },
+      {
+        "detection_limit": null,
+        "display_decimal_places": null,
+        "display_name": "C₂H₆",
+        "field_code": "C2H6",
+        "method_version_id": "66000000-0000-0000-0000-000000000001",
+        "sort_order": 4,
+        "unit_code": null
+      },
+      {
+        "detection_limit": null,
+        "display_decimal_places": null,
+        "display_name": "CO",
+        "field_code": "CO",
+        "method_version_id": "66000000-0000-0000-0000-000000000001",
+        "sort_order": 5,
+        "unit_code": null
+      },
+      {
+        "detection_limit": null,
+        "display_decimal_places": null,
+        "display_name": "CO₂",
+        "field_code": "CO2",
+        "method_version_id": "66000000-0000-0000-0000-000000000001",
+        "sort_order": 6,
+        "unit_code": null
+      },
+      {
+        "detection_limit": null,
+        "display_decimal_places": null,
+        "display_name": "微水",
+        "field_code": "MOISTURE",
+        "method_version_id": "66000000-0000-0000-0000-000000000002",
+        "sort_order": 0,
+        "unit_code": null
+      },
+      {
+        "detection_limit": null,
+        "display_decimal_places": null,
+        "display_name": "击穿电压",
+        "field_code": "BREAKDOWN_VOLTAGE",
+        "method_version_id": "66000000-0000-0000-0000-000000000003",
+        "sort_order": 0,
+        "unit_code": null
+      },
+      {
+        "detection_limit": null,
+        "display_decimal_places": 3,
+        "display_name": "微水",
+        "field_code": "MOISTURE",
+        "method_version_id": "86307c8d-261f-4f8c-9cc7-7d1b5dd700bf",
+        "sort_order": 0,
+        "unit_code": "TEST-UNIT"
+      }
+    ],
+    "test_method_versions": [
+      {
+        "configuration": null,
+        "created_at": null,
+        "created_by": null,
+        "display_name": "DGA方法（待配置）",
+        "id": "66000000-0000-0000-0000-000000000001",
+        "is_active": true,
+        "standard_reference": null,
+        "test_type": "DGA",
+        "version_label": "MVP-PLACEHOLDER"
+      },
+      {
+        "configuration": null,
+        "created_at": null,
+        "created_by": null,
+        "display_name": "微水方法（待配置）",
+        "id": "66000000-0000-0000-0000-000000000002",
+        "is_active": true,
+        "standard_reference": null,
+        "test_type": "MOISTURE",
+        "version_label": "MVP-PLACEHOLDER"
+      },
+      {
+        "configuration": null,
+        "created_at": null,
+        "created_by": null,
+        "display_name": "击穿电压方法（待配置）",
+        "id": "66000000-0000-0000-0000-000000000003",
+        "is_active": true,
+        "standard_reference": null,
+        "test_type": "BREAKDOWN_VOLTAGE",
+        "version_label": "MVP-PLACEHOLDER"
+      },
+      {
+        "configuration": {
+          "display_name": "Isolated capture method",
+          "fields": [
+            {
+              "allowed_qualifiers": [
+                "EQ",
+                "ND",
+                "LT",
+                "GT"
+              ],
+              "code": "MOISTURE",
+              "detection_limit": null,
+              "display_decimal_places": 3,
+              "display_name": "微水",
+              "maximum": null,
+              "minimum": null,
+              "quantitation_limit": null,
+              "unit_code": "TEST-UNIT"
+            }
+          ],
+          "qa_checks": [
+            {
+              "code": "BLANK",
+              "instructions": "",
+              "label": "Isolated capture blank"
+            }
+          ],
+          "standard_reference": null,
+          "test_type": "MOISTURE",
+          "version_label": "CAPTURE-V1"
+        },
+        "created_at": "2026-10-30T00:29:16.775621+00:00",
+        "created_by": "cbf6fb48-c456-40fe-b0b2-39164ef87aa2",
+        "display_name": "Isolated capture method",
+        "id": "86307c8d-261f-4f8c-9cc7-7d1b5dd700bf",
+        "is_active": true,
+        "standard_reference": null,
+        "test_type": "MOISTURE",
+        "version_label": "CAPTURE-V1"
+      }
+    ]
+  }
+}

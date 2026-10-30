@@ -1,0 +1,29 @@
+{
+  "caller_commit": "fcea999e313db51461cd9aefda66d70e6e34ed3b",
+  "captured_cases_file_sha256": "334c432b27d907f6ce9ead2ef202df08c0311be31e0d82ec7a13912b9c1d4a00",
+  "case_count": 9,
+  "cases_text_sha256": "fecba7efa983220d2409dfe48c84f35e144c53c28470266e843611b104127261",
+  "clock": "2026-08-06T12:00:00+00:00",
+  "command": "python -m tests.capture_finalization_legacy --expected-parent fcea999e313db51461cd9aefda66d70e6e34ed3b --output tests/fixtures/finalization_legacy/v1",
+  "hash_definition": "cases_text_sha256 is UTF8 with universal-newline LF normalization. captured_cases_file_sha256 records original capture bytes, not current checkout equality after Git CRLF/LF conversion. Original captured cases/PDF bytes were not rewritten; PDFs are always checked by exact byte SHA.",
+  "historical_producer_commit": "71d8a9e23a4e2428937f604b8ef8e24c4fe272de",
+  "historical_reports_blob": "12f2801b61df73b3d6e28003993a98653b2b0db7",
+  "migration_head": "0032_device_material_import",
+  "parent_blobs": {
+    "backend/dga/laboratory/report_pdf.py": "0103194c589727354c8b7299ed3440fffee1e3b8",
+    "backend/dga/laboratory/reports.py": "52ef4d9bab3c1ebbff91b6f1e7392976372abc74",
+    "backend/dga/laboratory/trends.py": "330d36c3dde9d25e567808e054ad953e1ad77a2a",
+    "backend/dga/laboratory/workbench.py": "33d509a10a2006147572490570ea2c6600d4f5d9"
+  },
+  "pdfs": {
+    "2c9a2dbd3ab52a85acfec26dccb345d251cb6ffbf297e7f36b389af56ed69175.pdf": "2c9a2dbd3ab52a85acfec26dccb345d251cb6ffbf297e7f36b389af56ed69175",
+    "48d45c95df1e5946523a6b2397396083cf1f492ec1ab79e6ee9c8cb743884ec8.pdf": "48d45c95df1e5946523a6b2397396083cf1f492ec1ab79e6ee9c8cb743884ec8",
+    "501372f42df557cf0ef941930d50818ef769aedf1adb261bb7e928071c910004.pdf": "501372f42df557cf0ef941930d50818ef769aedf1adb261bb7e928071c910004",
+    "a4c0d854b1609b9cef0c620f3d9249819f57979abe57b723d964a22d3ced4005.pdf": "a4c0d854b1609b9cef0c620f3d9249819f57979abe57b723d964a22d3ced4005",
+    "d3fc300b9ca152d3fea1f364b72d6ec33eb83ba12557ab93552488fe8c840b3e.pdf": "d3fc300b9ca152d3fea1f364b72d6ec33eb83ba12557ab93552488fe8c840b3e",
+    "dc68d585b7d079060b6ba2e8879dc8c962dbef71602d172e97234a00410f4740.pdf": "dc68d585b7d079060b6ba2e8879dc8c962dbef71602d172e97234a00410f4740",
+    "e92767529a5b94f4d923062c93a78076df5921b6a6d7a30b1866c6296ad06274.pdf": "e92767529a5b94f4d923062c93a78076df5921b6a6d7a30b1866c6296ad06274"
+  },
+  "qualification": "Actual identified producers. Withdrawn and pre-refinalization cases are historical observations, not current facts.",
+  "schema": 1
+}

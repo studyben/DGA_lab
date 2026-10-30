@@ -444,3 +444,15 @@ For v2, download the selected mode template and review the four sheet tables. `M
 Save each correction with a reason, then review the new issues and acknowledge each warning. A revision or refreshed preview clears earlier confirmations. Upload progress reports actual bytes sent; validation and publication have their own states. After an interrupted response, reload and select **Query unconfirmed operation** using the same account/mode; pending operation keys survive connection/session errors. A later published batch does not change an earlier operation's REFRESHED outcome. Equipment detail shows both its own and its material's provenance; original workbook downloads remain private to import-authorized users.
 
 Approved limits are500 customers +500 sites +500 materials +500 equipment roots/records (2000 total),500 per sheet,2000-character source notes,10MiB XLSX,50MiB expanded,200 ZIP members and150000 cells. A site or equipment business row is required. Unsafe formulas/macros/external links, malformed/duplicate ZIP entries and over-limit files are rejected without truncation or partial publication. Isolated native evidence published exactly2000 rows and checked all100 preview pages,500 materials,500 equipment details, all source records and identical retry IDs; observed publication1.883s in that test is evidence, not a production SLA. Full local evidence and external storage acceptance boundaries are in `docs/work-units/issue-50-s3.md`.
+
+## 定稿事实与报告兼容准备（#51 S1）
+
+迁移0033_lab_finalization_facts承接0032，按油样/token保留不可变定稿事实。新定稿保存完整活动检测清单、采用结果、方法及已确认警告；普通工作台仍自动排队，报告请求从事实复制旧schema1渲染快照。排队或后续事件/审计失败会回滚整个定稿事务。撤回保留历史事实并清除当前token，旧worker不能完成当前报告。
+
+公开应用读取LaboratoryWorkbench.get_current_finalization返回当前事实可用性及完整/未知清单，不暴露文件对象键或用户报告版本。旧v1快照只迁移原内容，不补造完整清单、来源或时刻；合法NULL-token旧记录保留单条诊断。完整旧READY PDF继续按当前token、大小和SHA-256校验原字节，损坏typed事实与可读文件分别判断。已有分析员laboratory.finalize权限不变。
+
+有事实数据时0033拒绝降级，使用已审核的向前恢复。当前S1未开放普通HTTP跳过PDF、外部导入或手动首次汇总；结果公开读取者/受控no-request策略由S2完成。MinIO/Azurite或内存fixture不替代真实Azure/Okta验收。
+
+### Finalization compatibility preparation (#51 S1)
+
+Migration0033 adds immutable per-token laboratory facts without changing ordinary autoqueued reports. New facts retain every active test and adopted result; existing v1 snapshots retain unknown inventory explicitly. Reports copy frozen facts, and withdrawal clears currentness while retaining history. The application current-fact view exposes availability; neither a new skip-PDF HTTP flow nor external/date-only import is delivered by S1. Existing READY bytes are still served after current-token/size/SHA checks. Populated facts require forward recovery; existing analyst finalization grants remain.
