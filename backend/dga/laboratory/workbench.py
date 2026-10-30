@@ -41,6 +41,11 @@ class TestingStatus(StrEnum):
     FINALIZED = 'FINALIZED'
 
 
+class FinalizationReportPolicy(StrEnum):
+    QUEUE_CURRENT = 'QUEUE_CURRENT'
+    NO_REQUEST = 'NO_REQUEST'
+
+
 class FinalizationEventType(StrEnum):
     FINALIZED = 'FINALIZED'
     WITHDRAWN = 'WITHDRAWN'
@@ -468,8 +473,14 @@ class LaboratoryWorkbench:
         actor: ActorContext,
         barcode_value: str,
         acknowledged_warning_codes: tuple[str, ...] = (),
+        *,
+        report_policy: FinalizationReportPolicy = FinalizationReportPolicy.QUEUE_CURRENT,
     ) -> WorkbenchSample:
         require_permission(actor, 'laboratory.finalize')
+        try:
+            report_policy = FinalizationReportPolicy(report_policy)
+        except (ValueError, TypeError) as error:
+            raise LaboratoryError('invalid_report_policy') from error
         barcode = self._barcode(barcode_value)
         sample_id = None
         try:
@@ -531,14 +542,10 @@ class LaboratoryWorkbench:
                 facts = self._facts.capture_current(
                     connection, actor, sample_id, finalization_token, now, confirmed,
                 )
-                self._reports.queue_current(
-                    connection,
-                    actor,
-                    sample_id,
-                    finalization_token,
-                    now,
-                    tuple(code for code in assessment.warning_codes if code in acknowledged),
-                )
+                if report_policy == FinalizationReportPolicy.QUEUE_CURRENT:
+                    self._reports.queue_current(
+                        connection, actor, sample_id, finalization_token, now, confirmed,
+                    )
                 self._insert_event(
                     connection, sample_id, actor, FinalizationEventType.FINALIZED, now
                 )
@@ -547,7 +554,7 @@ class LaboratoryWorkbench:
                     actor,
                     _AuditAction.LAB_TESTING_FINALIZATION_ATTEMPT,
                     entity_id=sample_id,
-                    details=dict(token=str(finalization_token), report_policy='QUEUE_CURRENT',
+                    details=dict(token=str(finalization_token), report_policy=report_policy.value,
                                  active_test_ids=[str(i) for i in facts.view().active_test_ids],
                                  adopted_test_ids=[str(i) for i in facts.view().adopted_test_ids],
                                  acknowledged_warning_codes=list(confirmed)),

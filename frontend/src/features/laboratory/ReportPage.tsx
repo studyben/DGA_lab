@@ -14,7 +14,8 @@ type ReportStatus = {
 const unavailableMessages: Record<string, string> = {
   sample_not_finalized: '检测尚未整体定稿，无法生成报告。',
   refinalization_required: '这份历史数据需撤回并重新定稿后才能生成报告。',
-  report_not_requested: '报告尚未进入生成队列，请撤回并重新定稿。',
+  report_not_requested: '检测已整体定稿，尚未请求系统报告；有效检测结果不依赖 PDF 生成。',
+  finalization_facts_unavailable: '当前定稿资料无法核实，请联系实验室核对。',
   report_not_current: '当前报告已失效，请撤回并重新定稿。',
 };
 
@@ -128,7 +129,7 @@ export function ReportPage() {
     {(report || error) && <section className="report-result-panel" aria-live="polite">
       {error && <p role="alert" className="report-error">{error}</p>}
       {report && <>
-        <div className="report-result-heading"><div><span className="step">02 / 报告状态</span><h2>{report.barcode}</h2></div><span className={`report-state ${report.state.toLowerCase()}`}>{report.state === 'READY' ? '已生成' : report.state === 'FAILED' ? '生成失败' : report.state === 'UNAVAILABLE' ? '不可生成' : '生成中'}</span></div>
+        <div className="report-result-heading"><div><span className="step">02 / 报告状态</span><h2>{report.barcode}</h2></div><span className={`report-state ${report.state.toLowerCase()}`}>{report.state === 'READY' ? '已生成' : report.state === 'FAILED' ? '生成失败' : report.state === 'UNAVAILABLE' ? (report.unavailable_reason === 'report_not_requested' ? '未请求' : '不可生成') : '生成中'}</span></div>
         <p role="status">{stateMessage(report)}</p>
         {report.generated_at && <p className="report-meta">生成时间：{new Date(report.generated_at).toLocaleString('zh-CN')}</p>}
         {report.state === 'FAILED' && can('laboratory.finalize') && <button type="button" className="primary-action" disabled={busy} onClick={() => void retry()}>重新生成报告</button>}

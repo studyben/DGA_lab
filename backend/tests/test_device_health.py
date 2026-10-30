@@ -246,3 +246,24 @@ def test_overlapping_historical_installation_fails_instead_of_wrong_parent_healt
             health(engine).query(actor,WHOLE_UNIT_ID)
     finally:
         engine.dispose()
+
+
+def test_public_measurement_evidence_preserves_legacy_keys_and_explicit_metadata(workbench_context):
+    from dataclasses import asdict, replace
+    from dga.laboratory.public import finalized_measurement_evidence
+    engine, _, actor, sample = workbench_context
+    method = configured_method(engine, actor)
+    add_point(engine, actor, sample.formal_asset_id, method['id'], 0, '20')
+    point = LaboratoryTrendSource(engine).finalized_measurements(actor, sample.formal_asset_id)[0]
+    legacy_keys = {'sample_id', 'test_id', 'barcode', 'sampled_at', 'measured_at', 'test_type', 'analyte',
+                   'method_version_id', 'method_name', 'version_label', 'unit', 'method_configured',
+                   'qualifier', 'value', 'site_name', 'equipment_serial', 'instrument_name', 'warnings',
+                   'asset_id', 'finalization_token', 'sampling_context'}
+    evidence = finalized_measurement_evidence(point)
+    assert set(evidence) == legacy_keys
+    assert evidence == {k:v for k,v in asdict(point).items() if k in legacy_keys}
+    assert finalized_measurement_evidence(replace(point, instrument_name=None))['instrument_name'] is None
+    explicit = replace(point, result_origin='EXTERNAL_LAB', sampled_at_precision='INSTANT',
+                       measured_at_precision='INSTANT', sampling_context_verification='PHYSICAL_IDENTITY_ONLY')
+    assert finalized_measurement_evidence(explicit) == evidence | dict(result_origin='EXTERNAL_LAB',
+        sampled_at_precision='INSTANT', measured_at_precision='INSTANT', sampling_context_verification='PHYSICAL_IDENTITY_ONLY')

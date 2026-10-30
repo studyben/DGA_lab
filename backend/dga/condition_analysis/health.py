@@ -8,7 +8,7 @@ from uuid import uuid4
 from sqlalchemy import text
 from dga.shared.auth.public import require_permission
 from dga.assets.public import HealthAssetReader
-from dga.laboratory.public import HealthResultReader
+from dga.laboratory.public import HealthResultReader, finalized_measurement_evidence
 from .rules import HealthRules, HealthError, encode
 
 SEVERITY = {'UNASSESSED': 0, 'NORMAL': 1, 'ATTENTION': 2, 'WARNING': 3, 'CRITICAL': 4}
@@ -34,7 +34,7 @@ def aggregate(sources):
 
 def assess(asset_id, measurement, policies):
     result = dict(asset_id=str(asset_id), status='UNASSESSED', reason=None,
-                  measurement=asdict(measurement), rule=None)
+                  measurement=finalized_measurement_evidence(measurement), rule=None)
     if not measurement.method_configured:
         result['reason'] = 'method_not_configured'
     elif not measurement.unit:

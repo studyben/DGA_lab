@@ -451,8 +451,14 @@ Approved limits are500 customers +500 sites +500 materials +500 equipment roots/
 
 公开应用读取LaboratoryWorkbench.get_current_finalization返回当前事实可用性及完整/未知清单，不暴露文件对象键或用户报告版本。旧v1快照只迁移原内容，不补造完整清单、来源或时刻；合法NULL-token旧记录保留单条诊断。完整旧READY PDF继续按当前token、大小和SHA-256校验原字节，损坏typed事实与可读文件分别判断。已有分析员laboratory.finalize权限不变。
 
-有事实数据时0033拒绝降级，使用已审核的向前恢复。当前S1未开放普通HTTP跳过PDF、外部导入或手动首次汇总；结果公开读取者/受控no-request策略由S2完成。MinIO/Azurite或内存fixture不替代真实Azure/Okta验收。
+有事实数据时0033拒绝降级，使用已审核的向前恢复。普通HTTP定稿保持自动请求PDF，拒绝额外report_policy字段；受控Python公开调用可显式NO_REQUEST，结果公开读取者独立读取当前不可变事实。未请求页如实说明有效结果不依赖PDF；没有首次请求按钮。外部导入或手动首次汇总仍属后续范围。MinIO/Azurite或内存fixture不替代真实Azure/Okta验收。
 
 ### Finalization compatibility preparation (#51 S1)
 
 Migration0033 adds immutable per-token laboratory facts without changing ordinary autoqueued reports. New facts retain every active test and adopted result; existing v1 snapshots retain unknown inventory explicitly. Reports copy frozen facts, and withdrawal clears currentness while retaining history. The application current-fact view exposes availability; neither a new skip-PDF HTTP flow nor external/date-only import is delivered by S1. Existing READY bytes are still served after current-token/size/SHA checks. Populated facts require forward recovery; existing analyst finalization grants remain.
+
+### Effective finalized results and optional PDF requests (#51 S2)
+
+The public Python Workbench accepts FinalizationReportPolicy.NO_REQUEST explicitly; its default and ordinary HTTP remain QUEUE_CURRENT, with the same current authorization, identity, QC, warning and transaction guards. All three analysis facades read current immutable facts independently of report requests or file state. Legal legacy NULL-token samples remain diagnostic-only; missing/corrupt qualified current facts return503 rather than a partial result. Intact old READY PDF bytes retain their separate token/size/SHA checks.
+
+Optional origin/precision/context read metadata stays unknown for existing writers. The laboratory-owned evidence serializer omits only the four absent metadata keys, preserving existing health/alarm signatures; explicit metadata participates in signatures. No formal external/date-only import, original-PDF upload, manual first-summary UI or new storage framework is delivered. Native checks and LocalFiles do not replace configured storage CI or real Azure/Okta acceptance.

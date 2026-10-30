@@ -196,6 +196,9 @@ class DecodedFinalization:
             acknowledged_warning_codes=tuple(data['acknowledged_warning_codes']),
         )
 
+    def measurement_snapshot(self):
+        return _Legacy.model_validate(self.to_report_snapshot())
+
     def to_report_snapshot(self):
         data = self.snapshot
         if self.schema_version == 1:

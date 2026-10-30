@@ -270,14 +270,15 @@ def test_placeholder_and_unknown_group_have_no_numeric_statistics(workbench_cont
 
 
 @pytest.mark.parametrize('damage', ['null_numeric', 'unknown_qualifier', 'missing_fields'])
-def test_corrupt_retained_source_is_explicitly_unavailable_not_empty(workbench_context, damage):
+def test_corrupt_report_copy_cannot_change_immutable_effective_results(workbench_context, damage):
     import json
     from sqlalchemy import text
     from dga.laboratory.public import LaboratoryError
     engine, _, actor, original = workbench_context
     method = configured_method(engine, actor)
     sample, _ = add_point(engine, actor, original.formal_asset_id, method['id'], 0, '4')
-    # Deliberate corruption at the retained-storage boundary, not a private-table assertion.
+    before = query(engine, actor, sample.formal_asset_id)
+    # Corrupting the delivery copy cannot rewrite immutable owner facts.
     with engine.begin() as c:
         snapshot = c.execute(text('SELECT report_snapshot FROM laboratory_reports WHERE oil_sample_id=:id'), {'id': sample.id}).scalar_one()
         result = snapshot['selected_results'][0]
@@ -289,6 +290,4 @@ def test_corrupt_retained_source_is_explicitly_unavailable_not_empty(workbench_c
             result['result']['result']['qualifier'] = 'UNKNOWN'
         c.execute(text('UPDATE laboratory_reports SET report_snapshot=CAST(:snapshot AS jsonb) WHERE oil_sample_id=:id'),
                   {'snapshot': json.dumps(snapshot), 'id': sample.id})
-    with pytest.raises(LaboratoryError, match='trend_snapshot_unavailable') as error:
-        query(engine, actor, sample.formal_asset_id)
-    assert error.value.status == 503
+    assert query(engine, actor, sample.formal_asset_id) == before

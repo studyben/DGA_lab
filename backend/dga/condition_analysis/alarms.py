@@ -1,13 +1,12 @@
 """Persistent alarm lifecycle behind the analysis public interface."""
 from datetime import datetime, timezone
 from enum import StrEnum
-from dataclasses import asdict
 from hashlib import sha256
 import json
 from uuid import uuid4
 from sqlalchemy import text
 from dga.assets.public import AlarmAssetReader
-from dga.laboratory.public import HealthResultReader
+from dga.laboratory.public import HealthResultReader, finalized_measurement_evidence
 from dga.shared.auth.public import require_permission, AuditTrail
 from .rules import encode, HealthError, validate_revision
 from .alarm_inputs import stable_observation, assessments, worst
@@ -71,17 +70,17 @@ class AlarmCenter:
                 generation = c.execute(text('SELECT version FROM alarm_generation WHERE id=1')).scalar_one()
             contexts, points, policies = stable_observation(self.engine,self.assets,self.laboratory,actor,now)
             observed = assessments(points,policies)
-            fingerprint = sha256(encode((contexts,[asdict(p) for p in points],policies)).encode()).hexdigest()
+            fingerprint = sha256(encode((contexts,[finalized_measurement_evidence(p) for p in points],policies)).encode()).hexdigest()
             with self.engine.begin() as c:
                 current = c.execute(text('SELECT version,fingerprint FROM alarm_generation WHERE id=1 FOR UPDATE')).mappings().one()
                 if current['version'] != generation:
                     continue
                 rows = self._rows(c)
                 previous = {a['id']:(a['revision'],encode(a)) for a in rows}
-                valid_measurements = {encode(asdict(p)) for p in points}
+                valid_measurements = {encode(finalized_measurement_evidence(p)) for p in points}
                 groups={}
                 for point in points:
-                    groups.setdefault((str(point.asset_id),point.test_type,point.analyte,point.sampled_at),set()).add(encode(asdict(point)))
+                    groups.setdefault((str(point.asset_id),point.test_type,point.analyte,point.sampled_at),set()).add(encode(finalized_measurement_evidence(point)))
                 for alarm in rows:
                     sources = observed.get((alarm['asset_id'],alarm['test_type'],alarm['analyte']),[])
                     alarm['trigger_currently_finalized']=encode(alarm['trigger']['measurement']) in valid_measurements

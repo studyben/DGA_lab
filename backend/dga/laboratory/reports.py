@@ -88,7 +88,7 @@ class LaboratoryReports:
         with self._engine.connect() as connection:
             row = connection.execute(
                 text(
-                    """SELECT s.testing_status,s.testing_finalization_token,
+                    """SELECT s.id,s.testing_status,s.testing_finalization_token,
                     r.finalization_token,r.state,r.error_code,r.requested_at,r.generated_at
                     FROM oil_samples s
                     LEFT JOIN laboratory_reports r ON r.oil_sample_id=s.id
@@ -96,23 +96,25 @@ class LaboratoryReports:
                 ),
                 {'barcode': barcode},
             ).mappings().first()
-        if not row:
-            raise LaboratoryError('sample_not_found', 404)
-        if row['testing_status'] != 'FINALIZED':
-            return ReportStatus(barcode, ReportState.UNAVAILABLE, 'sample_not_finalized')
-        if row['testing_finalization_token'] is None:
-            return ReportStatus(barcode, ReportState.UNAVAILABLE, 'refinalization_required')
-        if row['state'] is None:
-            return ReportStatus(barcode, ReportState.UNAVAILABLE, 'report_not_requested')
-        if row['finalization_token'] != row['testing_finalization_token']:
-            return ReportStatus(barcode, ReportState.UNAVAILABLE, 'report_not_current')
-        return ReportStatus(
-            barcode=barcode,
-            state=ReportState(row['state']),
-            error_code=row['error_code'],
-            requested_at=row['requested_at'],
-            generated_at=row['generated_at'],
-        )
+            if not row:
+                raise LaboratoryError('sample_not_found', 404)
+            if row['testing_status'] != 'FINALIZED':
+                return ReportStatus(barcode, ReportState.UNAVAILABLE, 'sample_not_finalized')
+            if row['testing_finalization_token'] is None:
+                return ReportStatus(barcode, ReportState.UNAVAILABLE, 'refinalization_required')
+            if row['state'] is None or row['finalization_token'] != row['testing_finalization_token']:
+                facts = FinalizationFacts().current_view(connection, row)
+                reason = 'report_not_requested' if facts.state == 'AVAILABLE' else (
+                    'report_not_current' if row['state'] is not None and facts.unavailable_reason == 'missing_finalization_facts'
+                    else 'finalization_facts_unavailable')
+                return ReportStatus(barcode, ReportState.UNAVAILABLE, reason)
+            return ReportStatus(
+                barcode=barcode,
+                state=ReportState(row['state']),
+                error_code=row['error_code'],
+                requested_at=row['requested_at'],
+                generated_at=row['generated_at'],
+            )
 
     def retry_report(self, actor: ActorContext, barcode_value: str) -> ReportStatus:
         require_permission(actor, 'laboratory.finalize')

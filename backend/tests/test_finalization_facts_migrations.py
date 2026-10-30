@@ -7,7 +7,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine
 
-from dga.laboratory.public import LaboratoryReports, LaboratoryTrendSource
+from dga.laboratory.public import LaboratoryReports, LaboratoryTrendSource, finalized_measurement_evidence
 from dga.shared.auth.public import AuditTrail
 from tests.finalization_legacy import load_case
 from tests.test_laboratory_workbench import make_workbench, RecordingObjectStore
@@ -19,7 +19,7 @@ def test_old_producer_retains_selected_only_facts_and_original_pdf(database_url)
     files = RecordingObjectStore()
     case, actor = load_case(engine, 'old71_placeholder_ready', files)
     old_file = LaboratoryReports(engine, AuditTrail(), files).read_report_file(actor, case['barcode']).content
-    before = LaboratoryTrendSource(engine).finalized_measurements(actor, UUID('44000000-0000-0000-0000-000000000001'))
+    before = case['public_measurements']  # Attested old public producer, before0033 exists.
     command.upgrade(Config('alembic.ini'), 'head')
     bench = make_workbench(engine, files)
     view = bench.get_current_finalization(actor, case['barcode'])
@@ -27,7 +27,7 @@ def test_old_producer_retains_selected_only_facts_and_original_pdf(database_url)
     assert view.inventory_complete is False and view.active_test_ids is None
     assert view.adopted_test_ids == tuple(UUID(i) for i in case['selected_test_ids'])
     assert view.token == UUID(case['token'])
-    assert LaboratoryTrendSource(engine).finalized_measurements(actor, before[0].asset_id) == before
+    assert _measurement_json(LaboratoryTrendSource(engine).finalized_measurements(actor, UUID(before[0]['asset_id']))) == before
     after = LaboratoryReports(engine, AuditTrail(), files).read_report_file(actor, case['barcode']).content
     assert after == old_file and sha256(after).hexdigest() == case['pdf_sha256']
     engine.dispose()
@@ -54,14 +54,14 @@ def test_parent_v1_cases_preserve_current_results_and_delivery(database_url, nam
     case, actor = load_case(engine, name, files)
     reports = LaboratoryReports(engine, AuditTrail(), files)
     status = reports.get_report_by_barcode(actor, case['barcode'])
-    points = LaboratoryTrendSource(engine).finalized_measurements(actor, UUID('44000000-0000-0000-0000-000000000001'))
+    points = case['public_measurements']  # Captured fcea caller/producer; no new reader on0032.
     original = reports.read_report_file(actor, case['barcode']).content if status.state.value == 'READY' else None
     command.upgrade(Config('alembic.ini'), 'head')
     view = make_workbench(engine, files).get_current_finalization(actor, case['barcode'])
     assert view.state == 'AVAILABLE' and view.inventory_complete is False and view.active_test_ids is None
     assert view.adopted_test_ids == tuple(UUID(i) for i in case['selected_test_ids'])
     assert reports.get_report_by_barcode(actor, case['barcode']) == status
-    assert LaboratoryTrendSource(engine).finalized_measurements(actor, points[0].asset_id) == points
+    assert _measurement_json(LaboratoryTrendSource(engine).finalized_measurements(actor, UUID(points[0]['asset_id']))) == points
     if original is not None:
         assert reports.read_report_file(actor, case['barcode']).content == original
     with pytest.raises(DBAPIError, match='Retained laboratory finalization facts require forward recovery'):
@@ -198,3 +198,9 @@ def test_configured_frozen_units_must_agree_with_saved_method_configuration(data
     assert view.state == 'UNAVAILABLE' and view.unavailable_reason == 'invalid_finalization_facts'
     engine.dispose()
 
+
+
+def _measurement_json(points):
+    # Match the attested capture's datetime/Decimal/UUID wire format.
+    return json.loads(json.dumps([finalized_measurement_evidence(p) for p in points],
+        default=lambda value: value.isoformat() if isinstance(value, datetime) else str(value)))

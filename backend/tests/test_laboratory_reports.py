@@ -302,6 +302,9 @@ def test_expired_lease_is_reclaimed_and_stale_completion_is_rejected(workbench_c
             generated_at=clock_value[0],
         )
 
+    reports.fail_report(stale, 'stale_failure')
+    assert reports.get_report_by_barcode(workbench_context[2], workbench_context[3].barcode_value).state == ReportState.GENERATING
+
 
 def test_failure_is_visible_and_retry_preserves_snapshot(workbench_context):
     engine, actor, sample, store = _queue_one(workbench_context)
