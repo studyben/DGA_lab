@@ -18,6 +18,7 @@ import { DashboardPage, SiteDetailPage } from './features/assets/DashboardPage';
 import { EquipmentDetailPage } from './features/assets/EquipmentDetailPage';
 import { RepairCenterPage } from './features/assets/LifecyclePanel';
 import { AssetImportPage } from './features/assets/AssetImportPage';
+import { ImportPage } from './features/laboratory/ImportPage';
 import { ReportPage } from './features/laboratory/ReportPage';
 import { LaboratoryHomePage } from './features/laboratory/OperationsPages';
 import { IdentityPage, LaboratoryLedgerPage } from './features/laboratory/SampleOperationsPanel';
@@ -118,9 +119,9 @@ function App() {
                     "这个地址暂时无法访问，请从工作区导航选择页面。"}
                 </p>
               </div>
-              {!(path === '/assets/analysis/trends' || equipmentId || siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
+              {!(path === '/lab/imports' || path === '/assets/analysis/trends' || equipmentId || siteId || path === '/assets' || path === '/assets/sites') && <span className="outline-badge">工程基础阶段</span>}
             </div>
-            {path === '/settings/sso' ? <OidcConfigurationPage/> : path === '/settings/users' ? <UserManagementPage/> : path === '/assets/analysis/alarms' ? <AlarmCenterPage/> : path === '/assets/analysis/rules' ? <RulesPage/> : path === '/assets/analysis/health' ? <HealthOverview/> : path === '/assets/analysis/trends' ? <TrendsPage /> : equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <LaboratoryLedgerPage /> : path === '/lab/identity' ? <IdentityPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/configuration' ? <ConfigurationPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
+            {path === '/settings/sso' ? <OidcConfigurationPage/> : path === '/settings/users' ? <UserManagementPage/> : path === '/assets/analysis/alarms' ? <AlarmCenterPage/> : path === '/assets/analysis/rules' ? <RulesPage/> : path === '/assets/analysis/health' ? <HealthOverview/> : path === '/assets/analysis/trends' ? <TrendsPage /> : equipmentId ? <EquipmentDetailPage assetId={equipmentId} /> : path === '/assets/import' ? <AssetImportPage /> : path === '/assets/repair-center' ? <RepairCenterPage /> : siteId ? <SiteDetailPage siteId={siteId} /> : path === '/assets' || path === '/assets/sites' ? <DashboardPage /> : path === '/lab' ? <LaboratoryHomePage /> : path === '/lab/samples' ? <LaboratoryLedgerPage /> : path === '/lab/identity' ? <IdentityPage /> : path === '/lab/imports' ? <ImportPage /> : path === '/lab/reception' ? <ReceptionPage /> : path === '/lab/workbench' ? <WorkbenchPage /> : path === '/lab/configuration' ? <ConfigurationPage /> : path === '/lab/reports' ? <ReportPage /> : <section className="empty-panel" aria-label="页面内容">
               <div className="empty-symbol" aria-hidden="true">
                 {inLab ? "▤" : "▦"}
               </div>

@@ -30,6 +30,8 @@ from dga.laboratory.public import (
     LaboratoryReports,
     LaboratoryOperations,
     LaboratoryConfiguration,
+    LaboratoryImports,
+    import_http_router as laboratory_import_router,
     LaboratoryTrendSource,
     configuration_router,
     operations_router,
@@ -140,6 +142,7 @@ def create_app(settings: Settings | None = None, *, file_store: FileStore | None
             content={'code': 'object_storage_unavailable'},
             headers={'Cache-Control': 'no-store'},
         )
+    app.include_router(laboratory_import_router(LaboratoryImports(engine, configured_object_store), current_actor, mutation_actor))
     sample_registry = SampleRegistry(engine, asset_directory, AuditTrail())
     app.include_router(configuration_router(LaboratoryConfiguration(engine), current_actor, mutation_actor))
     app.include_router(operations_router(

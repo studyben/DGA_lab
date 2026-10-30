@@ -1,4 +1,5 @@
 export const laboratoryPages = [
+  {path:'/lab/imports',permission:'laboratory.write',title:'检测资料暂存',description:'保存实验室资料原件，明确来源身份并保留暂存核对历史。'},
   {
     path: "/lab",
     permission: 'laboratory.read',

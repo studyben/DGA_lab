@@ -378,3 +378,7 @@ from .configuration_http import configuration_router  # noqa: E402
 from .trends import LaboratoryTrendSource, FinalizedResultReader, FinalizedMeasurement, HealthResultReader, finalized_measurement_evidence  # noqa: E402
 
 from .finalization_facts import FinalizationFactsView  # noqa: E402
+
+from .imports import LaboratoryImports  # noqa: E402
+
+from .import_http import import_router as import_http_router  # noqa: E402
