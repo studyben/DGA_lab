@@ -12,10 +12,11 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import Engine, text
 
-from dga.shared.auth.public import ActorContext, AuditTrail, require_permission
+from dga.shared.auth.public import ActorContext, AuditTrail, IdentityService, require_permission
 from dga.shared.files import FileStore
 
 from .errors import LaboratoryError
+from .finalization_facts import FinalizationFacts, FinalizationFactsView
 from .configuration import MethodVersionInput, QaExecution, lock_configuration, instrument_evidence
 
 if TYPE_CHECKING:
@@ -38,6 +39,11 @@ class ResultQualifier(StrEnum):
 class TestingStatus(StrEnum):
     OPEN = 'OPEN'
     FINALIZED = 'FINALIZED'
+
+
+class FinalizationReportPolicy(StrEnum):
+    QUEUE_CURRENT = 'QUEUE_CURRENT'
+    NO_REQUEST = 'NO_REQUEST'
 
 
 class FinalizationEventType(StrEnum):
@@ -231,9 +237,20 @@ class LaboratoryWorkbench:
         self._audit = audit_trail
         self._objects = object_store
         self._reports = report_lifecycle
+        self._facts = FinalizationFacts()
         self._samples = sample_registry
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._warning_source = warning_source or (lambda _tests: ())
+
+    def get_current_finalization(self, actor: ActorContext, barcode_value: str) -> FinalizationFactsView:
+        require_permission(actor, 'laboratory.read')
+        barcode = self._barcode(barcode_value)
+        with self._engine.connect() as connection:
+            sample = connection.execute(text('''SELECT id,testing_status,testing_finalization_token
+                FROM oil_samples WHERE barcode_value=:barcode FOR SHARE'''), {'barcode': barcode}).mappings().first()
+            if sample is None:
+                raise LaboratoryError('sample_not_found', 404)
+            return self._facts.current_view(connection, sample)
 
     def load(self, actor: ActorContext, barcode_value: str) -> WorkbenchSample:
         require_permission(actor, 'laboratory.read')
@@ -456,12 +473,19 @@ class LaboratoryWorkbench:
         actor: ActorContext,
         barcode_value: str,
         acknowledged_warning_codes: tuple[str, ...] = (),
+        *,
+        report_policy: FinalizationReportPolicy = FinalizationReportPolicy.QUEUE_CURRENT,
     ) -> WorkbenchSample:
         require_permission(actor, 'laboratory.finalize')
+        try:
+            report_policy = FinalizationReportPolicy(report_policy)
+        except (ValueError, TypeError) as error:
+            raise LaboratoryError('invalid_report_policy') from error
         barcode = self._barcode(barcode_value)
         sample_id = None
         try:
             with self._engine.begin() as connection:
+                actor = IdentityService(self._engine).authorize_current(connection, actor, 'laboratory.finalize')
                 lock_configuration(connection)
                 sample = self._locked_sample(connection, barcode)
                 sample_id = sample['id']
@@ -514,14 +538,14 @@ class LaboratoryWorkbench:
                     {'id': sample_id, 'actor': actor.user_id, 'now': now,
                      'token': finalization_token},
                 )
-                self._reports.queue_current(
-                    connection,
-                    actor,
-                    sample_id,
-                    finalization_token,
-                    now,
-                    tuple(code for code in assessment.warning_codes if code in acknowledged),
+                confirmed = tuple(code for code in assessment.warning_codes if code in acknowledged)
+                facts = self._facts.capture_current(
+                    connection, actor, sample_id, finalization_token, now, confirmed,
                 )
+                if report_policy == FinalizationReportPolicy.QUEUE_CURRENT:
+                    self._reports.queue_current(
+                        connection, actor, sample_id, finalization_token, now, confirmed,
+                    )
                 self._insert_event(
                     connection, sample_id, actor, FinalizationEventType.FINALIZED, now
                 )
@@ -530,6 +554,10 @@ class LaboratoryWorkbench:
                     actor,
                     _AuditAction.LAB_TESTING_FINALIZATION_ATTEMPT,
                     entity_id=sample_id,
+                    details=dict(token=str(finalization_token), report_policy=report_policy.value,
+                                 active_test_ids=[str(i) for i in facts.view().active_test_ids],
+                                 adopted_test_ids=[str(i) for i in facts.view().adopted_test_ids],
+                                 acknowledged_warning_codes=list(confirmed)),
                 )
         except LaboratoryError:
             if sample_id is not None:
@@ -556,6 +584,7 @@ class LaboratoryWorkbench:
             raise LaboratoryError('withdrawal_reason_required')
         barcode = self._barcode(barcode_value)
         with self._engine.begin() as connection:
+            actor = IdentityService(self._engine).authorize_current(connection, actor, 'laboratory.finalize')
             sample = self._locked_sample(connection, barcode)
             if sample['testing_status'] != TestingStatus.FINALIZED.value:
                 raise LaboratoryError('sample_not_finalized', 409)

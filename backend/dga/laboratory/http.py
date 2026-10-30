@@ -7,7 +7,7 @@ from typing import Callable, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from .public import (
     AssetHistoryQuery,
@@ -97,6 +97,7 @@ class ReportResultInput(BaseModel):
 
 
 class FinalizationInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     acknowledged_warning_codes: list[str] = Field(default_factory=list, max_length=100)
 
 

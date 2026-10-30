@@ -2,7 +2,6 @@
 from .alarms import AlarmCenter
 from .alarm_query import AlarmQuery
 from .alarm_http import alarm_router
-from dataclasses import asdict
 import json
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal
@@ -10,7 +9,7 @@ from zoneinfo import ZoneInfo
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from dga.assets.public import TransformerReader
-from dga.laboratory.public import FinalizedResultReader
+from dga.laboratory.public import FinalizedResultReader, finalized_measurement_evidence
 from .statistics import calculate, metric
 from dga.shared.contracts import ModuleDescriptor
 from dga.shared.auth.public import ActorContext, require_permission
@@ -62,7 +61,7 @@ class TransformerTrends:
         require_permission(actor, 'analysis.read')
         asset = self._assets.transformer_identity(actor, asset_id)
         start, end = query.instants()
-        points = [asdict(p) for p in self._laboratory.finalized_measurements(actor, asset_id, start, end)
+        points = [finalized_measurement_evidence(p) for p in self._laboratory.finalized_measurements(actor, asset_id, start, end)
                   if p.test_type == query.test_type and p.analyte == query.analyte]
         points.sort(key=lambda p: (p['sampled_at'], p['sample_id'], p['test_id']))
         groups = {}

@@ -390,3 +390,46 @@ def test_replacement_normal_does_not_resolve_removed_transformer_alarm(official_
     assert detail['state']=='UNACKNOWLEDGED'
     assert detail['current_asset']['location_kind']=='REPAIR_CENTER'
     assert detail['trigger']['measurement']['sampling_context']['site_name']=='Prairie Sun'
+
+
+def test_explicit_protocol_metadata_changes_persisted_observation_signatures(workbench_context):
+    from dga.condition_analysis.public import DeviceHealth, TransformerTrends, TrendQuery
+    engine, _, actor, sample = workbench_context
+    method = configured_method(engine, actor)
+    rule = rules(engine).create(actor, command(method))
+    rules(engine).activate(actor, rule['id'], 0, 'Synthetic metadata evidence')
+    add_point(engine, actor, sample.formal_asset_id, method['id'], 0, '20')
+    class ExplicitMetadata:
+        origin = None
+        def project(self, points):
+            if self.origin is None:
+                return points
+            return tuple(replace(p, result_origin=self.origin, sampled_at_precision='INSTANT',
+                         measured_at_precision='INSTANT', sampling_context_verification='PHYSICAL_IDENTITY_ONLY') for p in points)
+        def finalized_measurements(self, *args, **kwargs):
+            return self.project(LaboratoryTrendSource(engine).finalized_measurements(*args, **kwargs))
+        def finalized_measurements_for_assets(self, *args, **kwargs):
+            return self.project(LaboratoryTrendSource(engine).finalized_measurements_for_assets(*args, **kwargs))
+    source = ExplicitMetadata()
+    health_service = DeviceHealth(engine, AssetDirectory(engine), source, rules(engine), clock=lambda: NOW)
+    alarms = AlarmCenter(engine, AssetDirectory(engine), source, clock=lambda: NOW)
+    trends = TransformerTrends(AssetDirectory(engine), source)
+    baseline = health_service.query(actor, sample.formal_asset_id)
+    original = alarms.query(actor)['items'][0]
+    assert 'result_origin' not in original['trigger']['measurement']
+    source.origin = 'EXTERNAL_LAB'
+    explicit = health_service.query(actor, sample.formal_asset_id)
+    assert explicit['evaluation_id'] != baseline['evaluation_id']
+    assert health_service.query(actor, sample.formal_asset_id)['evaluation_id'] == explicit['evaluation_id']
+    assert trends.query(actor, sample.formal_asset_id, TrendQuery(test_type='MOISTURE', analyte='MOISTURE'))['latest']['result_origin'] == 'EXTERNAL_LAB'
+    changed = alarms.detail(actor, original['id'])
+    assert changed['id'] == original['id'] and changed['revision'] > original['revision']
+    assert changed['latest_abnormal'][0]['measurement']['result_origin'] == 'EXTERNAL_LAB'
+    assert alarms.detail(actor, original['id'])['revision'] == changed['revision']
+    source.origin = 'LOCAL_LAB'
+    assert health_service.query(actor, sample.formal_asset_id)['evaluation_id'] != explicit['evaluation_id']
+    again = alarms.detail(actor, original['id'])
+    assert again['revision'] > changed['revision']
+    assert again['latest_abnormal'][0]['measurement']['result_origin'] == 'LOCAL_LAB'
+    assert alarms.query(actor)['total'] == 1
+    assert 'result_origin' not in health_service.evaluation(actor, sample.formal_asset_id, baseline['evaluation_id'])['sources'][0]['measurement']

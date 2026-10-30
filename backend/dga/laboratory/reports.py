@@ -3,7 +3,6 @@
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 from enum import StrEnum
 from hashlib import sha256
 from pathlib import PurePath
@@ -13,11 +12,11 @@ from uuid import UUID, uuid4
 from sqlalchemy import Engine, text
 from sqlalchemy.engine import Connection
 
-from dga.shared.auth.public import ActorContext, AuditTrail, require_permission
+from dga.shared.auth.public import ActorContext, AuditTrail, IdentityService, require_permission
 from dga.shared.files import FileStore, ObjectStorageError
 
 from .errors import LaboratoryError
-from .configuration import MethodVersionInput
+from .finalization_facts import FinalizationFacts
 
 
 class ReportState(StrEnum):
@@ -66,7 +65,7 @@ class ReportFile:
 
 
 class LaboratoryReports:
-    """Own the current report request and immutable finalization snapshot."""
+    """Own current report delivery requests and copies of frozen laboratory facts."""
 
     def __init__(
         self,
@@ -89,7 +88,7 @@ class LaboratoryReports:
         with self._engine.connect() as connection:
             row = connection.execute(
                 text(
-                    """SELECT s.testing_status,s.testing_finalization_token,
+                    """SELECT s.id,s.testing_status,s.testing_finalization_token,
                     r.finalization_token,r.state,r.error_code,r.requested_at,r.generated_at
                     FROM oil_samples s
                     LEFT JOIN laboratory_reports r ON r.oil_sample_id=s.id
@@ -97,29 +96,32 @@ class LaboratoryReports:
                 ),
                 {'barcode': barcode},
             ).mappings().first()
-        if not row:
-            raise LaboratoryError('sample_not_found', 404)
-        if row['testing_status'] != 'FINALIZED':
-            return ReportStatus(barcode, ReportState.UNAVAILABLE, 'sample_not_finalized')
-        if row['testing_finalization_token'] is None:
-            return ReportStatus(barcode, ReportState.UNAVAILABLE, 'refinalization_required')
-        if row['state'] is None:
-            return ReportStatus(barcode, ReportState.UNAVAILABLE, 'report_not_requested')
-        if row['finalization_token'] != row['testing_finalization_token']:
-            return ReportStatus(barcode, ReportState.UNAVAILABLE, 'report_not_current')
-        return ReportStatus(
-            barcode=barcode,
-            state=ReportState(row['state']),
-            error_code=row['error_code'],
-            requested_at=row['requested_at'],
-            generated_at=row['generated_at'],
-        )
+            if not row:
+                raise LaboratoryError('sample_not_found', 404)
+            if row['testing_status'] != 'FINALIZED':
+                return ReportStatus(barcode, ReportState.UNAVAILABLE, 'sample_not_finalized')
+            if row['testing_finalization_token'] is None:
+                return ReportStatus(barcode, ReportState.UNAVAILABLE, 'refinalization_required')
+            if row['state'] is None or row['finalization_token'] != row['testing_finalization_token']:
+                facts = FinalizationFacts().current_view(connection, row)
+                reason = 'report_not_requested' if facts.state == 'AVAILABLE' else (
+                    'report_not_current' if row['state'] is not None and facts.unavailable_reason == 'missing_finalization_facts'
+                    else 'finalization_facts_unavailable')
+                return ReportStatus(barcode, ReportState.UNAVAILABLE, reason)
+            return ReportStatus(
+                barcode=barcode,
+                state=ReportState(row['state']),
+                error_code=row['error_code'],
+                requested_at=row['requested_at'],
+                generated_at=row['generated_at'],
+            )
 
     def retry_report(self, actor: ActorContext, barcode_value: str) -> ReportStatus:
         require_permission(actor, 'laboratory.finalize')
         barcode = self._barcode(barcode_value)
         now = self._clock()
         with self._engine.begin() as connection:
+            actor = IdentityService(self._engine).authorize_current(connection, actor, 'laboratory.finalize')
             sample = connection.execute(
                 text(
                     """SELECT id,testing_status,testing_finalization_token
@@ -359,14 +361,10 @@ class LaboratoryReports:
         finalized_at: datetime,
         acknowledged_warning_codes: tuple[str, ...],
     ) -> None:
-        snapshot = self._snapshot(
-            connection,
-            actor,
-            sample_id,
-            finalization_token,
-            finalized_at,
-            acknowledged_warning_codes,
-        )
+        snapshot = FinalizationFacts().load_current(connection, sample_id, finalization_token).to_report_snapshot()
+        if (datetime.fromisoformat(snapshot['finalization']['finalized_at']) != finalized_at
+                or tuple(snapshot['acknowledged_warning_codes']) != tuple(sorted(set(acknowledged_warning_codes)))):
+            raise LaboratoryError('finalization_facts_unavailable', 503)
         connection.execute(
             text(
                 """INSERT INTO laboratory_reports
@@ -408,144 +406,6 @@ class LaboratoryReports:
             ),
             {'sample': sample_id, 'generation': uuid4(), 'now': now},
         )
-
-    def _snapshot(
-        self,
-        connection: Connection,
-        actor: ActorContext,
-        sample_id: UUID,
-        finalization_token: UUID,
-        finalized_at: datetime,
-        warning_codes: tuple[str, ...],
-    ) -> dict[str, Any]:
-        sample = connection.execute(
-            text(
-                """SELECT barcode_value,sampled_at,received_at,site_name,equipment_serial,
-                notes,identity_status,asset_snapshot FROM oil_samples WHERE id=:sample"""
-            ),
-            {'sample': sample_id},
-        ).mappings().one()
-        display_name = connection.execute(
-            text('SELECT display_name FROM users WHERE id=:actor'),
-            {'actor': actor.user_id},
-        ).scalar_one()
-        selected = connection.execute(
-            text(
-                """SELECT t.*,m.display_name AS method_display_name,
-                m.standard_reference,m.version_label
-                FROM laboratory_tests t
-                JOIN test_method_versions m ON m.id=t.method_version_id
-                WHERE t.oil_sample_id=:sample AND t.record_status='ACTIVE'
-                    AND t.selected_for_report
-                ORDER BY t.test_type,t.created_at,t.id"""
-            ),
-            {'sample': sample_id},
-        ).mappings().all()
-        results = [self._selected_result(connection, row) for row in selected]
-        quality = [r['quality_snapshot'] for r in connection.execute(text('''SELECT quality_snapshot
-            FROM laboratory_tests WHERE oil_sample_id=:sample AND record_status='ACTIVE'
-            AND quality_snapshot IS NOT NULL ORDER BY created_at,id'''), {'sample': sample_id}).mappings()]
-        return {
-            'schema_version': 1,
-            'sample': {
-                'barcode': sample['barcode_value'],
-                'sampled_at': self._json_value(sample['sampled_at']),
-                'received_at': self._json_value(sample['received_at']),
-                'site_name': sample['site_name'],
-                'equipment_serial': sample['equipment_serial'],
-                'notes': sample['notes'],
-                'identity_status': sample['identity_status'],
-                'asset_snapshot': self._json_value(sample['asset_snapshot']),
-            },
-            'selected_results': results,
-            'quality_evidence': quality,
-            'acknowledged_warning_codes': sorted(set(warning_codes)),
-            'finalization': {
-                'token': str(finalization_token),
-                'finalized_at': self._json_value(finalized_at),
-                'finalized_by_user_id': str(actor.user_id),
-                'finalized_by_display_name': display_name,
-            },
-        }
-
-    def _selected_result(self, connection: Connection, row) -> dict[str, Any]:
-        fields = [
-            {
-                'code': field['field_code'],
-                'display_name': field['display_name'],
-                'unit_code': field['unit_code'],
-            }
-            for field in connection.execute(
-                text(
-                    """SELECT field_code,display_name,unit_code FROM test_method_fields
-                    WHERE method_version_id=:method ORDER BY sort_order,field_code"""
-                ),
-                {'method': row['method_version_id']},
-            ).mappings()
-        ]
-        configuration = connection.execute(text('SELECT configuration FROM test_method_versions WHERE id=:id'),
-                                           {'id': row['method_version_id']}).scalar_one()
-        if configuration is not None:
-            fields = [f.model_dump(mode='json') for f in MethodVersionInput.model_validate(configuration).fields]
-        if row['test_type'] == 'DGA':
-            values = connection.execute(
-                text('SELECT * FROM dga_test_results WHERE test_id=:test'),
-                {'test': row['id']},
-            ).mappings().one()
-            result = {
-                code: {
-                    'qualifier': values[f'{code}_qualifier'],
-                    'value': self._json_value(values[f'{code}_value']),
-                }
-                for code in ('h2', 'ch4', 'c2h2', 'c2h4', 'c2h6', 'co', 'co2')
-            }
-        else:
-            table = (
-                'moisture_test_results'
-                if row['test_type'] == 'MOISTURE'
-                else 'breakdown_voltage_test_results'
-            )
-            value = connection.execute(
-                text(f'SELECT result_value,result_qualifier FROM {table} WHERE test_id=:test'),
-                {'test': row['id']},
-            ).mappings().one()
-            result = {
-                'result': {
-                    'qualifier': value['result_qualifier'],
-                    'value': self._json_value(value['result_value']),
-                }
-            }
-        return {
-            'test_id': str(row['id']),
-            'test_type': row['test_type'],
-            'method': {
-                'method_version_id': str(row['method_version_id']),
-                'method_code': row['standard_reference'],
-                'display_name': row['method_display_name'],
-                'version_label': row['version_label'],
-                'fields': fields,
-                'configuration': configuration,
-            },
-            'measured_at': self._json_value(row['measured_at']),
-            'instrument_name': row['instrument_name'],
-            'quality_snapshot': row['quality_snapshot'],
-            'notes': row['notes'],
-            'result': result,
-        }
-
-    @classmethod
-    def _json_value(cls, value):
-        if isinstance(value, datetime):
-            return value.isoformat()
-        if isinstance(value, Decimal):
-            return format(value, 'f')
-        if isinstance(value, UUID):
-            return str(value)
-        if isinstance(value, dict):
-            return {key: cls._json_value(item) for key, item in value.items()}
-        if isinstance(value, (list, tuple)):
-            return [cls._json_value(item) for item in value]
-        return value
 
     @staticmethod
     def _barcode(value: str) -> str:
